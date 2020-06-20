@@ -1,0 +1,7 @@
+= SCLI
+
+A functional Command Line Interface library in and for Scala. 
+
+== Description
+
+TODO
