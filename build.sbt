@@ -17,14 +17,24 @@
 /** Definition of versions. */
 lazy val VersionScala = "2.13.2"
 lazy val VersionScalaTest = "3.1.1"
+lazy val VersionMockito = "1.9.5"
+lazy val VersionScalaTestMockito = "1.0.0-M2"
+lazy val VersionJunit = "4.13"  // needed by mockito
 
 scalacOptions ++= Seq("-deprecation", "-feature")
+
+lazy val testDependencies = Seq(
+    "org.scalatest" %% "scalatest" % VersionScalaTest % Test,
+    "org.scalatestplus" %% "scalatestplus-mockito" % VersionScalaTestMockito % Test,
+    "org.mockito" % "mockito-core" % VersionMockito % Test,
+    "junit" % "junit" % VersionJunit % Test
+)
 
 lazy val SCli = (project in file("."))
   .settings(
     version := "0.1-SNAPSHOT",
     scalaVersion := VersionScala,
-    libraryDependencies += "org.scalatest" %% "scalatest" % VersionScalaTest % Test,
+    libraryDependencies ++= testDependencies,
     organization := "com.github.oheger",
     name := "scli"
   )
