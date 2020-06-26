@@ -252,6 +252,13 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result should be(Success(NumberValues))
   }
 
+  it should "handle an unbounded multiplicity for an extractor" in {
+    val ext = optionValue(KeyNumbers).toInt.multiplicity(atLeast = 1)
+
+    val result = runExtractor(ext)
+    result should be(Success(NumberValues))
+  }
+
   it should "report a failure if not enough values are present" in {
     val ext = optionValue(KeyAnswer).multiplicity(atLeast = 2)
 

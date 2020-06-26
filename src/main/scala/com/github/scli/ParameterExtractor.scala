@@ -906,7 +906,7 @@ object ParameterExtractor {
       val res = optionValue.flatMap { values =>
         if (values.size < atLeast)
           Failure(paramException(context, ext.key, s"option must have at least $atLeast values"))
-        else if (values.size > atMost)
+        else if (atMost >= 0 && values.size > atMost)
           Failure(paramException(context, ext.key, s"option must have at most $atMost values"))
         else Success(values)
       }
