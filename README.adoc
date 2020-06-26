@@ -2,6 +2,244 @@
 
 A functional Command Line Interface library in and for Scala. 
 
-== Description
+== Overview
 
-TODO
+_SCLI_ is a small Scala library that uses approaches from functional
+programming to read and process the command line arguments that have been
+passed to an application. The focus of the library lies in the extraction of
+command line arguments into data or configuration classes that represent the
+options supported by the application.
+
+In a typical usage scenario, one or multiple case classes are created for the
+command line options the application should support. Using a DSL, the developer
+describes how the single elements from the command line should be mapped to the
+properties of these case classes. It is then the job of the library to produce
+the data object(s) containing the options provided via the command line.
+
+The extraction process may fail if invalid command line arguments have been
+passed; for instance, mandatory arguments may be missing, unsupported options
+may be present, or options may have invalid values. In this case, the library
+can generate output listing all the failures that have been detected with
+meaningful error messages. Based on the mapping declaration, it is possible to
+generate a help or usage screen that contains information about all the
+arguments supported by the application; alternatively, the help screen can be
+restricted to a subset of arguments, which are relevant in the current context.
+The information to be displayed for the arguments in the help screen can be
+customized.
+
+== Concepts
+
+Before we come to practical examples in the Tutorial section, it can help to
+get some understanding of the underlying concepts used by _SCLI_. So this
+section presents a (short) theoretical introduction.
+
+=== Terms
+
+At the very first, it is necessary to agree on some terminology that is used by
+the library and throughout this documentation. This is mainly related to the
+elements that can occur on a command line:
+
+Option::
+a command line argument that is assigned one or multiple values; such arguments
+typically start with a prefix, e.g. `--chunk-size 42`
+Switch::
+similar to an option, but the argument does not have an explicit value; rather,
+the presence or absence of the argument has a meaning itself
+Input parameter::
+refers to all other elements on the command line that do not belong to one of
+the other types; while options and switches typically define the way how an
+application should process data, the input parameters represent the data to
+process, such as files or URIs
+Argument::
+This term is used for all elements that can occur on a command line; it covers
+the special cases described before.
+Parameter::
+In this documentation, we use the terms _parameter_ and _argument_ as synonyms.
+
+=== Processing phases
+
+The processing of an applications's command line is a two-step process:
+
+1. A command line parser divides the elements found on the command line into
+   different categories, such as _options_, _switches_, and _input parameters_
+   (see above). This is a rather simple categorization, and the parser is not
+   very sophisticated.
+2. So-called _extractors_ access the values gathered in the first step,
+   transform them as necessary, and compose them to the data objects used as
+   model by the application. In this phase the actual intelligence takes place.
+   When using this library, the main task of a developer is the definition of
+   these extractor objects.
+
+For the users' convenience, there is a function that executes both phases in a
+single call; but the understanding of the different phases is nevertheless
+helpful to use the library correctly.
+
+=== Fundamental data types
+
+While processing the arguments passed to an application, the data is
+represented by some basic types. The types used for this purpose are
+deliberately simple and are based on standard collection types. This section
+describes the most important types a user will deal with when processing
+command line arguments.
+
+==== ParametersMap - a parsed command line
+
+In the parsing phase (refer to <<Processing phases>>), the sequence of strings
+that represents the command line is transformed into a form that allows for
+easy access to specific option values. For this purpose, the library uses a
+_Map_ of the following type:
+
+[source,scala]
+----
+type ParametersMap = Map[String, Iterable[String]]
+----
+
+The meaning of this type is as follows:
+* Command line arguments have a key by which they can be accessed. This is
+  typically the name of the option or the switch. In case of an input
+  parameter, a special constant serves as key. To support direct access to a
+  specific command line element, the _ParametersMap_ type uses the key of the
+  element.
+* The values of command line options are strings initially - after all, this is
+  how the command line is passed to the application. In later transformation
+  steps, the value types can be changed.
+* An application can support multiple input parameters, and options can appear
+  repeatedly on the command line, too. Therefore, for each argument the map
+  holds a collection of values.
+
+==== OptionValue
+
+When extracting and processing the values of a specific argument the current
+value needs to be represented somehow. This representation can undergo changes
+when further transformations are applied. For this purpose, _SCLI_ defines the
+following type:
+
+[source,scala]
+----
+type OptionValue[A] = scala.util.Try[Iterable[A]]
+----
+
+This type declaration has the reasoning as follows:
+* The type is generic. As was pointed out, argument values are initially
+  strings; but they can be transformed to other data types.
+* An argument can have multiple values; therefore, the type stores a
+  collection of values.
+* A transformation on a value can fail. For instance, the application might
+  expect a numeric vale, but the user provided an invalid string. To represent
+  such an error condition, the type uses the standard Scala _Try_ type. (It is
+  then possible to generate error messages based on the values that are of the
+  sub type _Failure_.)
+
+==== SingleOptionValue
+
+In many real scenarios, arguments typically have a single value. _SCLI_ defines
+a special type to represent this use case.
+
+[source,scala]
+----
+type SingleOptionValue[A] = scala.util.Try[Option[A]]
+----
+
+This type is similar to the <<OptionValue>> type; the main difference is that
+instead of an _Iterable_, the type uses an _Option_. This represents the
+semantic that there can be a single or no value. Of course, by applying a
+special transformation, an argument can be declared as mandatory; this
+transformation extracts the value from the _Option_ and fails if it is
+undefined.
+
+Note that _SingleOptionValue_ is seen as a specialized case of _OptionValue_;
+the latter is more generic. Therefore, transformations are usually applied to
+_OptionValue_, and the conversion to a single value is done as a final step.
+
+==== Other types
+
+The data types discussed so far mainly represent data during argument
+processing. When declaring the desired processing steps, the developer may
+encounter some additional types that are shortly summarized here.
+
+_ParameterContext_::
+A _ParameterContext_ stores the information required during argument extraction
+and processing. This includes a reference to the parsed parameters, which is of
+course needed to access the values of arguments. The context further contains
+some helper and service objects that are important for some use cases. The
+remaining types described in this sub section are all part of the
+_ParameterContext_ object.
+_Parameters_::
+Not surprisingly, this type holds information about the parameters passed to
+the application after they have been parsed. Via a _Parameters_ object the
+current values of arguments can be accessed. In addition, an instance stores
+information about which argument keys have been accessed. This is needed to
+detect unknown or unsupported parameters (i.e. parameters that were passed on
+the command line, but never accessed).
+_CliHelpContext_::
+This class holds information relevant for the generation of help or usage
+messages. It is constructed and populated automatically during the extraction
+phase. Based on the declaration of the extraction steps, the context stores
+some properties about single arguments - such as their type, potential default
+values, or the expected multiplicity. This information can then be displayed on
+a help screen.
+_ConsoleReader_::
+A _console reader_ is a service object that prompts the user to read in the
+value of a parameter from the console. This is typically used for secrets or
+passwords, which should not be provided as regular command line arguments
+(because they then might be exposed via the history of the shell).
+
+=== Extractors
+
+Extractors - represented by the _CliExtractor_ class - are probably the most
+important actors during command line processing. An extractor is basically a
+function that expects a _ParameterContext_ object and returns a value out of it
+plus an updated _ParameterContext_. (The _ParameterContext_ needs to be updated
+to record the access to a specific parameter and to store some metadata in the
+help context.)
+
+There are some fundamental pre-defined extractors, e.g. to extract the value of
+an option or input parameter as an <<OptionValue>>. _CliExtractor_ is actually
+a https://en.wikipedia.org/wiki/Monad_(functional_programming)[monad]; this
+means that extractors support the _map()_ and _flatMap()_ functions to
+manipulate the result they produce. For instance, the original
+`OptionValue[String]` obtained for an argument can be
+mapped using a type conversion function to a result of type `OptionValue[Int]`.
+A DSL is available to deal with frequent use cases; so in order to declare an
+extractor that converts the values passed to an option to `Int` values, you
+just have to use:
+
+[source,scala]
+----
+import com.github.scli.ParameterExtractor._
+
+val intExtractor = optionValue("my-option").toInt
+----
+
+Another great feature of monads is that they can be composed in a very flexible
+way. Using Scala's *for* comprehensions, you can construct an extractor that
+combines the results of a number of other extractors. That way, the values
+extracted from single arguments can be collected and stored in a data object:
+
+[source,scala]
+----
+import com.github.scli.ParameterExtractor._
+
+val extr1: CliExtractor[OptionValue[String]] = ???
+val extr2: CliExtractor[OptionValue[Int]] = ???
+val extr3: CliExtractor[OptionValue[Boolean]] = ???
+val combinedExtractor = for {
+  v1 <- extr1
+  v2 <- extr2
+  v3 <- extr3
+} yield ( /* Do something with the values */)
+----
+
+If all the extractors that are to be combined return a `Try[XXX]` (which is
+typically the case when using the standard types), SCLI provides special
+support for creating a result object out of the single argument values
+including error handling: As long as all tried values are successful, a result
+object is created; otherwise, result is an exception that contains the messages
+of all failed extractions.
+
+This concludes the discussion of the fundamental concepts of the SCLI library.
+Now it is a good time to checkout the tutorial to see practical usage examples.
+
+== License
+
+SCLI is available under the http://www.apache.org/licenses/LICENSE-2.0.html[Apache 2.0 License].
