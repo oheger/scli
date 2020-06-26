@@ -798,6 +798,13 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
       expParams = TestParametersWithInputs.parametersMap)("at most 2")
   }
 
+  it should "store the key for input parameters" in {
+    val paramKey = Some("myInput")
+    val extractor = ParameterExtractor.inputValue(1, optKey = paramKey)
+
+    extractor.key should be(paramKey.get)
+  }
+
   it should "check whether all parameters have been consumed" in {
     val Key2 = "otherKey1"
     val Key3 = "otherKey2"

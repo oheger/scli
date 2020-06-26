@@ -694,7 +694,7 @@ object ParameterExtractor {
         } yield inputs.slice(firstIndex, lastIndex + 1)
       val helpContext = context.helpContext.addInputParameter(fromIdx, optKey, optHelp)
       (result, context.update(context.parameters keyAccessed ParameterParser.InputOption, helpContext))
-    })
+    }, optKey)
 
   /**
     * Returns an extractor that can apply a fallback (or default) value to
