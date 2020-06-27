@@ -731,44 +731,43 @@ object ParameterExtractor {
   def consoleReaderValue(key: String, password: Boolean): CliExtractor[OptionValue[String]] =
     CliExtractor(context => (Try(List(context.reader.readOption(key, password))), context), Some(key))
 
+
   /**
-    * Returns an extractor that conditionally delegates to other extractors.
-    * The condition is modelled as ''CliExtractor'' of type ''Try[Boolean]''.
-    * This is because a typical use case is to extract one or multiple other
-    * command line options and evaluate their values. If this extractor yields
-    * '''true''', the ''ifExt'' extractor is executed. If the condition
-    * extractor yields '''false''', the ''elseExt'' is executed. In case of a
-    * failure, this extractor returns a failure with the same exception.
-    *
-    * Using this function, it is possible to implement quite complex scenarios.
-    * For instance, a program can expect a ''mode'' parameter, and depending on
-    * the concrete mode, a number of other parameters become enabled or
-    * disabled.
-    *
-    * Each extractor can be assigned a group name; the options extracted by the
-    * extractors are also associated with this group. When generating help
-    * information for the CLI it is then possible to show only help texts for
-    * options belonging to specific groups or to indicate that some options are
-    * valid only under specific conditions.
-    *
-    * @param condExt   the extractor that defines the condition
-    * @param ifExt     the extractor to run if the condition is fulfilled
-    * @param elseExt   the extractor to run if the condition is not fulfilled
-    * @param ifGroup   name of the group for the if extractor
-    * @param elseGroup name of the group for the else extractor
-    * @return the conditional extractor
-    * @tparam A the type of the option values
-    */
-  def conditionalValue[A](condExt: CliExtractor[Try[Boolean]], ifExt: CliExtractor[OptionValue[A]],
-                          elseExt: CliExtractor[OptionValue[A]] = emptyExtractor[A],
-                          ifGroup: Option[String] = None,
-                          elseGroup: Option[String] = None): CliExtractor[OptionValue[A]] =
+   * Returns an extractor that conditionally delegates to other extractors.
+   * The condition is modelled as ''CliExtractor'' of type ''Try[Boolean]''.
+   * This is because a typical use case is to extract one or multiple other
+   * command line options and evaluate their values. If this extractor yields
+   * '''true''', the ''ifExt'' extractor is executed. If the condition
+   * extractor yields '''false''', the ''elseExt'' is executed. In case of a
+   * failure, this extractor returns a failure with the same exception.
+   *
+   * Using this function, it is possible to implement quite complex scenarios.
+   * For instance, a program can expect a ''mode'' parameter, and depending on
+   * the concrete mode, a number of other parameters become enabled or
+   * disabled.
+   *
+   * Each extractor can be assigned a group name; the options extracted by the
+   * extractors are also associated with this group. When generating help
+   * information for the CLI it is then possible to show only help texts for
+   * options belonging to specific groups or to indicate that some options are
+   * valid only under specific conditions.
+   *
+   * @param condExt   the extractor that defines the condition
+   * @param ifExt     the extractor to run if the condition is fulfilled
+   * @param elseExt   the extractor to run if the condition is not fulfilled
+   * @param ifGroup   name of the group for the if extractor
+   * @param elseGroup name of the group for the else extractor
+   * @return the conditional extractor
+   * @tparam A the type of the option values
+   */
+  def conditionalValue[A](condExt: CliExtractor[Try[Boolean]], ifExt: CliExtractor[Try[A]],
+                          elseExt: CliExtractor[Try[A]], ifGroup: Option[String] = None,
+                          elseGroup: Option[String] = None): CliExtractor[Try[A]] =
     CliExtractor(context => {
       val (condResult, context2) = condExt.run(context)
       condResult match {
         case Success(value) =>
           val (activeExt, activeGroup) = if (value) (ifExt, ifGroup) else (elseExt, elseGroup)
-
           val extractorsAndGroups = List((ifExt, ifGroup), (elseExt, elseGroup))
             .filter(_._1 != activeExt)
           val helpContext = updateHelpContext(context2.helpContext, extractorsAndGroups)
@@ -780,6 +779,27 @@ object ParameterExtractor {
           (Failure(exception), context2)
       }
     })
+
+  /**
+    * A specialized variant of a conditional extractor that operates on sub
+    * extractors of type ''OptionValue''. The main difference between this
+    * function and ''conditionalValue()'' is that it is not necessary to provide
+    * an extractor for the else case; a default extractor is used that returns
+    * an empty value.
+    *
+    * @param condExt   the extractor that defines the condition
+    * @param ifExt     the extractor to run if the condition is fulfilled
+    * @param elseExt   the extractor to run if the condition is not fulfilled
+    * @param ifGroup   name of the group for the if extractor
+    * @param elseGroup name of the group for the else extractor
+    * @return the conditional extractor
+    * @tparam A the type of the option values
+    */
+  def conditionalOptionValue[A](condExt: CliExtractor[Try[Boolean]], ifExt: CliExtractor[OptionValue[A]],
+                                elseExt: CliExtractor[OptionValue[A]] = emptyExtractor[A],
+                                ifGroup: Option[String] = None,
+                                elseGroup: Option[String] = None): CliExtractor[OptionValue[A]] =
+    conditionalValue(condExt, ifExt, elseExt, ifGroup, elseGroup)
 
   /**
     * Returns an extractor that dispatches from the result of one extractor to

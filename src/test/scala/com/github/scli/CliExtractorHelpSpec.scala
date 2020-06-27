@@ -346,7 +346,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val extIf = optionValue("if", Some("help-if"))
     val extElse = optionValue("else", Some("help-else"))
     val extOther = optionValue(Key, Some(HelpText))
-    val extCase = conditionalValue(extCond, extIf, extElse, Some("grp-if"), Some("grp-else"))
+    val extCase = conditionalOptionValue(extCond, extIf, extElse, Some("grp-if"), Some("grp-else"))
     val ext = for {
       v1 <- extCase
       v2 = extOther
@@ -368,9 +368,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val extIfNested = optionValue("if-nested", Some("help-if-nested"))
     val extElseNested = optionValue("else-nested", Some("help-else-nested"))
     val extElse = optionValue("else", Some("help-else"))
-    val extCaseNested = conditionalValue(extCond2, extIfNested, extElseNested,
+    val extCaseNested = conditionalOptionValue(extCond2, extIfNested, extElseNested,
       ifGroup = Some("grp-if-nested"), elseGroup = Some("grp-else-nested"))
-    val extCase = conditionalValue(extCond1, extCaseNested, extElse,
+    val extCase = conditionalOptionValue(extCond1, extCaseNested, extElse,
       ifGroup = Some("grp-if"), elseGroup = Some("grp-else"))
 
     val helpContext = generateHelpContext(extCase)
@@ -390,7 +390,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val extCond = optionValue("condition").isDefined
     val extIf = optionValue(Key)
     val extElse = optionValue(Key)
-    val extCase = conditionalValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
+    val extCase = conditionalOptionValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
       elseExt = extElse, elseGroup = Some("g2"))
 
     val helpContext = generateHelpContext(extCase)
@@ -422,7 +422,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val extCond = optionValue("condition").isDefined
     val extIf = optionValue(Key).fallback(consoleReaderValue(Key2, password = true))
     val extElse = optionValue(Key2)
-    val extCase = conditionalValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
+    val extCase = conditionalOptionValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
       elseExt = extElse, elseGroup = Some("g2"))
     val reader = mock[ConsoleReader]
 

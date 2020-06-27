@@ -637,7 +637,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val nextNextParameters = Parameters(Map("next" -> List("v4", "v5")), Set("x", "y", "z"))
     val condExt: CliExtractor[Try[Boolean]] = testExtractor(Success(true))
     val ifExt = testExtractor(ResultOptionValue, expParameters = NextParameters, nextParameters = nextNextParameters)
-    val extractor = ParameterExtractor.conditionalValue(condExt, ifExt)
+    val extractor = ParameterExtractor.conditionalOptionValue(condExt, ifExt)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(nextNextParameters)
@@ -650,7 +650,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val condExt: CliExtractor[Try[Boolean]] = testExtractor(Success(false))
     val elseExt = testExtractor(ResultOptionValue, expParameters = NextParameters,
       nextParameters = nextNextParameters)
-    val extractor = ParameterExtractor.conditionalValue(condExt, ParameterExtractor.emptyExtractor, elseExt)
+    val extractor = ParameterExtractor.conditionalOptionValue(condExt, ParameterExtractor.emptyExtractor, elseExt)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(nextNextParameters)
@@ -661,7 +661,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val exception = new Exception("failed")
     val condExt: CliExtractor[Try[Boolean]] = testExtractor(Failure(exception))
-    val extractor = ParameterExtractor.conditionalValue(condExt, ifExt = ParameterExtractor.emptyExtractor[String],
+    val extractor = ParameterExtractor.conditionalOptionValue(condExt, ifExt = ParameterExtractor.emptyExtractor[String],
       elseExt = ParameterExtractor.emptyExtractor[String])
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
