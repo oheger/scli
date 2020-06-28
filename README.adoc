@@ -29,9 +29,9 @@ customized.
 
 == Concepts
 
-Before we come to practical examples in the Tutorial section, it can help to
-get some understanding of the underlying concepts used by _SCLI_. So this
-section presents a (short) theoretical introduction.
+Before we come to practical examples in the link:Tutorial.adoc[Tutorial]
+section, it can help to get some understanding of the underlying concepts used
+by _SCLI_. So this section presents a (short) theoretical introduction.
 
 === Terms
 
@@ -95,6 +95,7 @@ type ParametersMap = Map[String, Iterable[String]]
 ----
 
 The meaning of this type is as follows:
+
 * Command line arguments have a key by which they can be accessed. This is
   typically the name of the option or the switch. In case of an input
   parameter, a special constant serves as key. To support direct access to a
@@ -120,6 +121,7 @@ type OptionValue[A] = scala.util.Try[Iterable[A]]
 ----
 
 This type declaration has the reasoning as follows:
+
 * The type is generic. As was pointed out, argument values are initially
   strings; but they can be transformed to other data types.
 * An argument can have multiple values; therefore, the type stores a
@@ -238,7 +240,8 @@ object is created; otherwise, result is an exception that contains the messages
 of all failed extractions.
 
 This concludes the discussion of the fundamental concepts of the SCLI library.
-Now it is a good time to checkout the tutorial to see practical usage examples.
+Now it is a good time to checkout the link:Tutorial.adoc[tutorial] to see
+practical usage examples.
 
 == License
 

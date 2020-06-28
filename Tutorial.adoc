@@ -1,0 +1,146 @@
+= SCLI Tutorial
+
+This document describes the features of the SCLI library in form of usage
+examples, starting from easy ones and advancing to more complex scenarios.
+Most of the examples do not build upon each other; so you might directly
+proceed to the section you are interested in the most.
+
+NOTE: While not strictly necessary, it is helpful to understand the underlying
+concepts used by SCLI before browsing the usage examples in this document. They
+are described in the link:README.adoc[README document].
+
+== Introduction
+
+This document describes the usage of the SCLI library based on an imaginary
+command line interface application called _transfer_. _transfer_ can download
+or upload a number of files from or to a server. It supports a number of
+options to configure the data transfer; for instance, it is possible to encrypt
+data, to set timeouts, or to enable a _dry-run_ mode. For the server, which is
+the target of the transfer operation, the application supports multiple
+transfer protocols; depending on the protocol selected, different additional
+parameters are expected. So if the target server uses the HTTP protocol, the
+user needs to provide credentials for _basic auth_ authentication.
+
+The general command line for our hypothetical _transfer_ application looks as
+follows:
+
+`transfer [options] <command> <file1> [<file2>..<fileN>] <serverUri>`
+
+_<command>_ can be either `upload` or `download` and determines the direction
+of the data transfer. After the command, an arbitrary number of file paths to
+be transferred are listed; but there must be at least one file. The last
+argument is the URI of the server, which is the target of the transfer. The
+_spec_ of this URI is evaluated to determine the server type. The server type
+influences the set of parameters accepted by the application; options
+configuring an HTTP server are only accepted if the server type is actually
+HTTP.
+
+== Sample code
+
+The code examples used throughout this document are taken from the
+link:./src/test/scala/com/github/scli/sample/transfer/TransferParameterManager.scala[TransferParameterManager]
+module. It defines the data structures to represent the arguments accepted by
+the _transfer_ application and declares extractors to actually process the
+arguments. For your own applications, you can follow a similar pattern to keep
+the logic of command line processing in a dedicated parameter manager class.
+
+When you inspect the _TransferParameterManager_ source code, you will see a
+number of case classes ending on the suffix _Config_ that are representations
+of the command line arguments accepted by the sample application. The top-level
+case class is _TransferCommandConfig_; a successful processing of the command
+line yields an instance of this class. With such an object available, the
+application has direct and type-safe access to the arguments provided by the
+user. The examples in this document show how the single arguments are read from
+the command line, processed, and eventually stored in those config objects.
+
+There is also a test class for the _TransferParameterManager_ module, using the
+_transfer_ sample application to test the library against a realistic use case:
+link:./src/test/scala/com/github/scli/sample/transfer/TransferParameterManagerSpec.scala[TransferParameterManagerSpec].
+Use this class as a source for ideas how to test your own command line
+processing logic based on the SCLI library.
+
+== Usage examples
+
+This section contains many code examples showing SCLI in action to process the
+command line of the _transfer_ sample application.
+
+=== Basic extractors
+
+In order to read the values of arguments from the command line and convert them
+to a suitable representation, the developer has to define extractors. This
+subsection demonstrates the domain specific language offered by SCLI for the
+definition of basic extractors.
+
+The functions used within this section are defined by the _ParameterExtractor_
+module. So they require this import:
+
+`import com.github.scli.ParameterExtractor`
+
+==== Reading a plain option value
+
+The entry point into extracting the values of options is the _optionValue()_
+function. It returns a _CliExtractor_ of type _OptionValue[String]_.
+
+The _transfer_ sample application supports the command line option `log` to
+define a line for the transfer log. The option can occur multiple times if
+multiple log entries are needed, as in the following fragment:
+
+ transfer --log "Updating sources" --log "Version 1.1.2-2020-06-28" \
+    --log "by test.user@scli.org" upload ./source /target
+
+The type of the `log` option is `Iterable[String]`, which corresponds to the
+basic `OptionValue[String]` type - the basic type of extractors.
+
+NOTE: Actually, `OptionValue[String]` corresponds to a `Try[Iterable[String]]`.
+Extractors typically return `Try` types because transformations on the user
+input can always fail. When combining the results of extractors failed
+extractions are detected and collected into a meaningful error message.
+
+So, the extractor for the `log` parameter is the most basic one; we only need
+to call the _optionValue()_ function and pass in the key of the argument:
+
+[source,scala]
+----
+val extLog = optionValue("log")
+----
+
+==== Reading a single string option value
+
+Typically, options can only have a single value - or none at all. One example
+of such an option is the `tag` option of the sample application. Here the user
+can specify a label to be assigned to the transfer operation. The assignment
+only happens if the option is present:
+
+ transfer --tag "v1-1-2" upload ./source /target
+
+To indicate that an extractor should produce at most one value, we extend its
+declaration by the `single` modifier:
+
+[source,scala]
+----
+val extTag = optionValue("tag")
+  .single
+----
+
+This extractor yields an `Option[String]`; it fails if the option occurs
+multiple times and thus has more than one value.
+
+==== Reading a single mandatory option value
+
+Some parameters must always be present for the application to fulfill its
+function. In the _transfer_ application, if the target is an HTTP server, the
+user must provide the credentials for basic auth - a user name, and a password.
+
+To indicate that an extractor yields a single, mandatory value, in addition to
+the `single` modifier, the `mandatory` modifier needs to be present. This
+changes the result type of the extractor from `Try[Option[String]]` to
+`Try[String]`. The extractor produces a failure if no value is found for this
+argument. The following snippet shows the declaration of the extractor for the
+user name for the HTTP server:
+
+[source,scala]
+----
+val extUsr = optionValue("user")
+  .single
+  .mandatory
+----
