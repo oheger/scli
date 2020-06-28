@@ -211,9 +211,8 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   it should "convert a value to an enum" in {
     val EnumValues = List("larry", "curly", "moe")
-    val mapping = NumberValues.zip(EnumValues).toMap
+    val mapping = NumberValues.map(_.toString).zip(EnumValues).toMap
     val ext = optionValue(KeyNumbers)
-      .toInt
       .toEnum(mapping.get)
 
     val result = runExtractor(ext)

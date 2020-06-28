@@ -403,79 +403,115 @@ object ParameterExtractor {
       */
     def mapTo[B](f: A => B): CliExtractor[OptionValue[B]] =
       mapped(ext)(f)
+  }
+
+  /**
+   * A trait providing additional functionality to ''CliExtractor'' objects
+   * related to data type conversions.
+   *
+   * This trait offers some functions to convert string option values of a
+   * generic option value type to other data types. If a conversion fails
+   * (because the input string has an unexpected format), the resulting
+   * ''CliExtractor'' yields a ''Failure'' result.
+   *
+   * The data type conversions are implemented based on the abstract ''mapExt''
+   * function, which has to be implemented in concrete sub classes in a way
+   * suitable for the option value type supported.
+   *
+   * @tparam F the option value type of the wrapped ''CliExtractor''
+   */
+  trait CliExtractorConversions[F[_]] {
+    /**
+     * Returns the wrapped ''CliExtractor'', on which data type conversions are
+     * implemented.
+     *
+     * @return the wrapped ''CliExtractor''
+     */
+    def ext: CliExtractor[F[String]]
 
     /**
-      * Returns a ''CliExtractor'' that interprets the values of this extractor
-      * as enum literals by applying the given mapping function. If the mapping
-      * function yields a result for a current value, the result becomes the
-      * new value; otherwise, the extractor fails with an error message.
-      *
-      * @param fMap the enum mapping function
-      * @tparam B the result type of the mapping function
-      * @return the ''CliExtractor'' returning enum values
-      */
-    def toEnum[B](fMap: A => Option[B]): CliExtractor[OptionValue[B]] =
-      ext.mapTo { res =>
+     * Returns a ''CliExtractor'' that converts the option values of the
+     * managed extractor to ''Int'' values.
+     *
+     * @return the ''CliExtractor'' extracting ''Int'' values
+     */
+    def toInt: CliExtractor[F[Int]] = mapExt(_.toInt)
+
+    /**
+     * Returns a ''CliExtractor'' that converts the option values of the
+     * managed extractor to ''Boolean'' values. The strings must have the
+     * values *true* or *false* to be recognized. Note that case matters; if
+     * the conversion should be case insensitive, convert the values to lower
+     * case before (by applying the ''toLower'' conversion).
+     *
+     * @return the ''CliExtractor'' extracting ''Boolean'' values
+     */
+    def toBoolean: CliExtractor[F[Boolean]] =
+      toEnum(BooleanMapping.get)
+
+    /**
+     * Returns a ''CliExtractor'' that converts the option values of the
+     * managed extractor to ''Path'' values.
+     *
+     * @return the ''CliExtractor'' extracting ''Path'' values
+     */
+    def toPath: CliExtractor[F[Path]] = mapExt(s => Paths get s)
+
+    /**
+     * Returns a ''CliExtractor'' that interprets the values of this extractor
+     * as enum literals by applying the given mapping function. If the mapping
+     * function yields a result for a current value, the result becomes the
+     * new value; otherwise, the extractor fails with an error message.
+     *
+     * @param fMap the enum mapping function
+     * @tparam B the result type of the mapping function
+     * @return the ''CliExtractor'' returning enum values
+     */
+    def toEnum[B](fMap: String => Option[B]): CliExtractor[F[B]] =
+      mapExt { res =>
         fMap(res) match {
           case Some(value) => value
           case None => throw new IllegalArgumentException(s"Invalid enum value: $res")
         }
       }
+
+    /**
+     * Returns a string-based ''CliExtractor'' that returns values converted
+     * to lower case.
+     *
+     * @return the ''CliExtractor'' returning lower case strings
+     */
+    def toLower: CliExtractor[F[String]] = mapExt(toLowerCase)
+
+    /**
+     * Returns a string-based ''CliExtractor'' that returns values converted
+     * to upper case.
+     *
+     * @return the ''CliExtractor'' returning upper case strings
+     */
+    def toUpper: CliExtractor[F[String]] = mapExt(toUpperCase)
+
+    /**
+     * Implements a mechanism to apply a mapping function to the concrete
+     * option value type supported by the wrapped ''CliExtractor''.
+     *
+     * @param f the mapping function to be applied
+     * @tparam B the result type of the mapping function
+     * @return a ''CliExtractor'' that applies the mapping function
+     */
+    protected def mapExt[B](f: String => B): CliExtractor[F[B]]
   }
 
   /**
-    * A helper class providing additional functionality to ''CliExtractor''
-    * objects related to data type conversions.
-    *
-    * This class offers some functions to convert string option values to
-    * other data types. If a conversion fails (because the input string has an
-    * unexpected format), the resulting ''CliExtractor'' yields a ''Failure''
-    * result.
-    *
-    * @param ext the ''CliExtractor'' decorated by this class
-    */
-  class CliExtractorConvertOps(ext: CliExtractor[OptionValue[String]]) {
-    /**
-      * Returns a ''CliExtractor'' that converts the option values of the
-      * managed extractor to ''Int'' values.
-      *
-      * @return the ''CliExtractor'' extracting ''Int'' values
-      */
-    def toInt: CliExtractor[OptionValue[Int]] = ext.mapTo(_.toInt)
-
-    /**
-      * Returns a ''CliExtractor'' that converts the option values of the
-      * managed extractor to ''Boolean'' values. The strings must have the
-      * values *true* or *false* to be recognized.
-      *
-      * @return the ''CliExtractor'' extracting ''Boolean'' values
-      */
-    def toBoolean: CliExtractor[OptionValue[Boolean]] =
-      ext.toLower.toEnum(BooleanMapping.get)
-
-    /**
-      * Returns a ''CliExtractor'' that converts the option values of the
-      * managed extractor to ''Path'' values.
-      *
-      * @return the ''CliExtractor'' extracting ''Path'' values
-      */
-    def toPath: CliExtractor[OptionValue[Path]] = ext.mapTo(s => Paths get s)
-
-    /**
-      * Returns a string-based ''CliExtractor'' that returns values converted
-      * to lower case.
-      *
-      * @return the ''CliExtractor'' returning lower case strings
-      */
-    def toLower: CliExtractor[OptionValue[String]] = ext.mapTo(toLowerCase)
-
-    /**
-      * Returns a string-based ''CliExtractor'' that returns values converted
-      * to upper case.
-      *
-      * @return the ''CliExtractor'' returning upper case strings
-      */
-    def toUpper: CliExtractor[OptionValue[String]] = ext.mapTo(toUpperCase)
+   * A helper class providing additional functionality to ''CliExtractor''
+   * objects operating on the ''OptionValue'' type related to data type
+   * conversions.
+   *
+   * @param ext the ''CliExtractor'' decorated by this class
+   */
+  class CliExtractorConvertOps(override val ext: CliExtractor[OptionValue[String]])
+    extends CliExtractorConversions[OptionValue] {
+    override protected def mapExt[B](f: String => B): CliExtractor[OptionValue[B]] = mapped(ext)(f)
   }
 
   /**

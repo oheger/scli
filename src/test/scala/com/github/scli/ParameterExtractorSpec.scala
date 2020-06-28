@@ -514,10 +514,6 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     checkBooleanConversion("false", expResult = false)
   }
 
-  it should "provide an extractor that converts an option to boolean ignoring case" in {
-    checkBooleanConversion("TruE", expResult = true)
-  }
-
   it should "provide an extractor that converts an option to boolean and handles errors" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val StrValue = "not a valid boolean"
