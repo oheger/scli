@@ -19,7 +19,10 @@ package com.github.scli.sample.transfer
 import java.nio.file.Path
 import java.util.Locale
 
+import com.github.scli.ParameterExtractor._
+
 import scala.concurrent.duration.Duration
+import scala.util.{Success, Try}
 
 /**
  * An example module that provides functionality to extract command line
@@ -42,6 +45,17 @@ import scala.concurrent.duration.Duration
  * }}}
  */
 object TransferParameterManager {
+  /**
+   * Constant for a ''CryptConfig'' that is used if encryption is disabled. In
+   * this case, most properties are irrelevant.
+   */
+  final val DisabledCryptConfig: CryptConfig = CryptConfig(CryptMode.None, null, null)
+
+  /** The default algorithm to be used for encryption if none is provided. */
+  final val DefaultCryptAlgorithm = "RSA"
+
+  /** The default transfer chunk size. */
+  final val DefaultChunkSize = 8192
 
   /**
    * An enumeration defining the usage of encryption for a transfer operation.
@@ -51,19 +65,7 @@ object TransferParameterManager {
    */
   object CryptMode extends Enumeration {
 
-    protected case class Val(requiresPassword: Boolean = true) extends super.Val
-
-    /** Crypt mode indicating that encryption is disabled. */
-    val None: Val = Val(requiresPassword = false)
-
-    /** Crypt mode indicating that the content of files is encrypted. */
-    val Files: Val = Val()
-
-    /**
-     * Crypt mode indicating that both the content of files and the names of
-     * folders and files are encrypted.
-     */
-    val FilesAndNames: Val = Val()
+    val None, Files, FilesAndNames = Value
 
     /**
      * A map which allows retrieving an enum value from a string constant.
@@ -77,13 +79,13 @@ object TransferParameterManager {
    * A class that combines the properties related to encryption during a
    * transfer operation.
    *
-   * @param password  an option with the password used for encryption
    * @param cryptMode the crypt mode; it determines whether encryption is
    *                  used
+   * @param password  the password used for encryption
    * @param algorithm the algorithm to be used for encryption
    */
-  case class CryptConfig(password: Option[String],
-                         cryptMode: CryptMode.Value,
+  case class CryptConfig(cryptMode: CryptMode.Value,
+                         password: String,
                          algorithm: String)
 
   /**
@@ -179,4 +181,103 @@ object TransferParameterManager {
                                    cryptConfig: CryptConfig,
                                    transferConfig: TransferConfig)
 
+  /**
+   * Returns an extractor for the configuration for encryption. Whether
+   * encryption is enabled (and additional properties must be provided),
+   * depends on the crypt mode.
+   *
+   * @return the extractor for the ''CryptConfig''
+   */
+  def cryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
+    val extCryptEnabled = cryptModeExtractor
+      .map(triedMode => triedMode.map(_ != CryptMode.None))
+    conditionalValue(extCryptEnabled, ifExt = definedCryptConfigExtractor,
+      elseExt = constantExtractor(Success(DisabledCryptConfig)))
+  }
+
+  /**
+   * Returns an extractor for the configuration of an HTTP server. All
+   * properties of this configuration are mandatory; the extractor is applied
+   * only if the target server is actually an HTTP server.
+   * @return the extractor for the ''HttpServerConfig''
+   */
+  def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {
+    val extUsr = optionValue("user")
+      .single
+      .mandatory
+    val extPwd = optionValue("password")
+      .single
+      .mandatory
+    for {
+      user <- extUsr
+      pwd <- extPwd
+    } yield createRepresentation(user, pwd)(HttpServerConfig)
+  }
+
+  /**
+   * Returns an extractor for the ''TransferConfig''.
+   *
+   * @return the extractor for the ''TransferConfig''
+   */
+  def transferConfigExtractor: CliExtractor[Try[TransferConfig]] = {
+    val extSrcFiles = inputValues(fromIdx = 1, toIdx = -2, optKey = Some("transferFiles"))
+      .multiplicity(atLeast = 1)
+      .toPath
+      .map(_.map(_.toList))
+    val extServerUri = inputValue(optKey = Some("serverUri"), index = -1)
+      .single
+      .mandatory
+    val extChunkSize = optionValue("chunk-size")
+      .toInt
+      .fallbackValues(DefaultChunkSize)
+      .single
+      .mandatory
+    val extTag = optionValue("tag")
+      .single
+    for {
+      srcFiles <- extSrcFiles
+      serverUri <- extServerUri
+      logs <- optionValue("log")
+      tag <- extTag
+      chunkSize <- extChunkSize
+    } yield createRepresentation(srcFiles, serverUri, chunkSize, logs, tag) {
+      TransferConfig(_, _, _, null, false, _, _)
+    }
+  }
+
+  /**
+   * Returns an extractor that extracts a crypt mode value from a command line
+   * option.
+   *
+   * @return the extractor to extract the crypt mode
+   */
+  private def cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
+    optionValue("crypt-mode")
+      .toUpper
+      .toEnum(CryptMode.Literals.get)
+      .fallbackValues(CryptMode.None)
+      .single
+      .mandatory
+
+  /**
+   * Returns an extractor for the ''CryptConfig'' if the crypt mode is set to
+   * something different than ''None''. Only then additional options are
+   * evaluated.
+   *
+   * @return the extractor for the defined ''CryptConfig''
+   */
+  private def definedCryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
+    val extCryptPass = optionValue("crypt-password")
+      .single
+      .mandatory
+    val extCryptAlg = optionValue("crypt-alg")
+      .fallbackValues(DefaultCryptAlgorithm)
+      .single
+      .mandatory
+    for {
+      mode <- cryptModeExtractor
+      pwd <- extCryptPass
+      alg <- extCryptAlg
+    } yield createRepresentation(mode, pwd, alg)(CryptConfig)
+  }
 }
