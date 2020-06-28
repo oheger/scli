@@ -415,7 +415,12 @@ object ParameterExtractor {
       * @return the ''CliExtractor'' returning enum values
       */
     def toEnum[B](fMap: A => Option[B]): CliExtractor[OptionValue[B]] =
-      asEnum(ext)(fMap)
+      ext.mapTo { res =>
+        fMap(res) match {
+          case Some(value) => value
+          case None => throw new IllegalArgumentException(s"Invalid enum value: $res")
+        }
+      }
   }
 
   /**
@@ -436,7 +441,7 @@ object ParameterExtractor {
       *
       * @return the ''CliExtractor'' extracting ''Int'' values
       */
-    def toInt: CliExtractor[OptionValue[Int]] = asIntOptionValue(ext)
+    def toInt: CliExtractor[OptionValue[Int]] = ext.mapTo(_.toInt)
 
     /**
       * Returns a ''CliExtractor'' that converts the option values of the
@@ -445,7 +450,8 @@ object ParameterExtractor {
       *
       * @return the ''CliExtractor'' extracting ''Boolean'' values
       */
-    def toBoolean: CliExtractor[OptionValue[Boolean]] = asBooleanOptionValue(ext)
+    def toBoolean: CliExtractor[OptionValue[Boolean]] =
+      ext.toLower.toEnum(BooleanMapping.get)
 
     /**
       * Returns a ''CliExtractor'' that converts the option values of the
@@ -453,7 +459,7 @@ object ParameterExtractor {
       *
       * @return the ''CliExtractor'' extracting ''Path'' values
       */
-    def toPath: CliExtractor[OptionValue[Path]] = asPathOptionValue(ext)
+    def toPath: CliExtractor[OptionValue[Path]] = ext.mapTo(s => Paths get s)
 
     /**
       * Returns a string-based ''CliExtractor'' that returns values converted
@@ -461,7 +467,7 @@ object ParameterExtractor {
       *
       * @return the ''CliExtractor'' returning lower case strings
       */
-    def toLower: CliExtractor[OptionValue[String]] = asLowerCase(ext)
+    def toLower: CliExtractor[OptionValue[String]] = ext.mapTo(toLowerCase)
 
     /**
       * Returns a string-based ''CliExtractor'' that returns values converted
@@ -469,7 +475,7 @@ object ParameterExtractor {
       *
       * @return the ''CliExtractor'' returning upper case strings
       */
-    def toUpper: CliExtractor[OptionValue[String]] = asUpperCase(ext)
+    def toUpper: CliExtractor[OptionValue[String]] = ext.mapTo(toUpperCase)
   }
 
   /**
@@ -1011,81 +1017,6 @@ object ParameterExtractor {
                                firstFallback: B, moreFallbackValues: B*)(f: A => B):
   CliExtractor[OptionValue[B]] =
     withFallback(mapped(ext)(f), constantOptionValue(firstFallback, moreFallbackValues: _*))
-
-  /**
-    * Returns an extractor that converts a command line argument to int
-    * numbers. All the string values of the option are converted to
-    * numbers including error handling. Undefined values are ignored.
-    *
-    * @param ext the extractor providing the original option value
-    * @return the extractor converting the values to numbers
-    */
-  def asIntOptionValue(ext: CliExtractor[OptionValue[String]]):
-  CliExtractor[OptionValue[Int]] = mapped(ext)(_.toInt)
-
-  /**
-    * Returns an extractor that converts a command line argument to boolean
-    * values. All the string values of the option are converted to
-    * booleans including error handling. Undefined values are ignored.
-    *
-    * @param ext the extractor providing the original option value
-    * @return the extractor converting the values to booleans
-    */
-  def asBooleanOptionValue(ext: CliExtractor[OptionValue[String]]):
-  CliExtractor[OptionValue[Boolean]] = asEnum(asLowerCase(ext))(BooleanMapping.get)
-
-  /**
-    * Returns an extractor that converts a command line argument to file paths.
-    * The conversion may fail if one of the option values is not a valid path.
-    * Undefined values are ignored.
-    *
-    * @param ext the extractor providing the original option value
-    * @return the extractor converting the value to ''Path'' objects
-    */
-  def asPathOptionValue(ext: CliExtractor[OptionValue[String]]):
-  CliExtractor[OptionValue[Path]] = mapped(ext)({ s => Paths.get(s) })
-
-  /**
-    * Returns an extractor that converts the results of another extractor to
-    * lower case strings. This can be useful for instance if case insensitive
-    * comparisons are needed.
-    *
-    * @param ext the extractor providing the original option value
-    * @return the extractor converting string values to lower case
-    */
-  def asLowerCase(ext: CliExtractor[OptionValue[String]]): CliExtractor[OptionValue[String]] =
-    mapped(ext)(toLowerCase)
-
-  /**
-    * Returns an extractor that converts the results of another extractor to
-    * upper case strings. This can be useful for instance if case insensitive
-    * comparisons are needed.
-    *
-    * @param ext the extractor providing the original option value
-    * @return the extractor converting string values to upper case
-    */
-  def asUpperCase(ext: CliExtractor[OptionValue[String]]): CliExtractor[OptionValue[String]] =
-    mapped(ext)(toUpperCase)
-
-  /**
-    * Returns an extractor that accepts a number of literals and maps them to
-    * enum constants. The resulting extractor passes the results of the passed
-    * in extractor to a mapping function. If the function yields a result, it
-    * is used as resulting value; otherwise, the extractor returns a failure.
-    *
-    * @param ext  the extractor providing the original option value
-    * @param fMap the function that maps enum values
-    * @tparam A the value type of the original extractor
-    * @tparam B the value type of the resulting extractor
-    * @return the extractor doing the enum mapping
-    */
-  def asEnum[A, B](ext: CliExtractor[OptionValue[A]])(fMap: A => Option[B]): CliExtractor[OptionValue[B]] =
-    mappedWithContext(ext) { (res, context) =>
-      fMap(res) match {
-        case Some(value) => (value, context)
-        case None => throw paramException(context, ext.key, s"Invalid enum value: $res")
-      }
-    }
 
   /**
     * Checks whether all parameters passed via the command line have been

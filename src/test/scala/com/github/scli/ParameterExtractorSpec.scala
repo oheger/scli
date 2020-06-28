@@ -470,7 +470,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val StrValue: OptionValue[String] = Try(Some(ExtractorResult.toString))
     val ext = testExtractor(StrValue)
-    val extractor = ParameterExtractor.asIntOptionValue(ext)
+    val extractor = ext.toInt
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -482,7 +482,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val NoIntValue = "not a valid number"
     val StrValue: OptionValue[String] = Try(Some(NoIntValue))
     val ext = testExtractor(StrValue)
-    val extractor = ParameterExtractor.asIntOptionValue(ext)
+    val extractor = ext.toInt
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -499,7 +499,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val StrValue: OptionValue[String] = Try(Some(value))
     val ext = testExtractor(StrValue)
-    val extractor = ParameterExtractor.asBooleanOptionValue(ext)
+    val extractor = ext.toBoolean
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -523,7 +523,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val StrValue = "not a valid boolean"
     val ValueOption: OptionValue[String] = Try(Some(StrValue))
     val ext = testExtractor(ValueOption)
-    val extractor = ParameterExtractor.asBooleanOptionValue(ext)
+    val extractor = ext.toBoolean
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -534,7 +534,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val ValueOption: OptionValue[String] = Try(Some("This Is a TEST String"))
     val ext = testExtractor(ValueOption)
-    val extractor = ParameterExtractor.asLowerCase(ext)
+    val extractor = ext.toLower
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -545,7 +545,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val ValueOption: OptionValue[String] = Try(Some("This Is a TEST String"))
     val ext = testExtractor(ValueOption)
-    val extractor = ParameterExtractor.asUpperCase(ext)
+    val extractor = ext.toUpper
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -559,7 +559,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val results = values map (mapping(_))
     val ValueOption: OptionValue[String] = Success(values)
     val ext = testExtractor(ValueOption)
-    val extractor = ParameterExtractor.asEnum(ext)(mapping.get)
+    val extractor =ext.toEnum(mapping.get)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
@@ -572,7 +572,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val Value = "foo"
     val ValueOption: OptionValue[String] = Try(Some(Value))
     val ext = testExtractor(ValueOption)
-    val extractor = ParameterExtractor.asEnum(ext)(mappingFunc)
+    val extractor = ext.toEnum(mappingFunc)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
