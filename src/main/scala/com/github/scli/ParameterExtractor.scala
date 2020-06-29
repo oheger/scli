@@ -990,8 +990,7 @@ object ParameterExtractor {
     * @tparam B the mapped result type
     * @return the extractor applying the mapping function
     */
-  def mapped[A, B](ext: CliExtractor[OptionValue[A]])(f: A => B):
-  CliExtractor[OptionValue[B]] =
+  def mapped[A, B](ext: CliExtractor[OptionValue[A]])(f: A => B): CliExtractor[OptionValue[B]] =
     mappedWithContext(ext) { (a, context) =>
       (f(a), context)
     }
@@ -1033,6 +1032,27 @@ object ParameterExtractor {
           (Failure(exception), context)
       }
     }
+    }
+
+  /**
+   * Returns an extractor for a ''SingleOptionValue'' that modifies another
+   * extractor by applying a mapping function. This function corresponds to the
+   * ''mapped()'' function for option values of type ''SingleOptionValue''; the
+   * mapping function can focus on data values and does not have to deal with
+   * the wrapping ''Try'' or ''Option''.
+   *
+   * @param ext the extractor to be decorated
+   * @param f   the mapping function
+   * @tparam A the data type of the original extractor
+   * @tparam B the data type of the resulting extractor
+   * @return the extractor applying the mapping function
+   */
+  def mappedSingle[A, B](ext: CliExtractor[SingleOptionValue[A]])(f: A => B): CliExtractor[SingleOptionValue[B]] =
+    ext.mapWithContext { (triedResult, context) =>
+      val mappedResult = triedResult flatMap { optResult =>
+        paramTry(context, ext.key)(optResult.map(f))
+      }
+      (mappedResult, context)
     }
 
   /**

@@ -466,6 +466,50 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     res should be(Success(List(1, 2, 3)))
   }
 
+  it should "provide a single value mapping extractor that handles a failed result" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val FailedValue: SingleOptionValue[String] = Failure(new Exception("Failed"))
+    val ext = testExtractor(FailedValue)
+    val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    next.parameters should be(NextParameters)
+    res should be(FailedValue)
+  }
+
+  it should "provide a single mapping extractor that handles an empty result" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val EmptyResult: SingleOptionValue[String] = Success(None)
+    val ext = testExtractor(EmptyResult)
+    val extractor = ParameterExtractor.mappedSingle(ext)(_ => throw new IllegalArgumentException("Nope"))
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    next.parameters should be(NextParameters)
+    res should be(EmptyResult)
+  }
+
+  it should "provide a single mapping extractor that handles a defined result" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val Result: SingleOptionValue[String] = Success(Some(ExtractorResult.toString))
+    val ext = testExtractor(Result)
+    val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    next.parameters should be(NextParameters)
+    res should be(Success(Some(ExtractorResult)))
+  }
+
+  it should "provide a single mapping extractor that handles an exception thrown by the mapping function" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val Result: SingleOptionValue[String] = Success(Some("Not a number!"))
+    val ext = testExtractor(Result)
+    val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    next.parameters should be(NextParameters)
+    checkExtractionException(expectExtractionException(res))(classOf[NumberFormatException].getName)
+  }
+
   it should "provide an extractor that converts an option value to int" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val StrValue: OptionValue[String] = Try(Some(ExtractorResult.toString))
