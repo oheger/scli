@@ -310,7 +310,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "set a multiplicity attribute for options with a single value" in {
     val Key2 = Key + "_other"
-    val ext1 = multiOptionValue(Key).single
+    val ext1 = optionValue(Key)
     val ext2 = multiOptionValue(Key2)
     val ext = for {
       v1 <- ext1
@@ -330,7 +330,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "set a multiplicity attribute for mandatory options" in {
     val Key2 = Key + "_optional"
-    val ext1 = multiOptionValue(Key).single.mandatory
+    val ext1 = optionValue(Key).mandatory
     val ext2 = multiOptionValue(Key2).single
     val ext = for {
       v1 <- ext1

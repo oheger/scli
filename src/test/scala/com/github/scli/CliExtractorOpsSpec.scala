@@ -146,7 +146,35 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   import CliExtractorOpsSpec._
 
-  "ParameterExtractor" should "extract numeric values" in {
+  "ParameterExtractor" should "extract multiple string values" in {
+    val strValues = NumberValues.map(_.toString)
+    val ext = multiOptionValue(KeyNumbers)
+
+    val result = runExtractor(ext)
+    result should be(Success(strValues))
+  }
+
+  it should "extract a single string value" in {
+    val ext = optionValue(KeyAnswer)
+
+    val result = runExtractor(ext)
+    result should be(Success(Some(NumberValue.toString)))
+  }
+
+  it should "report a failure for a single value option that has multiple values" in {
+    val ext = optionValue(KeyNumbers)
+
+    val result = runExtractor(ext)
+    result match {
+      case Failure(exception: ParameterExtractionException) =>
+        val failure = exception.failures.head
+        failure.key should be(KeyNumbers)
+        failure.message should include("should have a single value")
+      case r => fail("Unexpected result: " + r)
+    }
+  }
+
+  it should "extract numeric values" in {
     val ext = multiOptionValue(KeyNumbers).toInt
 
     val result = runExtractor(ext)

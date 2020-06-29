@@ -649,6 +649,18 @@ object ParameterExtractor {
     constantExtractor(Success(first :: items.toList), optValueDesc)
 
   /**
+   * Returns an extractor that extracts the value of the specified option key
+   * in its basic string representation. If it checked whether this option has
+   * at most one value; if multiple values are found, the extractor fails.
+   *
+   * @param key  the key of the option
+   * @param help an optional help text for this option
+   * @return the extractor to extract the option value
+   */
+  def optionValue(key: String, help: Option[String] = None): CliExtractor[SingleOptionValue[String]] =
+    asSingleOptionValue(multiOptionValue(key, help))
+
+  /**
     * Returns an extractor that extracts all values of the specified option key
     * in their basic string representation.
     *
