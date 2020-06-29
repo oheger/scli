@@ -105,7 +105,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "handle a failed extractor" in {
     val args = List("--" + TestOptionKey, TestOptionValue)
-    val extractor = ParameterExtractor.optionValue(TestOptionKey)
+    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey)
       .toInt
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
@@ -119,8 +119,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "combine failures of the extractor with failures for unconsumed parameters" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--unknownOption", "shouldFail")
-    val ext1 = ParameterExtractor.optionValue(TestOptionKey).toInt
-    val ext2 = ParameterExtractor.optionValue("missing").single.mandatory
+    val ext1 = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
+    val ext2 = ParameterExtractor.multiOptionValue("missing").single.mandatory
     val extractor = for {
       v1 <- ext1
       v2 <- ext2
@@ -134,7 +134,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "add all failures to the help context in the resulting exception" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--unknownOption", "shouldFail")
-    val extractor = ParameterExtractor.optionValue(TestOptionKey).toInt
+    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
     val helpContext = exception.parameterContext.helpContext
@@ -144,7 +144,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
   it should "support customizing the parsing function" in {
     val args = List("/" + TestOptionKey, TestOptionValue)
     val key = TestOptionKey.toLowerCase(Locale.ROOT)
-    val extractor = ParameterExtractor.optionValue(key).single.mandatory
+    val extractor = ParameterExtractor.multiOptionValue(key).single.mandatory
     val prefixes = ParameterParser.OptionPrefixes("/")
     val keyExtractor = prefixes.extractorFunc andThen (s => s.toLowerCase(Locale.ROOT))
 
@@ -158,7 +158,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val FileOption = "file"
     val FileName = "someFile.txt"
     val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption, FileName)
-    val extractor = ParameterExtractor.optionValue(TestOptionKey, help = Some(HelpTestOption))
+    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey, help = Some(HelpTestOption))
 
     val parseFunc = ParameterManager.parsingFunc(optFileOption = Some(FileOption))
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor, parseFunc,

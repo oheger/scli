@@ -656,7 +656,7 @@ object ParameterExtractor {
     * @param help an optional help text for this option
     * @return the extractor to extract the option values
     */
-  def optionValue(key: String, help: Option[String] = None): CliExtractor[OptionValue[String]] =
+  def multiOptionValue(key: String, help: Option[String] = None): CliExtractor[OptionValue[String]] =
     CliExtractor(context => {
       val values = context.parameters.parametersMap.getOrElse(key, Nil)
       val nextHelpCtx = context.helpContext.addOption(key, help)
@@ -911,7 +911,7 @@ object ParameterExtractor {
     * @return an extractor checking whether this option is defined
     */
   def isDefinedExtractor(key: String): CliExtractor[Try[Boolean]] =
-    isOptionDefined(optionValue(key))
+    isOptionDefined(multiOptionValue(key))
 
   /**
     * Returns an extractor that extracts a single option value from the result

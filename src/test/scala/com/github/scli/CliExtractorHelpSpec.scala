@@ -150,7 +150,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   import CliExtractorHelpSpec._
 
   "The CLI library" should "store a help text for an option" in {
-    val ext = optionValue(Key, help = Some(HelpText))
+    val ext = multiOptionValue(Key, help = Some(HelpText))
 
     val helpContext = generateHelpContext(ext)
     helpContext.options.keys should contain only Key
@@ -161,7 +161,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val FallbackDesc = "This is the fallback value."
     val constExtValue: OptionValue[String] = Success(List("foo"))
     val fallbackExt = constantExtractor(constExtValue, Some(FallbackDesc))
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .fallback(fallbackExt)
 
     val helpContext = generateHelpContext(ext)
@@ -171,7 +171,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "support a description for constant values" in {
     val ValueDesc = "This is a meaningful default value."
     val valueExt = constantOptionValueWithDesc(Some(ValueDesc), "foo", "bar")
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .fallback(valueExt)
 
     val helpContext = generateHelpContext(ext)
@@ -180,7 +180,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "support skipping a description for a constant value" in {
     val valueExt = constantOptionValueWithDesc(None, "foo", "bar")
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .fallback(valueExt)
 
     val helpContext = generateHelpContext(ext)
@@ -189,7 +189,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "support a description for constant values via the DSL" in {
     val ValueDesc = "Description of this value."
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .fallbackValuesWithDesc(Some(ValueDesc), "foo", "bar", "baz")
 
     val helpContext = generateHelpContext(ext)
@@ -199,7 +199,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "generate a description for constant values" in {
     val Values = List("val1", "val2", "val3")
     val ValueDesc = s"<${Values.head}, ${Values(1)}, ${Values(2)}>"
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .fallbackValues(Values.head, Values.tail: _*)
 
     val helpContext = generateHelpContext(ext)
@@ -208,7 +208,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "generate a description for a single constant value" in {
     val Value = "test"
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .fallbackValues(Value)
 
     val helpContext = generateHelpContext(ext)
@@ -218,7 +218,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "update the help context with a fallback extractor" in {
     val paramsMap = Map(Key -> List("true"))
     val params = Parameters(paramsMap, Set.empty)
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
       .toBoolean
       .fallbackValues(false)
 
@@ -310,8 +310,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "set a multiplicity attribute for options with a single value" in {
     val Key2 = Key + "_other"
-    val ext1 = optionValue(Key).single
-    val ext2 = optionValue(Key2)
+    val ext1 = multiOptionValue(Key).single
+    val ext2 = multiOptionValue(Key2)
     val ext = for {
       v1 <- ext1
       v2 <- ext2
@@ -330,8 +330,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "set a multiplicity attribute for mandatory options" in {
     val Key2 = Key + "_optional"
-    val ext1 = optionValue(Key).single.mandatory
-    val ext2 = optionValue(Key2).single
+    val ext1 = multiOptionValue(Key).single.mandatory
+    val ext2 = multiOptionValue(Key2).single
     val ext = for {
       v1 <- ext1
       v2 <- ext2
@@ -342,10 +342,10 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support groups for conditional options" in {
-    val extCond = optionValue("condition").isDefined
-    val extIf = optionValue("if", Some("help-if"))
-    val extElse = optionValue("else", Some("help-else"))
-    val extOther = optionValue(Key, Some(HelpText))
+    val extCond = multiOptionValue("condition").isDefined
+    val extIf = multiOptionValue("if", Some("help-if"))
+    val extElse = multiOptionValue("else", Some("help-else"))
+    val extOther = multiOptionValue(Key, Some(HelpText))
     val extCase = conditionalOptionValue(extCond, extIf, extElse, Some("grp-if"), Some("grp-else"))
     val ext = for {
       v1 <- extCase
@@ -363,11 +363,11 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support nested conditional groups" in {
-    val extCond1 = optionValue("condition1").isDefined
-    val extCond2 = optionValue("condition2").isDefined
-    val extIfNested = optionValue("if-nested", Some("help-if-nested"))
-    val extElseNested = optionValue("else-nested", Some("help-else-nested"))
-    val extElse = optionValue("else", Some("help-else"))
+    val extCond1 = multiOptionValue("condition1").isDefined
+    val extCond2 = multiOptionValue("condition2").isDefined
+    val extIfNested = multiOptionValue("if-nested", Some("help-if-nested"))
+    val extElseNested = multiOptionValue("else-nested", Some("help-else-nested"))
+    val extElse = multiOptionValue("else", Some("help-else"))
     val extCaseNested = conditionalOptionValue(extCond2, extIfNested, extElseNested,
       ifGroup = Some("grp-if-nested"), elseGroup = Some("grp-else-nested"))
     val extCase = conditionalOptionValue(extCond1, extCaseNested, extElse,
@@ -387,9 +387,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "merge the values of group attributes" in {
-    val extCond = optionValue("condition").isDefined
-    val extIf = optionValue(Key)
-    val extElse = optionValue(Key)
+    val extCond = multiOptionValue("condition").isDefined
+    val extIf = multiOptionValue(Key)
+    val extElse = multiOptionValue(Key)
     val extCase = conditionalOptionValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
       elseExt = extElse, elseGroup = Some("g2"))
 
@@ -419,9 +419,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "use a dummy console reader when running extractors to get meta data" in {
     val Key2 = "readerOption"
-    val extCond = optionValue("condition").isDefined
-    val extIf = optionValue(Key).fallback(consoleReaderValue(Key2, password = true))
-    val extElse = optionValue(Key2)
+    val extCond = multiOptionValue("condition").isDefined
+    val extIf = multiOptionValue(Key).fallback(consoleReaderValue(Key2, password = true))
+    val extElse = multiOptionValue(Key2)
     val extCase = conditionalOptionValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
       elseExt = extElse, elseGroup = Some("g2"))
     val reader = mock[ConsoleReader]
@@ -434,8 +434,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "correctly handle the groups of a conditional group extractor" in {
     val Key2 = "OtherKey"
-    val extG1 = optionValue(Key)
-    val extG2 = optionValue(Key2)
+    val extG1 = multiOptionValue(Key)
+    val extG2 = multiOptionValue(Key2)
     val extGroupSel = constantOptionValue("g1").single.mandatory
     val groupMap = Map("g1" -> extG1, "g2" -> extG2)
     val extCondGroup = conditionalGroupValue(extGroupSel, groupMap)
@@ -447,7 +447,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "set the multiplicity attribute if it is defined" in {
-    val ext = optionValue(Key).multiplicity(1, 4)
+    val ext = multiOptionValue(Key).multiplicity(1, 4)
 
     val helpContext = generateHelpContext(ext)
     val attr = helpContext.options(Key)
@@ -455,7 +455,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "handle an unrestricted multiplicity" in {
-    val ext = optionValue(Key).multiplicity()
+    val ext = multiOptionValue(Key).multiplicity()
 
     val helpContext = generateHelpContext(ext)
     val attr = helpContext.options(Key)
@@ -463,7 +463,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "set the option type attribute for a plain option" in {
-    val ext = optionValue(Key)
+    val ext = multiOptionValue(Key)
 
     val helpContext = generateHelpContext(ext)
     fetchAttribute(helpContext, Key, CliHelpGenerator.AttrOptionType) should be(CliHelpGenerator.OptionTypeOption)

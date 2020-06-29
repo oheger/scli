@@ -210,7 +210,7 @@ just have to use:
 ----
 import com.github.scli.ParameterExtractor._
 
-val intExtractor = optionValue("my-option").toInt
+val intExtractor = multiOptionValue("my-option").toInt
 ----
 
 Another great feature of monads is that they can be composed in a very flexible

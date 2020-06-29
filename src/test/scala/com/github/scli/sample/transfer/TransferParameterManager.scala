@@ -202,10 +202,10 @@ object TransferParameterManager {
    * @return the extractor for the ''HttpServerConfig''
    */
   def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {
-    val extUsr = optionValue("user")
+    val extUsr = multiOptionValue("user")
       .single
       .mandatory
-    val extPwd = optionValue("password")
+    val extPwd = multiOptionValue("password")
       .single
       .mandatory
     for {
@@ -227,17 +227,17 @@ object TransferParameterManager {
     val extServerUri = inputValue(optKey = Some("serverUri"), index = -1)
       .single
       .mandatory
-    val extChunkSize = optionValue("chunk-size")
+    val extChunkSize = multiOptionValue("chunk-size")
       .toInt
       .fallbackValues(DefaultChunkSize)
       .single
       .mandatory
-    val extTag = optionValue("tag")
+    val extTag = multiOptionValue("tag")
       .single
     for {
       srcFiles <- extSrcFiles
       serverUri <- extServerUri
-      logs <- optionValue("log")
+      logs <- multiOptionValue("log")
       tag <- extTag
       chunkSize <- extChunkSize
     } yield createRepresentation(srcFiles, serverUri, chunkSize, logs, tag) {
@@ -252,7 +252,7 @@ object TransferParameterManager {
    * @return the extractor to extract the crypt mode
    */
   private def cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
-    optionValue("crypt-mode")
+    multiOptionValue("crypt-mode")
       .toUpper
       .toEnum(CryptMode.Literals.get)
       .fallbackValues(CryptMode.None)
@@ -267,10 +267,10 @@ object TransferParameterManager {
    * @return the extractor for the defined ''CryptConfig''
    */
   private def definedCryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
-    val extCryptPass = optionValue("crypt-password")
+    val extCryptPass = multiOptionValue("crypt-password")
       .single
       .mandatory
-    val extCryptAlg = optionValue("crypt-alg")
+    val extCryptAlg = multiOptionValue("crypt-alg")
       .fallbackValues(DefaultCryptAlgorithm)
       .single
       .mandatory
