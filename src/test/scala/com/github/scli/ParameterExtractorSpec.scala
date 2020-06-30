@@ -445,27 +445,6 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     checkExtractionException(expectExtractionException(res))(InvalidValues: _*)
   }
 
-  it should "provide a mapping extractor with fallbacks if the value is defined" in {
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val Result: OptionValue[String] = Success(Some(ExtractorResult.toString))
-    val ext = testExtractor(Result)
-    val extractor = ParameterExtractor.mappedWithFallback(ext, 1, 2, 3)(_.toInt)
-
-    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
-    next.parameters should be(NextParameters)
-    res should be(Success(List(ExtractorResult)))
-  }
-
-  it should "provide a mapping extractor with fallbacks if the value is undefined" in {
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val extractor = ParameterExtractor.mappedWithFallback(ParameterExtractor.emptyExtractor[String],
-      1, 2, 3)(_.toInt)
-
-    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
-    next.parameters should be(TestParameters)
-    res should be(Success(List(1, 2, 3)))
-  }
-
   it should "provide a single value mapping extractor that handles a failed result" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val FailedValue: SingleOptionValue[String] = Failure(new Exception("Failed"))

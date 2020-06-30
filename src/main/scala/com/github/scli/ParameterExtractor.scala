@@ -800,13 +800,12 @@ object ParameterExtractor {
     */
   def withFallback[A](ext: CliExtractor[OptionValue[A]], fallbackExt: CliExtractor[OptionValue[A]]):
   CliExtractor[OptionValue[A]] =
-    CliExtractor(context => {
-      val (result, context2) = ext.run(context)
+    ext.mapWithContext { (result, context) =>
       if (result.isFailure || result.get.nonEmpty) {
-        val helpContext = updateHelpContext(context2.helpContext, List((fallbackExt, None)))
-        (result, context2.copy(helpContext = helpContext))
-      } else fallbackExt.run(context2)
-    }, ext.optKey)
+        val helpContext = updateHelpContext(context.helpContext, List((fallbackExt, None)))
+        (result, context.copy(helpContext = helpContext))
+      } else fallbackExt.run(context)
+    }
 
   /**
     * Returns an extractor that prompts the user for entering the value of an
@@ -1103,25 +1102,6 @@ object ParameterExtractor {
       }
       (mappedResult, context)
     }
-
-  /**
-    * Returns an extractor that combines a map operation with applying constant
-    * fallback values. If the passed in extractor returns a non-empty value,
-    * the mapping function is applied to all values. Otherwise, a constant
-    * extractor is returned that yields the specified fallback values.
-    *
-    * @param ext                the extractor to be mapped
-    * @param firstFallback      the first fallback value
-    * @param moreFallbackValues further fallback values
-    * @param f                  the mapping function to be applied
-    * @tparam A the original result type
-    * @tparam B the mapped result type
-    * @return the extractor applying the mapping function with fallbacks
-    */
-  def mappedWithFallback[A, B](ext: CliExtractor[OptionValue[A]],
-                               firstFallback: B, moreFallbackValues: B*)(f: A => B):
-  CliExtractor[OptionValue[B]] =
-    withFallback(mapped(ext)(f), constantOptionValue(firstFallback, moreFallbackValues: _*))
 
   /**
     * Checks whether all parameters passed via the command line have been
