@@ -182,46 +182,82 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "extract a single numeric value" in {
-    val ext = multiOptionValue(KeyAnswer).toInt.single
+    val ext = optionValue(KeyAnswer).toInt
 
     val result = runExtractor(ext)
     result should be(Success(Some(NumberValue)))
   }
 
   it should "extract a single mandatory numeric value" in {
-    val ext = multiOptionValue(KeyAnswer).toInt.single.mandatory
+    val ext = optionValue(KeyAnswer).toInt.mandatory
 
     val result = runExtractor(ext)
     result should be(Success(NumberValue))
   }
 
   it should "extract a single flag value" in {
-    val ext = multiOptionValue(KeyFlag).toBoolean.single.mandatory
+    val ext = optionValue(KeyFlag).toBoolean.mandatory
 
     val result = runExtractor(ext)
     result should be(Success(true))
   }
 
+  it should "extract multiple flag values" in {
+    val ext = multiOptionValue(KeyFlag).toBoolean
+
+    val result = runExtractor(ext)
+    result.get should contain only true
+  }
+
   it should "extract a single path value" in {
-    val ext = multiOptionValue(KeyPath).toPath.single.mandatory
+    val ext = optionValue(KeyPath).toPath.mandatory
 
     val result = runExtractor(ext)
     result should be(Success(PathValue))
   }
 
+  it should "extract multiple path values" in {
+    val ext = multiOptionValue(KeyPath).toPath
+
+    val result = runExtractor(ext)
+    result.get should contain only PathValue
+  }
+
+  it should "convert multiple string values to lower case" in {
+    val OrgValues = List("TEST", "test", "Test", "TesT")
+    val Key = "multiStringOption"
+    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> OrgValues))
+    val ext = multiOptionValue(Key).toLower
+
+    val result = runExtractor(ext, parameters).get
+    result should have size OrgValues.size
+    result.toSet should contain only "test"
+  }
+
   it should "convert a string value to lower case" in {
     val Key = "stringOption"
     val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> List("TesT")))
-    val ext = multiOptionValue(Key).toLower.single.mandatory
+    val ext = optionValue(Key).toLower.mandatory
 
     val result = runExtractor(ext, parameters)
     result should be(Success("test"))
   }
 
+  it should "convert multiple string values to upper case" in {
+    val OrgValues = List("TEST", "test", "Test", "TesT")
+    val Key = "multiStringOption"
+    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> OrgValues))
+    val ext = multiOptionValue(Key).toUpper
+
+    val result = runExtractor(ext, parameters).get
+    result should have size OrgValues.size
+    result.toSet should contain only "TEST"
+  }
+
   it should "convert a string value to upper case" in {
     val Key = "stringOption"
     val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> List("TesT")))
-    val ext = multiOptionValue(Key).toUpper.single.mandatory
+    val ext = optionValue(Key).toUpper.mandatory
 
     val result = runExtractor(ext, parameters)
     result should be(Success("TEST"))
@@ -237,7 +273,17 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result should be(Success(expectedValues))
   }
 
-  it should "convert a value to an enum" in {
+  it should "support mapping the single value extracted by an extractor" in {
+    val ext = optionValue(KeyAnswer)
+      .toInt
+      .mapTo(_ + 1)
+      .mandatory
+
+    val result = runExtractor(ext)
+    result should be(Success(NumberValue + 1))
+  }
+
+  it should "convert values to an enum" in {
     val EnumValues = List("larry", "curly", "moe")
     val mapping = NumberValues.map(_.toString).zip(EnumValues).toMap
     val ext = multiOptionValue(KeyNumbers)
@@ -245,6 +291,16 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
     val result = runExtractor(ext)
     result should be(Success(EnumValues))
+  }
+
+  it should "convert a single value to an enum" in {
+    val enumFunc: String => Option[Int] = s => Some(s.length)
+    val ExpLength = PathValue.toString.length
+    val ext = optionValue(KeyPath)
+      .toEnum(enumFunc)
+
+    val result = runExtractor(ext)
+    result should be(Success(Some(ExpLength)))
   }
 
   it should "support checking whether an option is defined" in {

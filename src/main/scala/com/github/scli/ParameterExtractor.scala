@@ -532,6 +532,32 @@ object ParameterExtractor {
       * @return the ''CliExtractor'' extracting a mandatory single value
       */
     def mandatory: CliExtractor[Try[A]] = asMandatory(ext)
+
+    /**
+     * Returns a ''CliExtractor'' that yields the value of the managed
+     * extractor with the given mapping function applied to it. In contrast to
+     * the plain ''map()'' function, this function is more convenient for
+     * values of type ''SingleOptionValue'' because the mapping function
+     * operates directly on the value (if it is present) and does not have to
+     * deal with ''Try'' or ''Option'' objects.
+     *
+     * @param f the mapping function on the option value
+     * @tparam B the result type of the mapping function
+     * @return the ''CliExtractor'' applying the mapping function
+     */
+    def mapTo[B](f: A => B): CliExtractor[SingleOptionValue[B]] = mappedSingle(ext)(f)
+  }
+
+  /**
+   * A helper class providing additional functionality to ''CliExtractor''
+   * objects operating on the ''SingleOptionValue'' type related to data type
+   * conversions.
+   *
+   * @param ext the ''CliExtractor'' decorated by this class
+   */
+  class CliExtractorSingleConvertOps(override val ext: CliExtractor[SingleOptionValue[String]])
+    extends CliExtractorConversions[SingleOptionValue] {
+    override protected def mapExt[B](f: String => B): CliExtractor[SingleOptionValue[B]] = mappedSingle(ext)(f)
   }
 
   /**
@@ -564,6 +590,17 @@ object ParameterExtractor {
     */
   implicit def toConvertOps(ext: CliExtractor[OptionValue[String]]): CliExtractorConvertOps =
     new CliExtractorConvertOps(ext)
+
+  /**
+   * An implicit conversion function to decorate a ''CliExtractor'' with a
+   * ''CliExtractorSingleConvertOps'' object.
+   *
+   * @param ext the extractor to be decorated
+   * @return the ''CliExtractorSingleConvertOps'' object decorating this
+   *         extractor
+   */
+  implicit def toSingleConvertOps(ext: CliExtractor[SingleOptionValue[String]]): CliExtractorSingleConvertOps =
+    new CliExtractorSingleConvertOps(ext)
 
   /**
     * An implicit conversion function to decorate a ''CliExtractor'' with a
