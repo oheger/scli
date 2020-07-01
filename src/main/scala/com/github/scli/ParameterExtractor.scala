@@ -546,6 +546,16 @@ object ParameterExtractor {
      * @return the ''CliExtractor'' applying the mapping function
      */
     def mapTo[B](f: A => B): CliExtractor[SingleOptionValue[B]] = mappedSingle(ext)(f)
+
+    /**
+     * Returns a ''CliExtractor'' that yields a boolean result indicating
+     * whether the option extracted by the managed extractor has a value. This
+     * is useful for instance when constructing conditional extractors; so
+     * conditions can be defined based on the presence of certain options.
+     *
+     * @return the ''CliExtractor'' checking whether an option has a value
+     */
+    def isDefined: CliExtractor[Try[Boolean]] = isSingleOptionDefined(ext)
   }
 
   /**
@@ -943,6 +953,21 @@ object ParameterExtractor {
   def isOptionDefined[A](ext: CliExtractor[OptionValue[A]]): CliExtractor[Try[Boolean]] =
     ext map { optionValue =>
       optionValue map (_.nonEmpty)
+    }
+
+  /**
+   * Returns an extractor that yields a flag whether the ''CliExtractor''
+   * operating on a ''SingleOptionValue'' passed in extracts a defined value.
+   * This is analogous to ''isOptionDefined()'', but for extractors yielding
+   * only a single value.
+   *
+   * @param ext the extractor to be checked
+   * @tparam A the type of the option value
+   * @return the extractor checking whether there is a defined value
+   */
+  def isSingleOptionDefined[A](ext: CliExtractor[SingleOptionValue[A]]): CliExtractor[Try[Boolean]] =
+    ext map { triedValue =>
+      triedValue map (_.nonEmpty)
     }
 
   /**

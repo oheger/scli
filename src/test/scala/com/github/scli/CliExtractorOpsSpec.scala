@@ -303,15 +303,29 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result should be(Success(Some(ExpLength)))
   }
 
-  it should "support checking whether an option is defined" in {
+  it should "support checking whether a multi option is defined" in {
     val ext = multiOptionValue(KeyAnswer).isDefined
 
     val result = runExtractor(ext)
     result should be(Success(true))
   }
 
-  it should "support checking an option is defined if it is not" in {
+  it should "support checking whether a multi option is defined if it is not" in {
     val ext = multiOptionValue(UndefinedKey).isDefined
+
+    val result = runExtractor(ext)
+    result should be(Success(false))
+  }
+
+  it should "support checking whether an option is defined" in {
+    val ext = optionValue(KeyAnswer).isDefined
+
+    val result = runExtractor(ext)
+    result should be(Success(true))
+  }
+
+  it should "support checking whether an option is defined if it is not" in {
+    val ext = optionValue(UndefinedKey).isDefined
 
     val result = runExtractor(ext)
     result should be(Success(false))
