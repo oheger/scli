@@ -368,6 +368,14 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "support setting a fallback value if the extractor yields a value" in {
+    val ext = multiOptionValue(KeyAnswer).fallbackValues("fallback")
+      .toInt.single.mandatory
+
+    val result = runExtractor(ext)
+    result should be(Success(NumberValue))
+  }
+
   it should "support setting a fallback value for an option" in {
     val ext = multiOptionValue(UndefinedKey).fallback(constantOptionValue(NumberValue.toString))
       .toInt.single.mandatory
@@ -383,6 +391,18 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
     val result = runExtractor(ext)
     result should be(Success(NumberValues))
+  }
+
+  it should "ignore fallback values in case of a failure" in {
+    val ext = multiOptionValue(KeyPath)
+      .toInt
+      .fallbackValues(NumberValue)
+
+    runExtractor(ext) match {
+      case Failure(exception: ParameterExtractionException) =>
+        exception.failures.head.key should be(KeyPath)
+      case r => fail("Unexpected result: " + r)
+    }
   }
 
   it should "support combining multiple options to a data object" in {

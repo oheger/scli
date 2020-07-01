@@ -21,7 +21,6 @@ import java.io.IOException
 import com.github.scli.CliHelpGenerator.CliHelpContext
 import com.github.scli.ParameterExtractor.{OptionValue, ParameterContext, Parameters}
 import com.github.scli.ParameterParser.ParametersMap
-import org.mockito.Mockito
 import org.mockito.Mockito._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -296,43 +295,6 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(TestParameters)
     res.get should be(items)
-  }
-
-  it should "provide a fallback extractor if the first extractor yields a value" in {
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val ext1 = testExtractor(ResultOptionValue)
-    val ext2 = consoleReaderValue("someKey", password = true)
-    val extractor = ParameterExtractor.withFallback(ext1, ext2)
-
-    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
-    next.parameters should be(NextParameters)
-    res.get should be(ResultValues)
-    Mockito.verifyZeroInteractions(consoleReader)
-  }
-
-  it should "provide a fallback extractor if the first extractor yields an empty value" in {
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val nextNextParameters = Parameters(Map("next" -> List("v4", "v5")), Set("x", "y", "z"))
-    val ext1 = testExtractor[OptionValue[String]](Success(List.empty))
-    val ext2 = testExtractor(ResultOptionValue, expParameters = NextParameters, nextParameters = nextNextParameters)
-    val extractor = ParameterExtractor.withFallback(ext1, ext2)
-
-    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
-    next.parameters should be(nextNextParameters)
-    res.get should be(ResultValues)
-  }
-
-  it should "provide a fallback extractor if the first extractor yields a Failure" in {
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val exception = new IllegalArgumentException("Invalid option")
-    val optionValue: OptionValue[String] = Failure(exception)
-    val ext1 = testExtractor(optionValue)
-    val ext2 = constantExtractor(ResultOptionValue)
-    val extractor = ParameterExtractor.withFallback(ext1, ext2)
-
-    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
-    next.parameters should be(NextParameters)
-    res should be(optionValue)
   }
 
   it should "provide an extractor to extract a single option value if there is exactly one value" in {

@@ -800,12 +800,7 @@ object ParameterExtractor {
     */
   def withFallback[A](ext: CliExtractor[OptionValue[A]], fallbackExt: CliExtractor[OptionValue[A]]):
   CliExtractor[OptionValue[A]] =
-    ext.mapWithContext { (result, context) =>
-      if (result.isFailure || result.get.nonEmpty) {
-        val helpContext = updateHelpContext(context.helpContext, List((fallbackExt, None)))
-        (result, context.copy(helpContext = helpContext))
-      } else fallbackExt.run(context)
-    }
+    conditionalValue(ext.isDefined, ext, fallbackExt)
 
   /**
     * Returns an extractor that prompts the user for entering the value of an
