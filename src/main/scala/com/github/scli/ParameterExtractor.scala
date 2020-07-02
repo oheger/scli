@@ -534,6 +534,43 @@ object ParameterExtractor {
     def mandatory: CliExtractor[Try[A]] = asMandatory(ext)
 
     /**
+     * Adds a fallback or default extractor to the managed ''CliExtractor''. If
+     * the original extractor does not yield a value, the fallback extractor
+     * is evaluated.
+     *
+     * @param fallbackExt the fallback ''CliExtractor''
+     * @return the ''CliExtractor'' supporting a fallback
+     */
+    def fallback(fallbackExt: CliExtractor[SingleOptionValue[A]]): CliExtractor[SingleOptionValue[A]] =
+      withFallbackSingle(ext, fallbackExt)
+
+    /**
+     * Adds an extractor as fallback to the managed ''CliExtractor'' that
+     * produces the passed in constant value. Works the same way as
+     * ''fallback()'', but creates the fallback extractor itself. A
+     * description for the value is generated based on the passed in
+     * parameter value.
+     *
+     * @param value the fallback value
+     * @return the ''CliExtractor'' supporting these fallback values
+     */
+    def fallbackValue(value: A): CliExtractor[SingleOptionValue[A]] =
+      fallback(constantOptionValue(value).single)
+
+    /**
+     * Adds an extractor as fallback to the managed ''CliExtractor'' that
+     * produces the passed in constant value and sets the value description
+     * specified. Works the same way as ''fallbackValue()'', but allows more
+     * control over the value description.
+     *
+     * @param optValueDesc the optional description of the value
+     * @param value        the fallback value
+     * @return the ''CliExtractor'' supporting these fallback values
+     */
+    def fallbackValueWithDesc(optValueDesc: Option[String], value: A): CliExtractor[SingleOptionValue[A]] =
+      fallback(constantOptionValueWithDesc(optValueDesc, value).single)
+
+    /**
      * Returns a ''CliExtractor'' that yields the value of the managed
      * extractor with the given mapping function applied to it. In contrast to
      * the plain ''map()'' function, this function is more convenient for
@@ -810,6 +847,20 @@ object ParameterExtractor {
     */
   def withFallback[A](ext: CliExtractor[OptionValue[A]], fallbackExt: CliExtractor[OptionValue[A]]):
   CliExtractor[OptionValue[A]] =
+    conditionalValue(ext.isDefined, ext, fallbackExt)
+
+  /**
+   * Returns an extractor that can apply a fallback (or default) value to
+   * another extractor yielding a single value. This is analogous to
+   * ''withFallback()'', but for the value type ''SingleOptionValue''.
+   *
+   * @param ext         the extractor to be decorated
+   * @param fallbackExt the fallback extractor
+   * @tparam A the type of the values
+   * @return the resulting extractor applying a fallback value
+   */
+  def withFallbackSingle[A](ext: CliExtractor[SingleOptionValue[A]], fallbackExt: CliExtractor[SingleOptionValue[A]]):
+  CliExtractor[SingleOptionValue[A]] =
     conditionalValue(ext.isDefined, ext, fallbackExt)
 
   /**

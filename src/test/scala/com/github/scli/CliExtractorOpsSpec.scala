@@ -382,7 +382,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     }
   }
 
-  it should "support setting a fallback value if the extractor yields a value" in {
+  it should "support setting a fallback value for a multi option if the extractor yields a value" in {
     val ext = multiOptionValue(KeyAnswer).fallbackValues("fallback")
       .toInt.single.mandatory
 
@@ -390,7 +390,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result should be(Success(NumberValue))
   }
 
-  it should "support setting a fallback value for an option" in {
+  it should "support setting a fallback value for a multi option" in {
     val ext = multiOptionValue(UndefinedKey).fallback(constantOptionValue(NumberValue.toString))
       .toInt.single.mandatory
 
@@ -398,7 +398,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result should be(Success(NumberValue))
   }
 
-  it should "support setting fallback values for an option" in {
+  it should "support setting fallback values for a multi option" in {
     val ext = multiOptionValue(UndefinedKey)
       .toInt
       .fallbackValues(NumberValues.head, NumberValues.tail: _*)
@@ -417,6 +417,31 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
         exception.failures.head.key should be(KeyPath)
       case r => fail("Unexpected result: " + r)
     }
+  }
+
+  it should "support setting a fallback value of a single option if the extractor yields a value" in {
+    val ext = optionValue(KeyAnswer).fallbackValue("not accessed")
+      .toInt.mandatory
+
+    val result = runExtractor(ext)
+    result should be(Success(NumberValue))
+  }
+
+  it should "support setting a fallback extractor for a single option" in {
+    val extFallback = constantOptionValue(NumberValue).single
+    val ext = optionValue(UndefinedKey)
+      .toInt.fallback(extFallback).mandatory
+
+    val result = runExtractor(ext)
+    result should be(Success(NumberValue))
+  }
+
+  it should "support setting a fallback value for a single option" in {
+    val ext = optionValue(UndefinedKey).toInt
+      .fallbackValueWithDesc(None, NumberValue).mandatory
+
+    val result = runExtractor(ext)
+    result should be(Success(NumberValue))
   }
 
   it should "support combining multiple options to a data object" in {

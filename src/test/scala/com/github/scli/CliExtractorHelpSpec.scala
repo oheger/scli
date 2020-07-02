@@ -187,10 +187,19 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     helpContext.hasAttribute(Key, CliHelpGenerator.AttrFallbackValue) shouldBe false
   }
 
-  it should "support a description for constant values via the DSL" in {
-    val ValueDesc = "Description of this value."
+  it should "support a description for multi fallback values" in {
+    val ValueDesc = "Description of these values."
     val ext = multiOptionValue(Key)
       .fallbackValuesWithDesc(Some(ValueDesc), "foo", "bar", "baz")
+
+    val helpContext = generateHelpContext(ext)
+    fetchAttribute(helpContext, Key, CliHelpGenerator.AttrFallbackValue) should be(ValueDesc)
+  }
+
+  it should "support a description for a single fallback value" in {
+    val ValueDesc = "Description of this single value."
+    val ext = optionValue(Key)
+      .fallbackValueWithDesc(Some(ValueDesc), "theValue")
 
     val helpContext = generateHelpContext(ext)
     fetchAttribute(helpContext, Key, CliHelpGenerator.AttrFallbackValue) should be(ValueDesc)
