@@ -62,20 +62,20 @@ object ParameterExtractorSpec {
 }
 
 /**
-  * Test class for ''ParameterExtractor''.
-  */
+ * Test class for ''ParameterExtractor''.
+ */
 class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   import ParameterExtractor._
   import ParameterExtractorSpec._
 
   /**
-    * Tries to cast the given ''Throwable'' to a
-    * ''ParameterExtractionException'' or fails if this is not possible.
-    *
-    * @param exception the exception
-    * @return the ''ParameterExtractionException''
-    */
+   * Tries to cast the given ''Throwable'' to a
+   * ''ParameterExtractionException'' or fails if this is not possible.
+   *
+   * @param exception the exception
+   * @return the ''ParameterExtractionException''
+   */
   private def extractionException(exception: Throwable): ParameterExtractionException =
     exception match {
       case pe: ParameterExtractionException => pe
@@ -83,13 +83,13 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     }
 
   /**
-    * Expects that the given ''Try'' is a failure wrapping a
-    * ''ParameterExtractionException''. This exception is returned.
-    *
-    * @param res the tried result
-    * @tparam T the result type of the ''Try''
-    * @return the exception that was extracted
-    */
+   * Expects that the given ''Try'' is a failure wrapping a
+   * ''ParameterExtractionException''. This exception is returned.
+   *
+   * @param res the tried result
+   * @tparam T the result type of the ''Try''
+   * @return the exception that was extracted
+   */
   private def expectExtractionException[T](res: Try[T]): ParameterExtractionException =
     res match {
       case Failure(exception) => extractionException(exception)
@@ -97,14 +97,14 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     }
 
   /**
-    * Checks the properties of an ''ExtractionFailure''.
-    *
-    * @param failure     the failure object to be checked
-    * @param expKey      the expected key
-    * @param expParams   the expected parameters map
-    * @param expMsgParts strings to be contained in the message
-    * @return the ''ExtractionFailure'' unchanged
-    */
+   * Checks the properties of an ''ExtractionFailure''.
+   *
+   * @param failure     the failure object to be checked
+   * @param expKey      the expected key
+   * @param expParams   the expected parameters map
+   * @param expMsgParts strings to be contained in the message
+   * @return the ''ExtractionFailure'' unchanged
+   */
   private def checkExtractionFailure(failure: ExtractionFailure, expKey: String = Key,
                                      expParams: ParametersMap = TestParameters.parametersMap)
                                     (expMsgParts: String*): ExtractionFailure = {
@@ -118,16 +118,16 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   }
 
   /**
-    * Checks the ''ExtractionFailure'' of a ''ParameterExtractionException''.
-    * It is expected that the exception contains only a single failure. The
-    * properties of this failure are checked.
-    *
-    * @param exception   the exception to be checked
-    * @param expKey      the expected key
-    * @param expParams   the expected parameters map
-    * @param expMsgParts strings to be contained in the message
-    * @return the ''ExtractionFailure'' unchanged
-    */
+   * Checks the ''ExtractionFailure'' of a ''ParameterExtractionException''.
+   * It is expected that the exception contains only a single failure. The
+   * properties of this failure are checked.
+   *
+   * @param exception   the exception to be checked
+   * @param expKey      the expected key
+   * @param expParams   the expected parameters map
+   * @param expMsgParts strings to be contained in the message
+   * @return the ''ExtractionFailure'' unchanged
+   */
   private def checkExtractionException(exception: ParameterExtractionException, expKey: String = Key,
                                        expParams: ParametersMap = NextParameters.parametersMap)
                                       (expMsgParts: String*): ExtractionFailure = {
@@ -197,16 +197,16 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   }
 
   /**
-    * Creates a generic test Cli extractor that checks the context passed to it
-    * and returns a defined result.
-    *
-    * @param value          the value to be returned by the extractor
-    * @param expParameters  the expected parameters
-    * @param nextParameters the updated parameters
-    * @param expReader      the expected console reader
-    * @tparam A the type of the value
-    * @return the test extractor
-    */
+   * Creates a generic test Cli extractor that checks the context passed to it
+   * and returns a defined result.
+   *
+   * @param value          the value to be returned by the extractor
+   * @param expParameters  the expected parameters
+   * @param nextParameters the updated parameters
+   * @param expReader      the expected console reader
+   * @tparam A the type of the value
+   * @return the test extractor
+   */
   private def testExtractor[A](value: A, expParameters: Parameters = TestParameters,
                                nextParameters: Parameters = NextParameters)
                               (implicit expReader: ConsoleReader): CliExtractor[A] = CliExtractor(context => {
@@ -475,11 +475,11 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   }
 
   /**
-    * Helper method for testing a boolean conversion.
-    *
-    * @param value     the original string option value
-    * @param expResult the expected result
-    */
+   * Helper method for testing a boolean conversion.
+   *
+   * @param value     the original string option value
+   * @param expResult the expected result
+   */
   private def checkBooleanConversion(value: String, expResult: Boolean): Unit = {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val StrValue: OptionValue[String] = Try(Some(value))
@@ -540,7 +540,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val results = values map (mapping(_))
     val ValueOption: OptionValue[String] = Success(values)
     val ext = testExtractor(ValueOption)
-    val extractor =ext.toEnum(mapping.get)
+    val extractor = ext.toEnum(mapping.get)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)

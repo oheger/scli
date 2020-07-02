@@ -50,19 +50,19 @@ object CliExtractorHelpSpec {
     data => List(data.key)
 
   /**
-    * A test column generator function that returns the multi-line help text.
-    */
+   * A test column generator function that returns the multi-line help text.
+   */
   private val HelpColumnGenerator: ColumnGenerator =
     data => data.attributes.attributes(CliHelpGenerator.AttrHelpText).split(CR).toList
 
   /**
-    * Runs the given ''CliExtractor'' and returns the resulting help context.
-    *
-    * @param ext      the extractor to be executed
-    * @param params    the parameters to be used
-    * @param optReader optional console reader for the context
-    * @return the resulting help context
-    */
+   * Runs the given ''CliExtractor'' and returns the resulting help context.
+   *
+   * @param ext       the extractor to be executed
+   * @param params    the parameters to be used
+   * @param optReader optional console reader for the context
+   * @return the resulting help context
+   */
   private def generateHelpContext(ext: CliExtractor[_], params: Parameters = EmptyParameters,
                                   optReader: Option[ConsoleReader] = None): CliHelpContext = {
     implicit val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
@@ -71,43 +71,43 @@ object CliExtractorHelpSpec {
   }
 
   /**
-    * Helper function to obtain the value of an attribute of an option. Throws
-    * an exception if the option or the attribute is not present.
-    *
-    * @param helpContext the helper context
-    * @param optionKey   the option key
-    * @param attrKey     the attribute key
-    * @return the value of this attribute
-    */
+   * Helper function to obtain the value of an attribute of an option. Throws
+   * an exception if the option or the attribute is not present.
+   *
+   * @param helpContext the helper context
+   * @param optionKey   the option key
+   * @param attrKey     the attribute key
+   * @return the value of this attribute
+   */
   private def fetchAttribute(helpContext: CliHelpContext, optionKey: String, attrKey: String): String =
     helpContext.options(optionKey).attributes(attrKey)
 
   /**
-    * Generates the key of the test option with the given index.
-    *
-    * @param idx the index of the test option
-    * @return the key for this option
-    */
+   * Generates the key of the test option with the given index.
+   *
+   * @param idx the index of the test option
+   * @return the key for this option
+   */
   private def testKey(idx: Int): String = s"$Key$idx"
 
   /**
-    * Generates test meta data for an option.
-    *
-    * @param idx the index of the test option
-    * @return the test meta data
-    */
+   * Generates test meta data for an option.
+   *
+   * @param idx the index of the test option
+   * @return the test meta data
+   */
   private def testOptionMetaData(idx: Int): OptionMetaData = {
     val key = testKey(idx)
     testOptionMetaData(key, HelpText + key)
   }
 
   /**
-    * Generates test meta data based on the given parameters.
-    *
-    * @param key  the option key
-    * @param help the help text
-    * @return the resulting meta data
-    */
+   * Generates test meta data based on the given parameters.
+   *
+   * @param key  the option key
+   * @param help the help text
+   * @return the resulting meta data
+   */
   private def testOptionMetaData(key: String, help: String): OptionMetaData = {
     val attrs = Map(CliHelpGenerator.AttrHelpText -> help,
       CliHelpGenerator.AttrOptionType -> CliHelpGenerator.OptionTypeOption)
@@ -115,20 +115,20 @@ object CliExtractorHelpSpec {
   }
 
   /**
-    * Creates a new help context with standard settings and the given options.
-    *
-    * @param options the options
-    * @return the help context
-    */
+   * Creates a new help context with standard settings and the given options.
+   *
+   * @param options the options
+   * @return the help context
+   */
   private def createHelpContext(options: Map[String, OptionAttributes] = Map.empty): CliHelpContext =
     new CliHelpContext(options, SortedSet.empty, None, List.empty)
 
   /**
-    * Generates a help context object that contains a number of test options.
-    *
-    * @param count the number of options to generate
-    * @return the test help context
-    */
+   * Generates a help context object that contains a number of test options.
+   *
+   * @param count the number of options to generate
+   * @return the test help context
+   */
   private def helpContextWithOptions(count: Int): CliHelpContext = {
     val options = (1 to count).map(testOptionMetaData)
       .map(data => (data.key, data.attributes)).toMap
@@ -142,9 +142,9 @@ object CliExtractorHelpSpec {
 }
 
 /**
-  * Test class for testing whether help and usage texts can be generated
-  * correctly from ''CliExtractor'' objects.
-  */
+ * Test class for testing whether help and usage texts can be generated
+ * correctly from ''CliExtractor'' objects.
+ */
 class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   import CliExtractorHelpSpec._

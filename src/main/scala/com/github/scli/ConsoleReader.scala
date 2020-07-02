@@ -17,38 +17,38 @@
 package com.github.scli
 
 /**
-  * A trait defining a mechanism how command line options can be queried from
-  * the user.
-  *
-  * This mechanism is especially used for command line options that represent
-  * passwords. Passwords should not be passed in plain text as command line
-  * arguments when invoking the CLI. Rather, the user is prompted for them if
-  * necessary.
-  */
+ * A trait defining a mechanism how command line options can be queried from
+ * the user.
+ *
+ * This mechanism is especially used for command line options that represent
+ * passwords. Passwords should not be passed in plain text as command line
+ * arguments when invoking the CLI. Rather, the user is prompted for them if
+ * necessary.
+ */
 trait ConsoleReader {
   /**
-    * Prompts the user to enter the value for the given key. A typical
-    * implementation prints the key and then waits for the user to enter a
-    * string. The ''password'' parameter controls whether the user's input
-    * should be treated as secret (which is the default for the intended use
-    * case): if set to '''true''', no echo should be displayed for the keys
-    * typed by the user.
-    *
-    * @param key      the key of the option to be read
-    * @param password flag whether this is a password option
-    * @return the input read from the user
-    */
+   * Prompts the user to enter the value for the given key. A typical
+   * implementation prints the key and then waits for the user to enter a
+   * string. The ''password'' parameter controls whether the user's input
+   * should be treated as secret (which is the default for the intended use
+   * case): if set to '''true''', no echo should be displayed for the keys
+   * typed by the user.
+   *
+   * @param key      the key of the option to be read
+   * @param password flag whether this is a password option
+   * @return the input read from the user
+   */
   def readOption(key: String, password: Boolean): String
 }
 
 /**
-  * A default implementation of the ''ConsoleReader'' trait that reads user
-  * input via Java's ''Console'' class.
-  *
-  * ''java.io.Console'' offers methods for prompting the user and gathering
-  * user input, with and without echo (as needed for passwords). Unfortunately,
-  * the class is final which makes testing rather difficult.
-  */
+ * A default implementation of the ''ConsoleReader'' trait that reads user
+ * input via Java's ''Console'' class.
+ *
+ * ''java.io.Console'' offers methods for prompting the user and gathering
+ * user input, with and without echo (as needed for passwords). Unfortunately,
+ * the class is final which makes testing rather difficult.
+ */
 object DefaultConsoleReader extends ConsoleReader {
   override def readOption(key: String, password: Boolean): String = {
     val prompt = s"$key: "
@@ -59,11 +59,11 @@ object DefaultConsoleReader extends ConsoleReader {
 }
 
 /**
-  * A dummy implementation of the ''ConsoleReader'' trait that does not
-  * actually access the console, but always returns an empty string. This is
-  * used to process command line options if only the meta data of extractors is
-  * of interest.
-  */
+ * A dummy implementation of the ''ConsoleReader'' trait that does not
+ * actually access the console, but always returns an empty string. This is
+ * used to process command line options if only the meta data of extractors is
+ * of interest.
+ */
 object DummyConsoleReader extends ConsoleReader {
   override def readOption(key: String, password: Boolean): String = ""
 }

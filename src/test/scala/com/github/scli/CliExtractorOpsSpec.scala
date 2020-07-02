@@ -58,25 +58,25 @@ object CliExtractorOpsSpec {
     KeyPath -> List(PathValue.toString))
 
   /**
-    * Executes the given extractor on the test parameters.
-    *
-    * @param ext        the extractor
-    * @param parameters the parameters
-    * @tparam A the result type of the extractor
-    * @return the result produced by the extractor
-    */
+   * Executes the given extractor on the test parameters.
+   *
+   * @param ext        the extractor
+   * @param parameters the parameters
+   * @tparam A the result type of the extractor
+   * @return the result produced by the extractor
+   */
   private def runExtractor[A](ext: CliExtractor[A], parameters: Parameters = TestParameters): A =
     ParameterExtractor.runExtractor(ext, parameters)(DefaultConsoleReader)._1
 
   /**
-    * Creates a [[ParamModel]] object from the given components.
-    *
-    * @param triedNumbers the numbers component
-    * @param triedAnswer  the answer component
-    * @param triedFlag    the flag component
-    * @param triedPath    the path component
-    * @return a ''Try'' with the resulting model
-    */
+   * Creates a [[ParamModel]] object from the given components.
+   *
+   * @param triedNumbers the numbers component
+   * @param triedAnswer  the answer component
+   * @param triedFlag    the flag component
+   * @param triedPath    the path component
+   * @return a ''Try'' with the resulting model
+   */
   private def createModel(triedNumbers: Try[Iterable[Int]], triedAnswer: Try[Int], triedFlag: Try[Boolean],
                           triedPath: Try[Option[Path]]): Try[ParamModel] =
     createRepresentation(triedNumbers, triedAnswer, triedFlag, triedPath) { (nums, a, f, p) =>
@@ -84,10 +84,10 @@ object CliExtractorOpsSpec {
     }
 
   /**
-    * Returns an extractor that extracts a [[ParamModel]] object.
-    *
-    * @return the extractor
-    */
+   * Returns an extractor that extracts a [[ParamModel]] object.
+   *
+   * @return the extractor
+   */
   private def paramModelExtractor(): CliExtractor[Try[ParamModel]] =
     for {
       extNumbers <- multiOptionValue(KeyNumbers).toInt
@@ -97,41 +97,41 @@ object CliExtractorOpsSpec {
     } yield createModel(extNumbers, extAnswer, extFlag, extPath)
 
   /**
-    * Creates a test component for a given index.
-    *
-    * @param index the index
-    * @return the test component with this index
-    */
+   * Creates a test component for a given index.
+   *
+   * @param index the index
+   * @return the test component with this index
+   */
   private def createComponent(index: Int): String = s"testValue$index"
 
   /**
-    * Creates a successful ''Try'' with the test component with the given
-    * index.
-    *
-    * @param index the index
-    * @return the ''Success'' with this test component
-    */
+   * Creates a successful ''Try'' with the test component with the given
+   * index.
+   *
+   * @param index the index
+   * @return the ''Success'' with this test component
+   */
   private def triedComponent(index: Int): Try[String] =
     Success(createComponent(index))
 
   /**
-    * Creates a sequence with test components that can be used to test the
-    * creation of a representation.
-    *
-    * @param count the number of components
-    * @return the sequence with the test components
-    */
+   * Creates a sequence with test components that can be used to test the
+   * creation of a representation.
+   *
+   * @param count the number of components
+   * @return the sequence with the test components
+   */
   private def createComponents(count: Int): IndexedSeq[String] =
     (1 to count) map createComponent
 
   /**
-    * A data class that combines the test option values.
-    *
-    * @param numbers value for the list of numbers
-    * @param answer  value for the single number
-    * @param flag    value for the flag
-    * @param path    value for the path
-    */
+   * A data class that combines the test option values.
+   *
+   * @param numbers value for the list of numbers
+   * @param answer  value for the single number
+   * @param flag    value for the flag
+   * @param path    value for the path
+   */
   case class ParamModel(numbers: List[Int],
                         answer: Int,
                         flag: Boolean,
@@ -140,8 +140,8 @@ object CliExtractorOpsSpec {
 }
 
 /**
-  * Test class for the DSL to define complex ''CliExtractor'' objects.
-  */
+ * Test class for the DSL to define complex ''CliExtractor'' objects.
+ */
 class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   import CliExtractorOpsSpec._

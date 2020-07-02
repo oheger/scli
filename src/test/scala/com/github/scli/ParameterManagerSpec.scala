@@ -35,10 +35,10 @@ object ParameterManagerSpec {
   private val HelpTestOption = "This is the help text for the test option."
 
   /**
-    * A test extractor that can be used by test cases. The extractor returns
-    * the current parameters map as result. It also adds the test option to the
-    * map of accessed options and to the help context.
-    */
+   * A test extractor that can be used by test cases. The extractor returns
+   * the current parameters map as result. It also adds the test option to the
+   * map of accessed options and to the help context.
+   */
   private val TestExtractor = ParameterManager.wrapTryExtractor(CliExtractor(context => {
     if (context.reader == DefaultConsoleReader) {
       val nextContext = context.update(context.parameters.keyAccessed(TestOptionKey),
@@ -49,19 +49,19 @@ object ParameterManagerSpec {
 }
 
 /**
-  * Test class for ''ParameterManager''.
-  */
+ * Test class for ''ParameterManager''.
+ */
 class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   import ParameterManagerSpec._
 
   /**
-    * Checks whether the given ''Try'' has a success result and returns it.
-    *
-    * @param triedRes the tried result
-    * @tparam A the type of the result
-    * @return the success result
-    */
+   * Checks whether the given ''Try'' has a success result and returns it.
+   *
+   * @param triedRes the tried result
+   * @tparam A the type of the result
+   * @return the success result
+   */
   private def triedResult[A](triedRes: Try[A]): A =
     triedRes match {
       case Success(value) => value
@@ -69,12 +69,12 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     }
 
   /**
-    * Checks whether the given ''Try'' has failed with a parameter extraction
-    * exception and returns it.
-    *
-    * @param triedRes the tried result
-    * @return the exception that has been extracted
-    */
+   * Checks whether the given ''Try'' has failed with a parameter extraction
+   * exception and returns it.
+   *
+   * @param triedRes the tried result
+   * @return the exception that has been extracted
+   */
   private def failedResult(triedRes: Try[_]): ParameterExtractionException =
     triedRes match {
       case Failure(exception: ParameterExtractionException) => exception

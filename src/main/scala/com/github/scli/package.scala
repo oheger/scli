@@ -20,18 +20,18 @@ import java.util.Locale
 
 package object scli {
   /**
-    * Converts a string to lower case.
-    *
-    * @param s the string
-    * @return the string in lowercase
-    */
+   * Converts a string to lower case.
+   *
+   * @param s the string
+   * @return the string in lowercase
+   */
   def toLowerCase(s: String): String = s.toLowerCase(Locale.ROOT)
 
   /**
-    * Converts a string to uppercase.
-    *
-    * @param s the string
-    * @return the string in uppercase
-    */
+   * Converts a string to uppercase.
+   *
+   * @param s the string
+   * @return the string in uppercase
+   */
   def toUpperCase(s: String): String = s.toUpperCase(Locale.ROOT)
 }

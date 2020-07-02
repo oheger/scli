@@ -199,6 +199,7 @@ object TransferParameterManager {
    * Returns an extractor for the configuration of an HTTP server. All
    * properties of this configuration are mandatory; the extractor is applied
    * only if the target server is actually an HTTP server.
+   *
    * @return the extractor for the ''HttpServerConfig''
    */
   def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {

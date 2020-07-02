@@ -48,8 +48,8 @@ object ParameterParserSpec {
 }
 
 /**
-  * Test class for ''ParameterParser''.
-  */
+ * Test class for ''ParameterParser''.
+ */
 class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Matchers {
 
   import ParameterParserSpec._
@@ -159,12 +159,12 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   /**
-    * Extracts the map with parameters from the given tried result; fails for
-    * other results.
-    *
-    * @param result the result
-    * @return the map with parameters
-    */
+   * Extracts the map with parameters from the given tried result; fails for
+   * other results.
+   *
+   * @param result the result
+   * @return the map with parameters
+   */
   private def extractParametersMap(result: Try[ParameterParser.ParametersMap]): ParameterParser.ParametersMap =
     result match {
       case Success(value) => value
@@ -172,22 +172,22 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     }
 
   /**
-    * Invokes the parameter parser on the given sequence with arguments and
-    * expects a successful result. The resulting map is returned.
-    *
-    * @param args the sequence with arguments
-    * @return the resulting parameters map
-    */
+   * Invokes the parameter parser on the given sequence with arguments and
+   * expects a successful result. The resulting map is returned.
+   *
+   * @param args the sequence with arguments
+   * @return the resulting parameters map
+   */
   private def parseParametersSuccess(args: Seq[String]): ParameterParser.ParametersMap =
     extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption)))
 
   /**
-    * Invokes the parameter parser on the given sequence with arguments and
-    * expects a failure result. The causing exception is returned.
-    *
-    * @param args the sequence with arguments
-    * @return the exception causing the failure
-    */
+   * Invokes the parameter parser on the given sequence with arguments and
+   * expects a failure result. The causing exception is returned.
+   *
+   * @param args the sequence with arguments
+   * @return the exception causing the failure
+   */
   private def parseParametersFailure(args: Seq[String]): Throwable =
     ParameterParser.parseParameters(args, optFileOption = Some(FileOption)) match {
       case Failure(exception) => exception
@@ -195,31 +195,31 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     }
 
   /**
-    * Creates a temporary file that contains the given parameter strings.
-    *
-    * @param args the parameters to store in the file
-    * @return the path to the newly created file
-    */
+   * Creates a temporary file that contains the given parameter strings.
+   *
+   * @param args the parameters to store in the file
+   * @return the path to the newly created file
+   */
   private def createParameterFile(args: String*): Path =
     createDataFile(parameterFileContent(args: _*))
 
   /**
-    * Generates the content of a parameters file from the given parameter
-    * strings.
-    *
-    * @param args the parameters to store in the file
-    * @return the content of the parameter file as string
-    */
+   * Generates the content of a parameters file from the given parameter
+   * strings.
+   *
+   * @param args the parameters to store in the file
+   * @return the content of the parameter file as string
+   */
   private def parameterFileContent(args: String*): String =
     args.mkString("\r\n")
 
   /**
-    * Adds a parameter to read the given file to a parameter list.
-    *
-    * @param path    the path to the file to be read
-    * @param argList the original parameter list
-    * @return the parameter list with the file parameter added
-    */
+   * Adds a parameter to read the given file to a parameter list.
+   *
+   * @param path    the path to the file to be read
+   * @param argList the original parameter list
+   * @return the parameter list with the file parameter added
+   */
   private def appendFileParameter(path: Path, argList: List[String]): List[String] =
     "--" + FileOption :: path.toString :: argList
 

@@ -20,8 +20,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 /**
-  * Test class for ''Multiplicity''.
-  */
+ * Test class for ''Multiplicity''.
+ */
 class MultiplicitySpec extends AnyFlatSpec with Matchers {
   "Multiplicity" should "provide a string representation" in {
     val multiplicity = Multiplicity(1, 2)
