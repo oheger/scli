@@ -203,11 +203,9 @@ object TransferParameterManager {
    * @return the extractor for the ''HttpServerConfig''
    */
   def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {
-    val extUsr = multiOptionValue("user")
-      .single
+    val extUsr = optionValue("user")
       .mandatory
-    val extPwd = multiOptionValue("password")
-      .single
+    val extPwd = optionValue("password")
       .mandatory
     for {
       user <- extUsr
@@ -228,18 +226,15 @@ object TransferParameterManager {
     val extServerUri = inputValue(optKey = Some("serverUri"), index = -1)
       .single
       .mandatory
-    val extChunkSize = multiOptionValue("chunk-size")
+    val extChunkSize = optionValue("chunk-size")
       .toInt
-      .fallbackValues(DefaultChunkSize)
-      .single
+      .fallbackValue(DefaultChunkSize)
       .mandatory
-    val extTag = multiOptionValue("tag")
-      .single
     for {
       srcFiles <- extSrcFiles
       serverUri <- extServerUri
       logs <- multiOptionValue("log")
-      tag <- extTag
+      tag <- optionValue("tag")
       chunkSize <- extChunkSize
     } yield createRepresentation(srcFiles, serverUri, chunkSize, logs, tag) {
       TransferConfig(_, _, _, null, false, _, _)
@@ -253,11 +248,10 @@ object TransferParameterManager {
    * @return the extractor to extract the crypt mode
    */
   private def cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
-    multiOptionValue("crypt-mode")
+    optionValue("crypt-mode")
       .toUpper
       .toEnum(CryptMode.Literals.get)
-      .fallbackValues(CryptMode.None)
-      .single
+      .fallbackValue(CryptMode.None)
       .mandatory
 
   /**
@@ -268,12 +262,10 @@ object TransferParameterManager {
    * @return the extractor for the defined ''CryptConfig''
    */
   private def definedCryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
-    val extCryptPass = multiOptionValue("crypt-password")
-      .single
+    val extCryptPass = optionValue("crypt-password")
       .mandatory
-    val extCryptAlg = multiOptionValue("crypt-alg")
-      .fallbackValues(DefaultCryptAlgorithm)
-      .single
+    val extCryptAlg = optionValue("crypt-alg")
+      .fallbackValue(DefaultCryptAlgorithm)
       .mandatory
     for {
       mode <- cryptModeExtractor

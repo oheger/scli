@@ -74,73 +74,85 @@ definition of basic extractors.
 The functions used within this section are defined by the _ParameterExtractor_
 module. So they require this import:
 
-`import com.github.scli.ParameterExtractor`
+`import com.github.scli.ParameterExtractor._`
 
-==== Reading a plain option value
+NOTE: The DSL provided by SCLI is implemented using Scala _implicit functions_,
+which are also defined by the `ParameterExtractor` class; the wildcard import
+above makes sure that these functions are available in the current scope.
 
-The entry point into extracting the values of options is the _optionValue()_
-function. It returns a _CliExtractor_ of type _OptionValue[String]_.
+==== Extracting a single string option value
+
+One entry point into extracting the values of options is the _optionValue()_
+function. It returns a _CliExtractor_ of type _SingleOptionValue[String]_. This
+can be the basis for further data type conversions. The function expects the
+key of the option as argument. It assumes that the option can have at most
+one value (which is reflected by the result type). This should be the most
+typical use case.
+
+One example of such an option in the sample application is the `tag` option.
+It allows the user to specify a label to be assigned to the transfer operation.
+The assignment only happens if the option is present:
+
+ transfer --tag "v1.1.2" upload ./source /target
+
+This use case is actually handled by the most basic extractor:
+
+[source,scala]
+----
+val extTag = optionValue("tag")
+----
+
+This extractor yields an `Option[String]`, which corresponds to the basic
+`SingleOptionValue[String]` type; it fails if the option occurs multiple times
+and thus has more than one value.
+
+NOTE: Actually, `SingleOptionValue[String]` corresponds to a
+`Try[Option[String]]`. Extractors typically return `Try` types because
+transformations on the user input can always fail. When combining the results
+of extractors failed extractions are detected and collected into a meaningful
+error message.
+
+==== Extracting an option with multiple string values
 
 The _transfer_ sample application supports the command line option `log` to
-define a line for the transfer log. The option can occur multiple times if
-multiple log entries are needed, as in the following fragment:
+define lines for the transfer log. The option can occur multiple times to
+generate multiple log entries, as in the following fragment:
 
  transfer --log "Updating sources" --log "Version 1.1.2-2020-06-28" \
     --log "by test.user@scli.org" upload ./source /target
 
 The type of the `log` option is `Iterable[String]`, which corresponds to the
-basic `OptionValue[String]` type - the basic type of extractors.
-
-NOTE: Actually, `OptionValue[String]` corresponds to a `Try[Iterable[String]]`.
-Extractors typically return `Try` types because transformations on the user
-input can always fail. When combining the results of extractors failed
-extractions are detected and collected into a meaningful error message.
-
-So, the extractor for the `log` parameter is the most basic one; we only need
-to call the _optionValue()_ function and pass in the key of the argument:
+basic `OptionValue[String]` type. For the creation of extractors of this type,
+the _multiOptionValue()_ function is responsible. Its signature is analogous to
+the one of the _optionValue()_ function:
 
 [source,scala]
 ----
-val extLog = optionValue("log")
+val extLog = multiOptionValue("log")
 ----
 
-==== Reading a single string option value
+Except for the different result type, extractors created by the functions
+_optionValue()_ and _multiOptionValue()_ are very similar in the features they
+support; a common set of transformations is available for both. We will discuss
+such transformations later in this tutorial.
 
-Typically, options can only have a single value - or none at all. One example
-of such an option is the `tag` option of the sample application. Here the user
-can specify a label to be assigned to the transfer operation. The assignment
-only happens if the option is present:
-
- transfer --tag "v1-1-2" upload ./source /target
-
-To indicate that an extractor should produce at most one value, we extend its
-declaration by the `single` modifier:
-
-[source,scala]
-----
-val extTag = optionValue("tag")
-  .single
-----
-
-This extractor yields an `Option[String]`; it fails if the option occurs
-multiple times and thus has more than one value.
-
-==== Reading a single mandatory option value
+==== Extracting an option with a mandatory string value
 
 Some parameters must always be present for the application to fulfill its
 function. In the _transfer_ application, if the target is an HTTP server, the
 user must provide the credentials for basic auth - a user name, and a password.
 
-To indicate that an extractor yields a single, mandatory value, in addition to
-the `single` modifier, the `mandatory` modifier needs to be present. This
-changes the result type of the extractor from `Try[Option[String]]` to
-`Try[String]`. The extractor produces a failure if no value is found for this
-argument. The following snippet shows the declaration of the extractor for the
-user name for the HTTP server:
+To indicate that an extractor yields a single, mandatory value, it needs to be
+decorated with the `mandatory` modifier. This is actually a difference between
+extractors for single option values (constructed via `optionValue()`) and those
+for multi option values (created by `multiOptionValue()`): `mandatory` only
+works for single values. The modifier changes the result type of the extractor
+from `Try[Option[String]]` to `Try[String]`. The extractor produces a failure
+if no value is present for this argument. The following snippet shows the
+declaration of the extractor for the user name for the HTTP server:
 
 [source,scala]
 ----
 val extUsr = optionValue("user")
-  .single
   .mandatory
 ----
