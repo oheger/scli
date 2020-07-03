@@ -785,8 +785,8 @@ object ParameterExtractor {
    * @return the extractor to extract this input value
    */
   def inputValue(index: Int, optKey: Option[String] = None, optHelp: Option[String] = None, last: Boolean = false):
-  CliExtractor[OptionValue[String]] =
-    inputValues(index, index, optKey, optHelp, last)
+  CliExtractor[SingleOptionValue[String]] =
+    inputValues(index, index, optKey, optHelp, last).single
 
   /**
    * Returns an extractor that extracts a sequence of values from the input

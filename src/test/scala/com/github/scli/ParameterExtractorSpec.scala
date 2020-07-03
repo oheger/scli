@@ -715,7 +715,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
     next.parameters.accessedParameters should contain only ParameterParser.InputOption
-    res.get should contain only InputValues.head
+    res.get should be(Some(InputValues.head))
   }
 
   it should "provide an extractor that extracts multiple input values" in {
@@ -749,7 +749,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValue(-2)
 
     val (res, _) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    res.get should contain only InputValues(1)
+    res.get should be(Some(InputValues(1)))
   }
 
   it should "yield a failure if the index of an input value is too small" in {

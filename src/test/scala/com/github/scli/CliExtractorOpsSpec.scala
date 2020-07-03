@@ -645,7 +645,6 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val parameters: Parameters = Map(ParameterParser.InputOption -> List("1", "2", "3"))
     val extractor = inputValue(-2)
       .toInt
-      .single
       .mandatory
 
     val result = runExtractor(extractor, parameters)

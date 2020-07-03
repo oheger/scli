@@ -224,7 +224,6 @@ object TransferParameterManager {
       .toPath
       .map(_.map(_.toList))
     val extServerUri = inputValue(optKey = Some("serverUri"), index = -1)
-      .single
       .mandatory
     val extChunkSize = optionValue("chunk-size")
       .toInt
