@@ -25,6 +25,7 @@ import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
 import scala.util.{Failure, Success, Try}
+import scala.concurrent.duration._
 
 /**
  * Test class for ''TransferParameterManager''.
@@ -95,7 +96,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers {
 
   "TransferParameterManager" should "extract a TransferConfig" in {
     val args = List("upload", "--log", "log1", "file1", "--tag", "tag", "file2", "file3", "serverUri",
-      "--log", "log2", "--chunk-size", "16384")
+      "--log", "log2", "--chunk-size", "16384", "--timeout", "30")
     val ExpPaths = List(Paths.get("file1"), Paths.get("file2"), Paths.get("file3"))
 
     val config = extractResult(args, TransferParameterManager.transferConfigExtractor)
@@ -104,6 +105,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers {
     config.logs should be(List("log1", "log2"))
     config.tag should be(Some("tag"))
     config.chunkSize should be(16384)
+    config.timeout should be(Some(30.seconds))
   }
 
   it should "set a default chunk size" in {

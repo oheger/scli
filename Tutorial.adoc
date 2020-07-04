@@ -288,3 +288,162 @@ in.
 NOTE: The `multiplicity` modifier has been introduced in the context of
 input parameters; but it is supported by all kinds of parameters with multiple
 values.
+
+=== Type conversions
+
+While the command line passed to an application is a list of strings, the
+single parameter values may have different data types in the logic of the
+applications. In the _transfer_ sample application, the list of files to
+transfer should actually contain `java.nio.file.Path` objects; there is another
+parameter to define a chunk size for the transfer, which is actually an integer
+number.
+
+SCLI supports a standard set of data type conversions for both extractors for
+single-valued and multi-valued parameters. In addition, there is a mechanism
+to apply arbitrary conversion functions.
+
+Type conversions may fail. For instance, if the user passes the string _LARGE_
+to the _chunkSize_ option, the conversion to `Int` will throw an exception.
+Such exceptions are caught during parameter processing and recorded as failures
+that can be displayed to the user.
+
+==== Extracting an Int parameter
+
+One of the conversion functions available out of the box is `toInt`. Like all
+of these conversions, it is applicable to extractors yielding a String type.
+The resulting extractor then produces a value of type `Int`.
+
+The sample application, applies this conversion to the already mentioned
+_chunkSize_ option:
+
+[source,scala]
+----
+val extChunkSize: CliExtractor[SingleOptionValue[Int]] = optionValue("chunk-size")
+  .toInt
+----
+
+==== Extracting a Path parameter
+
+For the input parameter for the files to transfer, the values need to be
+converted to `Path` objects. This is done analogously to the integer conversion
+by using the `toPath` conversion function. (As you see, it does not make any
+difference whether the extractor produces a single or multiple values; the
+conversion functions are available in both cases.)
+
+[source,scala]
+----
+val extSrcFiles: CliExtractor[OptionValue[Path]] =
+  inputValues(fromIdx = 1, toIdx = -2, optKey = Some("transferFiles"))
+    .multiplicity(atLeast = 1)
+    .toPath
+----
+
+==== Extracting a Boolean parameter
+
+Another conversion function available out of the box is `toBoolean`, which, not
+surprisingly, converts parameter values to the type Boolean. It does this by
+evaluating the string value and expecting one of the strings *true* or *false*;
+result is the corresponding Boolean value, any other value causes the extractor
+to produce a failure.
+
+So this conversion function is rather restrictive. One way to make it more
+lenient is allowing different case for the parameter values - so that input
+like *True* or *FALSE* is still accepted. For such use cases, SCLI supports the
+`toLower` function which converts the value(s) of a parameter to lower case.
+This function can now be applied before the `toBoolean` conversion:
+
+[source,scala]
+----
+val extBoolean: CliExtractor[SingleOptionValue[Boolean]] = optionValue("flag")
+  .toLower
+  .toBoolean
+----
+
+NOTE: An alternative to a type conversion to Boolean can be switches. Here the
+presence or absence of the switch in the command line determines whether the
+value is *true* or *false*. This can be more convenient for the user who is not
+forced to enter the correctly spelled string values.
+
+==== Extracting an enum parameter
+
+Sometimes the value(s) of a parameter must belong to a defined set of allowed
+constants. A possible use case is selecting a specific mode of the application.
+The _transfer_ sample application supports a parameter to set the mode for
+encrypting files during the transfer. Here multiple options are available:
+Encryption can be disabled, the content of the files can be encrypted, or
+encryption can be applied to both the content and the file names.
+
+The conversion function to deal with such cases is `toEnum`. The function is
+not limited to Java enum classes as the name might suggest. It rather expects a
+mapping function, which converts the original string value to a target value.
+The function actually returns an `Option` of the target value; a result of
+`None` means, that the string value could not be matched to a valid enumeration
+literal. This causes the extractor to produce a failure.
+
+The _transfer_ application needs to map strings to constants of the `CryptMode`
+class. `CryptMode` is actually a Scala enumeration class as shown below:
+
+[source,scala]
+----
+object CryptMode extends Enumeration {
+
+  val None, Files, FilesAndNames = Value
+
+  final val Literals: Map[String, CryptMode.Value] =
+    values.map(v => (v.toString.toUpperCase(Locale.ROOT), v)).toMap
+  }
+----
+
+The class defines a number of constants representing the valid modes for
+encryption. It also has a map allowing access to constants by their name; the
+keys in this map are in upper case. The extractor for the encryption mode uses
+this map for the mapping of input strings to `CryptMode` constants:
+
+[source,scala]
+----
+private def cryptModeExtractor: CliExtractor[SingleOptionValue[CryptMode.Value]] =
+  optionValue("crypt-mode")
+    .toUpper
+    .toEnum(CryptMode.Literals.get)
+----
+
+Note how the _get()_ function of the map with `CryptMode` literals is passed as
+mapping function to the `toEnum` converter. `Map.get()` in this case is a
+function of type `String => Option[CryptMode.Value]`, which is the exact
+signature required by `toEnum`. This is a good example of the flexibility
+allowed by the approach with the mapping function.
+
+Note further the usage of the `toUpper` conversion function before applying
+`toEnum`. `toUpper` is the counter-part of the `toLower` converter we already
+met. It converts the current parameter value to upper case. This is needed in
+this case because the keys in the map accessed by the mapping function are in
+upper case as well.
+
+==== Applying a custom mapping function
+
+Extractors, being monads, support operations like _map()_ or _flatMap()_
+natively to transform the values they produce. However, given the data types
+the extractors typically operate on, using these operations is rather
+inconvenient. The mapping functions expected by them have to deal with
+Iterables or Options nested in Tries.
+
+To simplify custom mapping, SCLI therefore offers the `mapTo` converter. It
+expects a mapping function that directly operates on the option values. This
+function is called only if the result of the extractor is successful, and a
+value is actually present.
+
+The _transfer_ sample application uses this feature to extract the `timeout`
+option. The user can here specify an Int value, which is interpreted as the
+timeout for a transfer operation in seconds. The data type of the value of
+this option is `Option[Duration]` (as it is not required to provide a timeout).
+The code fragment below shows the declaration of the extractor for the
+`timeout` option. It converts the value of the option to the type `Int` first
+and then applies a custom mapping function to transform the result to a
+`Duration`:
+
+[source,scala]
+----
+val extTimeout = optionValue("timeout")
+  .toInt
+  .mapTo(t => t.seconds)
+----

@@ -23,6 +23,7 @@ import com.github.scli.ParameterExtractor._
 
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Try}
+import scala.concurrent.duration._
 
 /**
  * An example module that provides functionality to extract command line
@@ -97,7 +98,7 @@ object TransferParameterManager {
    * @param sourceFiles a list with the paths to the files to be transferred
    * @param serverUrl   the URL of the target server
    * @param chunkSize   the chunks to use for I/O operations
-   * @param timeout     a timeout for I/O operations
+   * @param timeout     an optional timeout for I/O operations
    * @param dryRun      a flag whether only a test run should be made
    * @param logs        a list of log messages to describe the transfer
    * @param tag         an optional identifier to tag the files on the server
@@ -105,7 +106,7 @@ object TransferParameterManager {
   case class TransferConfig(sourceFiles: List[Path],
                             serverUrl: String,
                             chunkSize: Int,
-                            timeout: Duration,
+                            timeout: Option[Duration],
                             dryRun: Boolean,
                             logs: Iterable[String],
                             tag: Option[String])
@@ -229,14 +230,18 @@ object TransferParameterManager {
       .toInt
       .fallbackValue(DefaultChunkSize)
       .mandatory
+    val extTimeout = optionValue("timeout")
+      .toInt
+      .mapTo(t => t.seconds)
     for {
       srcFiles <- extSrcFiles
       serverUri <- extServerUri
       logs <- multiOptionValue("log")
       tag <- optionValue("tag")
       chunkSize <- extChunkSize
-    } yield createRepresentation(srcFiles, serverUri, chunkSize, logs, tag) {
-      TransferConfig(_, _, _, null, false, _, _)
+      timeout <- extTimeout
+    } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, logs, tag) {
+      TransferConfig(_, _, _, _, false, _, _)
     }
   }
 
