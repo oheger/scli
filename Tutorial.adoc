@@ -447,3 +447,84 @@ val extTimeout = optionValue("timeout")
   .toInt
   .mapTo(t => t.seconds)
 ----
+
+=== Fallback values
+
+It is often not necessary that the user provides each and every parameter on
+the command line; the application can assume meaningful default or fallback
+values for missing parameters. There are basically two approaches to handle
+such missing parameters in SCLI:
+
+The first approach is to model optional parameters as such. For instance, the
+data classes representing the parameters supported by the application can have
+properties of type `Option` or potentially empty collections for parameters
+that are not mandatory. Because the base types of SCLI for parameter values
+already support optional parameters, there is no additional work to do for the
+developer; when evaluating the values extracted, they come out as `Option` or
+collection types. This approach forces the application logic to deal with
+missing parameters. For instance, when accessing an optional property the
+application could use a `getOrElse` construct to inject a fallback value if
+necessary.
+
+The second approach is to provide such fallback values directly during the
+processing of the command line. For this purpose, SCLI offers functions to
+assign fallback values to processors. The logic of these functions is that if
+the extractor produces a value, this value is used; otherwise, the fallback
+value comes into play. When using this approach the application logic can
+assume that parameter values are present. A drawback could be that the module
+responsible for command line processing needs the knowledge about meaningful
+default values.
+
+SCLI is not opinionated about the approach chosen by a concrete application.
+It is also no problem to mix these approaches, so that an application can
+decide on a per parameter basis which variant is the most suitable one. This
+subsection describes the second approach.
+
+==== Specifying a single fallback value
+
+Every extractor based on the `SingleOptionValue` type supports setting a
+single fallback value, which of course must correspond to the concrete data
+type of the value. It is set via the `fallbackValue()` function. The sample
+_transfer_ application uses this mechanism to set a fallback value for the
+`chunkSize` option:
+
+[source,scala]
+----
+final val DefaultChunkSize = 8192
+
+val extChunkSize = optionValue("chunk-size")
+  .toInt
+  .fallbackValue(DefaultChunkSize)
+  .mandatory
+----
+
+Note that it is now safe to use the `mandatory` modifier at the end: with the
+fallback value in place, it is guaranteed that the option has a value. The
+result type of the extractor is now `Try[Int]`.
+
+==== Specifying multiple fallback values
+
+For extractors operating on the `OptionValue` type, you can specify multiple
+fallback values. The function for this purpose is consequently named
+`fallbackValues()`. It expects a mandatory parameter for the first fallback
+value and then a varargs parameter for an arbitrary number of further values.
+
+The sample application does not use this function. So let's for a moment
+consider that we want to set some default log entries to be applied if the user
+has not provided the `log` option. Then the declaration of the extractor could
+look as follows:
+
+[source,scala]
+----
+val extLog = multiOptionValue("log")
+  .fallbackValues("Transfer log", "Update without a concrete log message")
+----
+
+==== Specifying a fallback extractor
+
+Setting concrete fallback values is just a special case for running another
+extractor if an extractor does not yield a value. This replacement extractor
+can then execute arbitrary logic to compute a value for the parameter in
+question. This mechanism is supported for both single-valued and multi-valued
+extractors in form of the `fallback()` function. We will present an example of
+using this function when we discuss password parameters.
