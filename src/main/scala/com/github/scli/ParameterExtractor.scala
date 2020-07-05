@@ -870,13 +870,19 @@ object ParameterExtractor {
    * instance together with ''withFallback()'' to let the user enter a value
    * if it has not been provided on the command line.
    *
-   * @param key      the key of the option
-   * @param password a flag whether a password is to be entered
+   * @param key       the key of the option
+   * @param password  a flag whether a password is to be entered
+   * @param optPrompt an optional text to be displayed to the user; if
+   *                  undefined, the option key is used as prompt
    * @return the extractor that reads from the console
    */
-  def consoleReaderValue(key: String, password: Boolean): CliExtractor[OptionValue[String]] =
-    CliExtractor(context => (Try(List(context.reader.readOption(key, password))), context), Some(key))
-
+  def consoleReaderValue(key: String, password: Boolean = true, optPrompt: Option[String] = None):
+  CliExtractor[SingleOptionValue[String]] =
+    CliExtractor(context => {
+      val prompt = optPrompt getOrElse key
+      val consoleValue = context.reader.readOption(prompt, password)
+      (Try(Some(consoleValue)), context)
+    }, Some(key))
 
   /**
    * Returns an extractor that conditionally delegates to other extractors.

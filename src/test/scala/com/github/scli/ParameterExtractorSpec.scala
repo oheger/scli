@@ -586,11 +586,11 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val Result = "enteredFromUser"
     when(consoleReader.readOption(Key, password = true)).thenReturn(Result)
-    val extractor = ParameterExtractor.consoleReaderValue(Key, password = true)
+    val extractor = ParameterExtractor.consoleReaderValue(Key)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(TestParameters)
-    res.get should contain only Result
+    res.get should be(Some(Result))
   }
 
   it should "evaluate the password flag of the console reader extractor" in {
@@ -601,7 +601,19 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(TestParameters)
-    res.get should contain only Result
+    res.get should be(Some(Result))
+  }
+
+  it should "evaluate the prompt when reading an option from the command line" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val Prompt = "Dear user, please be so kind to enter the option value"
+    val Result = "enteredFromUserAfterNicePrompt"
+    when(consoleReader.readOption(Prompt, password = false)).thenReturn(Result)
+    val extractor = ParameterExtractor.consoleReaderValue(Key, password = false, optPrompt = Some(Prompt))
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    next.parameters should be(TestParameters)
+    res.get should be(Some(Result))
   }
 
   it should "provide an extractor that yields an empty option value" in {

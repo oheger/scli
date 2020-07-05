@@ -206,8 +206,7 @@ object TransferParameterManager {
   def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {
     val extUsr = optionValue("user")
       .mandatory
-    val extPwd = optionValue("password")
-      .mandatory
+    val extPwd = passwordExtractor("password")
     for {
       user <- extUsr
       pwd <- extPwd
@@ -246,6 +245,19 @@ object TransferParameterManager {
   }
 
   /**
+   * Returns an extractor for a (mandatory) password option. The extractor
+   * reads the password from the console if it has not been specified on the
+   * command line.
+   *
+   * @param key the key of the option
+   * @return the password extractor for this key
+   */
+  private def passwordExtractor(key: String): CliExtractor[Try[String]] =
+    optionValue(key)
+      .fallback(consoleReaderValue(key, password = true))
+      .mandatory
+
+  /**
    * Returns an extractor that extracts a crypt mode value from a command line
    * option.
    *
@@ -266,8 +278,7 @@ object TransferParameterManager {
    * @return the extractor for the defined ''CryptConfig''
    */
   private def definedCryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
-    val extCryptPass = optionValue("crypt-password")
-      .mandatory
+    val extCryptPass = passwordExtractor("crypt-password")
     val extCryptAlg = optionValue("crypt-alg")
       .fallbackValue(DefaultCryptAlgorithm)
       .mandatory

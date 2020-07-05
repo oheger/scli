@@ -19,10 +19,12 @@ package com.github.scli.sample.transfer
 import java.nio.file.Paths
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterContext, ParameterExtractionException}
-import com.github.scli.ParameterManager
+import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterManager}
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, HttpServerConfig}
+import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
+import org.scalatestplus.mockito.MockitoSugar
 
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
@@ -30,7 +32,7 @@ import scala.concurrent.duration._
 /**
  * Test class for ''TransferParameterManager''.
  */
-class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers {
+class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with MockitoSugar {
   /**
    * Parses the given command line arguments and invokes the extractor
    * specified on the result. The function expects that the extraction is
@@ -157,10 +159,31 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers {
     config should be(TransferParameterManager.DisabledCryptConfig)
   }
 
+  it should "read the encryption password from the console if it is not specified" in {
+    val args = Map("crypt-mode" -> List("files"),
+      "crypt-alg" -> List("DES"))
+    val Password = "secret_Encryption!Pwd"
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    Mockito.when(consoleReader.readOption("crypt-password", password = true)).thenReturn(Password)
+
+    val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, args)
+    result.map(_.password) should be(Success(Password))
+  }
+
   it should "extract an HttpServerConfig" in {
     val args = List("--user", "scott", "--password", "tiger")
 
     val config = extractResult(args, TransferParameterManager.httpServerConfigExtractor)
     config should be(HttpServerConfig("scott", "tiger"))
+  }
+
+  it should "read the HTTP server password from the console if it is not specified" in {
+    val args = Map("user" -> List("scott"))
+    val Password = "tiger"
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    Mockito.when(consoleReader.readOption("password", password = true)).thenReturn(Password)
+
+    val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, args)
+    result.map(_.password) should be(Success(Password))
   }
 }

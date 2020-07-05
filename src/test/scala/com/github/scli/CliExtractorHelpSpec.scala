@@ -428,10 +428,10 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "use a dummy console reader when running extractors to get meta data" in {
     val Key2 = "readerOption"
-    val extCond = multiOptionValue("condition").isDefined
-    val extIf = multiOptionValue(Key).fallback(consoleReaderValue(Key2, password = true))
-    val extElse = multiOptionValue(Key2)
-    val extCase = conditionalOptionValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
+    val extCond = optionValue("condition").isDefined
+    val extIf = optionValue(Key).fallback(consoleReaderValue(Key2, password = true))
+    val extElse = optionValue(Key2)
+    val extCase = conditionalValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
       elseExt = extElse, elseGroup = Some("g2"))
     val reader = mock[ConsoleReader]
 
