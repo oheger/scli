@@ -527,4 +527,70 @@ extractor if an extractor does not yield a value. This replacement extractor
 can then execute arbitrary logic to compute a value for the parameter in
 question. This mechanism is supported for both single-valued and multi-valued
 extractors in form of the `fallback()` function. We will present an example of
-using this function when we discuss password parameters.
+using this function when we discuss <<Password parameters>>.
+
+=== Password parameters
+
+There are use case when command line applications need a password to fulfill
+their task. The _transfer_ application even supports two different password
+parameters: one password to encrypt the data to transfer and another password
+to authenticate against the target HTTP server.
+
+Syntactically, passwords are just strings; so they could be treated as any
+other option. For security reasons, however, it is not recommended passing a
+password as plain text to a command line application. The password is then
+visible when it is typed, and it can be stored in the history of the shell.
+
+An alternative to expecting a password to be provided as parameter is letting
+the application prompt the user for the password. SCLI supports this use case
+with the `consoleReaderValue()` function. The function returns an extractor of
+type `SingleOptionValue[String]` that yields the value the user entered on the
+console. It expects the following parameters:
+
+* the key of the option; this parameter is mandatory
+* a flag whether the function should read a password. This flag controls
+  whether the characters typed by the user are visible in the console, which
+  should not be the case when entering passwords. The flag is *true* per
+  default because reading passwords is the main use case for this function.
+* an optional prompt to be displayed to the user; if undefined, the function
+  prints the option key
+
+Using this function, the extractor for the password for the HTTP server could
+look as follows:
+
+[source,scala]
+----
+val extHttpPwd: CliExtractor[SingleOptionValue[String]] =
+  consoleReaderValue("password", optPrompt = "Enter the password for the HTTP server")
+    .mandatory
+----
+
+This would work, but there is the drawback that the password now always has to
+be entered manually. There may be cases, e.g. when the application is part of a
+CI pipeline, when no user is present who could react on the prompt. Therefore,
+a better solution would be to check whether a password is present on the
+command line and only prompt the user if this is not the case.
+
+This behavior can be achieved using a fallback extractor: the main extractor
+for the password accesses the value from the option on the command line; only
+if it is not present, the extractor reading from the console is invoked as
+fallback. The parameter manager object from the _transfer_ sample application
+defines a helper function which does exactly this:
+
+[source,scala]
+----
+private def passwordExtractor(key: String, prompt: String): CliExtractor[Try[String]] =
+  optionValue(key)
+    .fallback(consoleReaderValue(key, optPrompt = Some(prompt)))
+    .mandatory
+----
+
+Now the extractors for the password options can delegate to this helper
+function:
+
+[source,scala]
+----
+val extPwd = passwordExtractor("password", "HTTP server password")
+
+val extCryptPass = passwordExtractor("crypt-password", "Encryption password")
+----

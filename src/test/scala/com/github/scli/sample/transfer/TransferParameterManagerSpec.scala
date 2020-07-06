@@ -164,7 +164,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
       "crypt-alg" -> List("DES"))
     val Password = "secret_Encryption!Pwd"
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    Mockito.when(consoleReader.readOption("crypt-password", password = true)).thenReturn(Password)
+    Mockito.when(consoleReader.readOption("Encryption password", password = true)).thenReturn(Password)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, args)
     result.map(_.password) should be(Success(Password))
@@ -181,7 +181,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val args = Map("user" -> List("scott"))
     val Password = "tiger"
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    Mockito.when(consoleReader.readOption("password", password = true)).thenReturn(Password)
+    Mockito.when(consoleReader.readOption("HTTP server password", password = true)).thenReturn(Password)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, args)
     result.map(_.password) should be(Success(Password))
