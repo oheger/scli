@@ -594,3 +594,118 @@ val extPwd = passwordExtractor("password", "HTTP server password")
 
 val extCryptPass = passwordExtractor("crypt-password", "Encryption password")
 ----
+
+=== Combining extractors
+
+The extractors we have discussed so far have only been concerned with single
+parameters. The link:README.adoc[README document] stated that SCLI supports
+transforming of parameter values into data objects that can then be readily
+consumed by applications. So how are those extractors for single parameters
+composed to yield complex model objects?
+
+The underlying mechanism consists of two parts: The first part is Scala's
+built-in support for monads in form of *for* comprehensions. Because extractors
+are monads, they can make use of the syntactic sugar Scala provides in this
+area. So if `ext1`, `ext2`, and `ext3` are extractors of arbitrary result
+types, we can write a construct as follows:
+
+[source,scala]
+----
+val extCombined = for {
+  v1 <- ext1
+  v2 <- ext2
+  v3 <- ext3
+} yield // do some computation with v1, v2, v3
+----
+
+The values passed to the *yield* clause are the results produced by the
+primitive extractors. They can now be combined in whatever way, e.g. stored in
+the properties of a case class. The resulting _extCombined_ is an extractor
+whose result type corresponds to the computation done on the single values.
+
+This is only half of the way because the combination of the single result
+values is still complex. The extractors generated based on the SCLI functions
+typically return results of type `Try[X]`, where `X` is the data we are
+actually interested in. So code to combine these results would have to check,
+which results are successful and handle failures in a meaningful way. SCLI
+offers support for this, and this is the second part of the combination
+mechanism.
+
+The support for combining extractor results is available as a set of overloaded
+`createRepresentation()` functions defined in the `ParameterExtractor` module.
+The functions work as follows:
+
+* Each function expects a number of `Try` arguments, which can have different
+  types.
+* On a second parameter list, the functions expect a creation function. The
+  signature of this function must correspond to the number and types of `Try`
+  parameters, and it returns the result type of the resulting combined
+  extractor.
+* The functions now inspect all the passed in `Try` parameters:
+** If all of them are successful, the creation function is invoked with the
+   values stored in them. So the function can process the actual result values
+   without having to deal with checks for `Success` or `Failure` values.
+** In case there are failures, `createRepresentation()` does not invoke the
+   creation function, but returns a `Failure` of the result type of the
+   creation function that is initialized with a special exception class. It
+   contains a collection of all the failures produced by the passed in
+   extractors.
+
+Let us see how the combination of extractors look in practice. A rather simple
+example is the extractor for the configuration of the HTTP server. The data
+type of this configuration contains only user credentials and is defined as
+below:
+
+[source,scala]
+----
+case class HttpServerConfig(user: String,
+                            password: String)
+----
+
+We can now construct an extractor of this type based on the extractors for the
+user name and the password:
+
+[source,scala]
+----
+def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {
+  val extUsr = optionValue("user")
+    .mandatory
+  val extPwd = passwordExtractor("password", "HTTP server password")
+  for {
+    user <- extUsr
+    pwd <- extPwd
+  } yield createRepresentation(user, pwd)(HttpServerConfig)
+}
+----
+
+What happens here? First, the two extractors for the user name and the password
+are defined using functionality we have discussed already. Then the code uses a
+*for* comprehension to obtain the result values of these extractors. The
+*yield* clause invokes the `createRepresentation` function and passes the
+values from the extractors plus the function to create the result of the
+combined extractor. In this special case, this function is just a reference to
+the `apply` function of the `HttpServerConfig` companion object. We can use
+this short syntax because we passed the values to `createRepresentation()` in
+the same order as they are expected by the configuration case class. A more
+explicit version of this construct would look as follows:
+
+ yield createRepresentation(user, pwd)((u, p) => HttpServerConfig(u, p))
+
+Now, as mentioned, the extractor for the HTTP server configuration is really a
+simple case, as it just combines two values. However, it demonstrates the
+principle pattern of combining extractors to more complex ones. This approach
+works in exactly the same way with more extractors to be combined. It can
+also be applied recursively; so in a next step, the extractor for the HTTP
+server configuration could be combined with other ones to a more complex
+configuration. Just list the extractors affected in a *for* and call
+`createRepresentation()` passing in a suitable creation function.
+
+NOTE: In order to support different numbers of parameters, there is a set of
+overloaded `createRepresentation()` functions. Currently, functions accepting
+up to 15 parameters exist. If your application has more parameters, you can
+group them logically into different configuration objects; the sample
+application uses the same approach. There is also a generic
+`createRepresentationN()` function that can deal with an arbitrary number of
+parameters. It does, however, not support a creation function with a specific
+parameter list; instead, the creation function has to unpack the `Try`
+parameters manually.
