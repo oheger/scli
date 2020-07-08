@@ -709,3 +709,86 @@ application uses the same approach. There is also a generic
 parameters. It does, however, not support a creation function with a specific
 parameter list; instead, the creation function has to unpack the `Try`
 parameters manually.
+
+=== Running extractors
+
+Throughout the previous sections, we have declared a number of extractors, from
+simple ones to more advanced ones; but we have not yet seen the extractors in
+action, i.e. how they are used to transforming the command line of an
+application.
+
+There are multiple ways to do this, and these ways reflect a bit the internal
+structure of the SCLI library: There is the `ParameterManager` module serving
+as a facade for a small number of services that collaborate during parameter
+processing. When using the facade, you do not need to bother with details, and
+a single function call is sufficient to parse the command line, run an
+extractor on it, and return the result generated. This function will be fine
+for most use cases, especially as it already allows a high degree of
+customization. If you need full control over all the steps executed during
+command line processing, you can also interact with the underlying services
+directly.
+
+This section focuses on the `ParameterManager` facade and its capabilities for
+customization. Services that do the actual work are at least mentioned.
+
+==== Running an extractor with standard settings
+
+The single function offered by `ParameterManager` to apply an extractor to the
+application's command line is `processCommandLine()`. At minimum, it expects
+the command line (as a sequence of strings) and the extractor to execute. Its
+result is a `Try` of a tuple with the extractor's result and a
+`ParameterContext`.
+
+The extractor is supposed to return a `Try` of a specific type; depending on
+the transformations it applies, there is always the chance that something goes
+wrong. This is also the reason why `processCommandLine()` returns a `Try` -
+failure results produced by the extractor need to be communicated to the
+caller.
+
+The second result of `processCommandLine()`, the parameter context, is not that
+obvious. It contains information that is useful, for instance, to display a
+help message to the user. For now, we will ignore it.
+
+So if we have an extractor yielding a result of type `Data` (for an imaginary
+data class), and the sequence `args` contains the command line parameters of
+the application, we can execute the executor in the following way:
+
+[source,scala]
+----
+val triedResult = ParameterManager.processCommandLine(args, extractor)
+triedResult match {
+  case Success(tuple) =>
+    val result = tuple._1
+    // do something with result
+  case r =>
+    // the command line was invalid; handle the failure, e.g. show a help message
+}
+----
+
+This fragment parses the command line with default settings. This means that
+items on the command line prefixed with `--` are interpreted as options or
+switches; items prefixed with `-` are considered short alias names for options.
+If the command line contains a parameter that is unknown, result is a failure.
+
+==== Running an extractor ignoring unknown options
+
+Per default, the function for processing the command line checks whether there
+are unknown elements; these are options or switches, for which no extractor
+exists. When detecting such elements, the function produces a failure
+referencing the unknown option key.
+
+If you like more control over the handling of unexpected parameters, this
+check can be disabled: simply pass the parameter _checkUnconsumedParameters_
+with a value of *false* to the function:
+
+ val triedResult = ParameterManager.processCommandLine(args, extractor,
+   checkUnconsumedParameters = false)
+
+Using the `ParameterContext` returned as part of the result, it is possible to
+check for unexpected parameters. `ParameterContext` has a `Parameters` object,
+and the `Parameters` class offers methods to query for parameter keys that have
+not been accessed by any extractor.
+
+==== Running an extractor with custom settings
+
+TODO

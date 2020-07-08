@@ -123,6 +123,13 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     expectFailureInOptions(args, TransferParameterManager.transferConfigExtractor, "transferFiles")
   }
 
+  it should "fail for an unexpected parameter" in {
+    val UnexpectedParam = "unsupported"
+    val args = List("upload", "file1", "serverUri", "--tag", "test", "--" + UnexpectedParam, "strange")
+
+    expectFailureInOptions(args, TransferParameterManager.transferConfigExtractor, UnexpectedParam)
+  }
+
   it should "extract a CryptConfig" in {
     val args = List("--crypt-mode", "files", "--crypt-password", "secret", "--crypt-alg", "AES")
 
