@@ -58,6 +58,21 @@ object TransferParameterManager {
   /** The default transfer chunk size. */
   final val DefaultChunkSize = 8192
 
+  /** The default Umask for a file server. */
+  final val DefaultUmask = 775
+
+  /** Constant for the upload transfer command. */
+  final val CommandUpload = "upload"
+
+  /** Constant for the download transfer command. */
+  final val CommandDownload = "download"
+
+  /** Conditional group identifier for a file server. */
+  private val ServerTypeFile = "file"
+
+  /** Conditional group identifier for an HTTP server. */
+  private val ServerTypeHttp = "http"
+
   /**
    * An enumeration defining the usage of encryption for a transfer operation.
    *
@@ -203,7 +218,7 @@ object TransferParameterManager {
    *
    * @return the extractor for the ''HttpServerConfig''
    */
-  def httpServerConfigExtractor: CliExtractor[Try[HttpServerConfig]] = {
+  def httpServerConfigExtractor: CliExtractor[Try[ServerConfig]] = {
     val extUsr = optionValue("user")
       .mandatory
     val extPwd = passwordExtractor("password", "HTTP server password")
@@ -223,8 +238,7 @@ object TransferParameterManager {
       .multiplicity(atLeast = 1)
       .toPath
       .map(_.map(_.toList))
-    val extServerUri = inputValue(optKey = Some("serverUri"), index = -1)
-      .mandatory
+    val extServerUri = serverUriExtractor.mandatory
     val extChunkSize = optionValue("chunk-size")
       .toInt
       .fallbackValue(DefaultChunkSize)
@@ -245,11 +259,78 @@ object TransferParameterManager {
   }
 
   /**
+   * Returns an extractor for the ''TransferCommandConfig''. This is the
+   * top-level extractor which combines all other extractors to process the
+   * full command line.
+   *
+   * @return the extractor for the ''TransferCommandConfig''
+   */
+  def transferCommandConfigExtractor: CliExtractor[Try[TransferCommandConfig]] = {
+    for {
+      cmd <- commandConfigExtractor
+      svr <- serverConfigExtractor
+      crypt <- cryptConfigExtractor
+      trans <- transferConfigExtractor
+    } yield createRepresentation(cmd, svr, crypt, trans)(TransferCommandConfig)
+  }
+
+  /**
+   * Returns the extractor for the command config. Depending on the transfer
+   * command passed as the first input parameter, either the extractor for
+   * the ''UploadCommandConfig'' or the ''DownloadCommandConfig'' needs to be
+   * run.
+   *
+   * @return the extractor for the command config
+   */
+  private def commandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
+    val extCmdName = inputValue(index = 0, optKey = Some("transfer-command"))
+      .toLower
+      .mandatory
+    val groupExtractors = Map(CommandUpload -> uploadCommandConfigExtractor,
+      CommandDownload -> downloadCommandConfigExtractor)
+    conditionalGroupValue(extCmdName, groupExtractors)
+  }
+
+  /**
+   * Returns the extractor for the server configuration. Based on the server
+   * URI, its type is determined. Depending on the type then a specific
+   * server configuration is extracted.
+   *
+   * @return the extractor for the server config
+   */
+  private def serverConfigExtractor: CliExtractor[Try[ServerConfig]] = {
+    val groupExtractors = Map(ServerTypeFile -> fileServerConfigExtractor,
+      ServerTypeHttp -> httpServerConfigExtractor)
+    conditionalGroupValue(serverTypeExtractor, groupExtractors)
+  }
+
+  /**
+   * Returns an extractor to determine the server type based on its URI. This
+   * type determines, which additional options are supported to configure the
+   * server.
+   *
+   * @return the extractor for the server type
+   */
+  private def serverTypeExtractor: CliExtractor[Try[String]] =
+    serverUriExtractor.mapTo { uri =>
+      if (uri.startsWith("http://") || uri.startsWith("https://")) ServerTypeHttp else ServerTypeFile
+    }.mandatory
+
+  /**
+   * Returns the extractor for the URI of the target server. The URI is read
+   * from the last input parameter.
+   *
+   * @return the extractor for the URI of the server
+   */
+  private def serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
+    inputValue(optKey = Some("serverUri"), index = -1)
+
+  /**
    * Returns an extractor for a (mandatory) password option. The extractor
    * reads the password from the console if it has not been specified on the
    * command line.
    *
-   * @param key the key of the option
+   * @param key    the key of the option
    * @param prompt the string to prompt the user
    * @return the password extractor for this key
    */
@@ -288,5 +369,61 @@ object TransferParameterManager {
       pwd <- extCryptPass
       alg <- extCryptAlg
     } yield createRepresentation(mode, pwd, alg)(CryptConfig)
+  }
+
+  /**
+   * Returns an extractor for the ''UploadCommandConfig''.
+   *
+   * @return the extractor for the ''UploadCommandConfig''
+   */
+  private def uploadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
+    val extUploadHashes = optionValue("upload-hashes")
+      .toBoolean
+      .fallbackValue(false)
+      .mandatory
+    val extRemoveUploaded = optionValue("remove-uploaded-files")
+      .toBoolean
+      .fallbackValue(false)
+      .mandatory
+    for {
+      uploadHashes <- extUploadHashes
+      removeUploaded <- extRemoveUploaded
+    } yield createRepresentation(uploadHashes, removeUploaded)(UploadCommandConfig)
+  }
+
+  /**
+   * Returns an extractor for the configuration of the download command.
+   *
+   * @return the extractor for the ''DownloadCommandConfig''
+   */
+  private def downloadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
+    val extTargetPath = optionValue("target-folder")
+      .toPath
+      .mandatory
+    val extOverride = optionValue("override-local-files")
+      .toBoolean
+      .fallbackValue(false)
+      .mandatory
+    for {
+      target <- extTargetPath
+      fOverride <- extOverride
+    } yield createRepresentation(target, fOverride)(DownloadCommandConfig)
+  }
+
+  /**
+   * Returns an extractor for the configuration of a file server.
+   *
+   * @return the extractor for the ''FileServerConfig''
+   */
+  private def fileServerConfigExtractor: CliExtractor[Try[ServerConfig]] = {
+    val extRootPath = optionValue("root-path")
+    val extUmask = optionValue("umask")
+      .toInt
+      .fallbackValue(DefaultUmask)
+      .mandatory
+    for {
+      rootPath <- extRootPath
+      mask <- extUmask
+    } yield createRepresentation(rootPath, mask)(FileServerConfig)
   }
 }

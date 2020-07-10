@@ -20,7 +20,7 @@ import java.nio.file.Paths
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterContext, ParameterExtractionException}
 import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterManager}
-import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, HttpServerConfig}
+import com.github.scli.sample.transfer.TransferParameterManager.{CryptConfig, CryptMode, DownloadCommandConfig, FileServerConfig, HttpServerConfig, UploadCommandConfig}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -191,6 +191,101 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     Mockito.when(consoleReader.readOption("HTTP server password", password = true)).thenReturn(Password)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, args)
-    result.map(_.password) should be(Success(Password))
+    result match {
+      case Success(config: HttpServerConfig) =>
+        config.password should be(Password)
+      case r => fail("Unexpected result: " + r)
+    }
+  }
+
+  it should "extract a command config for uploads and a file server" in {
+    val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes", "true",
+      "--remove-uploaded-files", "true", "--root-path", "/data", "--umask", "660",
+      "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.cryptConfig should be(CryptConfig(CryptMode.FilesAndNames, "secret",
+      TransferParameterManager.DefaultCryptAlgorithm))
+    config.transferConfig.serverUrl should be("/file/server")
+    config.transferConfig.sourceFiles should contain only(Paths get "file1", Paths get "file2")
+    config.commandConfig should be(UploadCommandConfig(uploadHashes = true, removeUploadedFiles = true))
+    config.serverConfig should be(FileServerConfig(Some("/data"), 660))
+  }
+
+  it should "set default values for the upload config" in {
+    val args = List("upload", "file1", "file2", "/file/server", "--root-path", "/data", "--umask", "660")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.commandConfig should be(UploadCommandConfig(uploadHashes = false, removeUploadedFiles = false))
+  }
+
+  it should "set default values for the file server config" in {
+    val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes", "true")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.serverConfig should be(FileServerConfig(rootPath = None, umask = TransferParameterManager.DefaultUmask))
+  }
+
+  it should "extract a command config for downloads and a file server" in {
+    val args = List("download", "file1", "file2", "/file/server", "--target-folder", "target",
+      "--override-local-files", "true", "--root-path", "/data", "--umask", "660",
+      "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.cryptConfig should be(CryptConfig(CryptMode.FilesAndNames, "secret",
+      TransferParameterManager.DefaultCryptAlgorithm))
+    config.transferConfig.serverUrl should be("/file/server")
+    config.transferConfig.sourceFiles should contain only(Paths get "file1", Paths get "file2")
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
+    config.serverConfig should be(FileServerConfig(Some("/data"), 660))
+  }
+
+  it should "set default values for the download config" in {
+    val args = List("download", "file1", "file2", "/file/server", "--target-folder", "target")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.cryptConfig should be(TransferParameterManager.DisabledCryptConfig)
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
+  }
+
+  it should "detect an unsupported transfer command" in {
+    val args = List("unknownCmd", "file1", "file2", "/file/server", "--target-folder", "target")
+
+    expectFailureInOptions(args, TransferParameterManager.transferCommandConfigExtractor,
+      "transfer-command")
+  }
+
+  it should "detect transfer commands in a case-insensitive manner" in {
+    val args = List("DownLoad", "file1", "file2", "/file/server", "--target-folder", "target")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
+  }
+
+  it should "extract a command config for downloads and an HTTP server" in {
+    val ServerUri = "http://www.test-server.org"
+    val args = List("download", "file1", "file2", ServerUri, "--user", "scott", "--password", "tiger",
+      "--target-folder", "target")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.serverConfig should be(HttpServerConfig("scott", "tiger"))
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
+  }
+
+  it should "extract a command config for uploads and an HTTP server" in {
+    val ServerUri = "https://www.test-server.org"
+    val args = List("upload", "file1", "file2", ServerUri, "--user", "scott", "--password", "tiger",
+      "--upload-hashes", "true")
+
+    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    config.serverConfig should be(HttpServerConfig("scott", "tiger"))
+    config.commandConfig should be(UploadCommandConfig(uploadHashes = true, removeUploadedFiles = false))
+  }
+
+  it should "detect unexpected parameters from a different server type" in {
+    val args = List("upload", "file1", "file2", "/file/server", "--user", "scott", "--password", "tiger")
+
+    expectFailureInOptions(args, TransferParameterManager.transferCommandConfigExtractor,
+      "user", "password")
   }
 }
