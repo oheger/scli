@@ -792,3 +792,282 @@ not been accessed by any extractor.
 ==== Running an extractor with custom settings
 
 TODO
+
+=== Conditional extractors
+
+There are situations when extractors should only be executed under certain
+circumstances. For instance, if one parameter on the command line has a
+specific value, other parameters are enabled or disabled. A good real-life
+example for such a constellation is an application supporting multiple
+commands: each command may define its own set of parameters; only if the
+specific command is active, the parameters related to it need to be gathered.
+
+The _transfer_ sample application makes use of a couple of conditional
+extractors. Based on those, the following sub sections explain this concept.
+
+==== Constant extractors
+
+In the section about <<Basic extractors>> we have missed out one extractor type
+that is arguably even more basic than the ones discussed there: a constant
+extractor. This was because the reasons behind this extractor type become only
+obvious in the context of conditional extractor logic. Therefore, it is going
+to be discussed now.
+
+A constant extractor does not access the command line parameters, but directly
+produces a constant result. The `constantExtractor()` function produces such
+extractors. It expects the value to be returned by the constant extractor as
+argument; the result type of the resulting extractor is then derived from this
+value.
+
+In the following sub sections we will see examples of using this function to
+model conditional extraction logic. A constant extractor is especially useful
+to define default values to use if certain conditions are not fulfilled.
+
+==== Simple conditional logic
+
+In the section <<Extracting an enum parameter>> we already encountered the
+`CryptMode` enumeration class. The `--crypt-mode` option passes a value of this
+class to the _transfer_ application. Encryption is active if this parameter
+does not equal the value `CryptMode.None`. In this case, additional parameters
+must be present on the command line to construct a `CryptConfig` data object,
+especially the mandatory encryption password; otherwise, the application uses a
+dummy `CryptConfig` instance with all settings disabled.
+
+What is needed here is some basic if-then-else logic: if a specific condition
+is *true*, execute one extractor; otherwise execute another extractor. SCLI
+provides an extractor function to model such constructs: `conditionalValue()`.
+The function expects three extractors as input:
+
+* a condition extractor yielding a `Try[Boolean]`: it represents the condition
+  to be evaluated. Based on the result of this extractor, the function decides
+  which of the other extractors to execute.
+* the if-extractor: an extractor to run if the condition extractor yields the
+  value *true*. Its result type must be an arbitrary `Try`.
+* the else-extractor: this extractor is run if the condition extractor yields
+  the value *false*. It must have the same result type as the if-extractor.
+
+So, actually this is a rather simple concept. The extractors for the if and
+else logic are typically nothing special; they access the command line in the
+usual way to generate a result. The condition extractor will probably access the
+command line, too, but it will execute some logic to compute a boolean result
+value. Because this logic may produce an error, the result type of this
+extractor is `Try[Boolean]`; if the result is a failure, this becomes the
+result of the whole conditional extractor.
+
+To make this concrete, here is how the sample application uses the
+`conditionalValue()` function to extract a `CryptConfig` object. First, this is
+the declaration of `CryptConfig`:
+
+[source,scala]
+----
+case class CryptConfig(cryptMode: CryptMode.Value,
+                       password: String,
+                       algorithm: String)
+----
+
+The application defines two functions to define extractors for a `CryptConfig`.
+One function declares the actual extractor that fetches the parameter values
+from the command line unconditionally:
+
+[source,scala]
+----
+private def definedCryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
+  val extCryptPass = passwordExtractor("crypt-password", "Encryption password")
+  val extCryptAlg = optionValue("crypt-alg")
+    .fallbackValue(DefaultCryptAlgorithm)
+    .mandatory
+  for {
+    mode <- cryptModeExtractor
+    pwd <- extCryptPass
+    alg <- extCryptAlg
+  } yield createRepresentation(mode, pwd, alg)(CryptConfig)
+}
+----
+
+This extractor uses the mechanisms described under <<Combining extractors>> to
+produce a result object from multiple parameter values. The other function uses
+`conditionalValue()` to execute this extractor only if encryption is actually
+enabled; otherwise, it applies a <<Constant extractors,constant extractor>> to
+generate a default `CryptConfig` object:
+
+[source,scala]
+----
+def cryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
+  val extCryptEnabled = cryptModeExtractor
+    .map(triedMode => triedMode.map(_ != CryptMode.None))
+  conditionalValue(extCryptEnabled, ifExt = definedCryptConfigExtractor,
+    elseExt = constantExtractor(Success(DisabledCryptConfig)))
+}
+----
+
+The most interesting part here is the `extCryptEnabled` extractor, which is
+passed as condition extractor to `conditionalValue()`. Note how it is derived
+from the standard extractor for the `CryptMode` by mapping a predicate function
+to the original result. This predicate checks whether the `CryptMode` is not
+`CryptMode.None`.
+
+With this conditional extractor in place, invoking the 'conditionalValue()'
+function with the parameters required is straight-forward.
+
+==== Commands
+
+Command line applications often make use of commands that select specific
+functionality to execute. A very prominent example is `git` which supports
+numerous commands like _clone_, _add_, _commit_, _push_, and many more. One
+characteristic of this approach is that the set of command line parameters
+accepted by the application can change partly or even completely depending on
+the command provided by the user. So this is again a special case of executing
+extraction logic conditionally.
+
+Theoretically, the `conditionalValue()` function introduced in the previous
+section would be able to implement the logic of dealing with commands. However,
+the result would be rather complex and hard to read: the processing of multiple
+commands requires nesting conditional extractors, where each extractor checks
+for a specific command, executes the corresponding command-specific extractors
+in the if-extractor, and delegates to the next conditional extractor for
+checking for another command. SCLI offers an easier solution in form of the
+`conditionalGroupValue()` function.
+
+The background of this function is that it supports multiple groups of command
+line parameters. Each group has a name and is represented by an extractor
+(which can of course be a complex one combining multiple other extractors). All
+of these extractors must have the same result type, which becomes the result
+type of the extractor returned by `conditionalGroupValue()`. The function
+expects the following arguments:
+
+* an extractor of type `Try[String]` which selects the name of the active group
+* a map of type String -> extractor associating the group names with their
+  extractors
+
+The resulting extractor first invokes the extractor passed as first argument to
+the function to obtain the name of the active group. It then invokes the
+extractor stored in the map under this name. If the group name extractor yields
+a failure or a name which is not contained in the map, result is a
+corresponding failure.
+
+So basically, while the `conditionalValue()` function selects one of two
+extractors based on a boolean condition, `conditionalGroupValue()` selects one
+extractor from an arbitrary number of extractors based by its name.
+
+For the implementation of commands this logic fits nicely. The name of the
+command can be used directly as key to the map. One requirement of the function
+is that all the extractors in the map must return the same result type; but the
+commands will typically accept different sets of parameters. The solution is
+using a common base trait for the configuration of commands which is extended
+by command-specific data classes.
+
+We show the usage of this mechanism for the _transfer_ application. For reasons
+of simplicity, this application supports only two commands for uploading or
+downloading files. The following fragment shows how the parameters supported by
+these commands are modelled:
+
+[source,scala]
+----
+  sealed trait CommandConfig
+
+  case class UploadCommandConfig(uploadHashes: Boolean,
+                                 removeUploadedFiles: Boolean) extends CommandConfig
+
+  case class DownloadCommandConfig(targetFolder: Path,
+                                   overrideLocalFiles: Boolean) extends CommandConfig
+----
+
+Note the usage of Scala's concept of sealed classes. This makes sure that there
+is only a controlled number of sub classes and allows the compiler to check for
+exhaustive *match* expressions. The `TransferParameterManager` module defines
+extractors for `UploadCommandConfig` and `DownloadCommandConfig` as usual. Then
+it has the following function to construct the extractor for the command
+configuration:
+
+[source,scala]
+----
+final val CommandUpload = "upload"
+
+final val CommandDownload = "download"
+
+private def commandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
+  val extCmdName = inputValue(index = 0, optKey = Some("transfer-command"))
+    .toLower
+    .mandatory
+  val groupExtractors = Map(CommandUpload -> uploadCommandConfigExtractor,
+    CommandDownload -> downloadCommandConfigExtractor)
+  conditionalGroupValue(extCmdName, groupExtractors)
+}
+----
+
+Based on the preceding explanations, this function should be understandable.
+The name of the command to execute is obtained from the first input parameter.
+We want to be tolerant regarding case, therefore, we apply a `toLower`
+transformation. The function constructs a map with the specific sub extractors
+keyed by the command name and invokes `conditionalGroupValue()`.
+
+After the successful extraction of a concrete command configuration, the
+application can handle the command entered by the user in a way similar to the
+following construct:
+
+[source,scala]
+----
+commandConfig match {
+  case uc: UploadCommandConfig =>
+    handleUpload(uc)
+  case dc: DownloadCommandConfig =>
+    handleDownload(dc)
+}
+----
+
+==== Complex group selection logic
+
+While commands are an obvious use case of the `conditionalGroupValue()`
+function, it is usable in other contexts as well. The _transfer_ sample
+application has another example in the processing of the URL of the target
+server.
+
+_transfer_ supports different types of target servers, namely file and HTTP
+servers. Each server type of course needs specific parameters for its
+configuration. To handle these parameters, `TransferParameterManager` uses an
+approach similar to the processing of commands: It defines again a sealed base
+trait for server configurations and concrete sub classes for the server types
+supported:
+
+[source,scala]
+----
+sealed trait ServerConfig
+
+case class FileServerConfig(rootPath: Option[String],
+                            umask: Int) extends ServerConfig
+
+case class HttpServerConfig(user: String,
+                            password: String) extends ServerConfig
+----
+
+The extractor for the server configuration calls `conditionalGroupValue()`
+passing in a map with the extractors for these configuration types. The
+extractor to select the correct one from the map is, however, slightly more
+complex. It accesses the server URL and checks whether it starts with a prefix
+indicating an HTTP server. If this is the case, it returns a name selecting the
+HTTP server extractor; otherwise, the file server extractor is selected. The
+code is as follows:
+
+[source,scala]
+----
+private val ServerTypeFile = "file"
+
+private val ServerTypeHttp = "http"
+
+private def serverConfigExtractor: CliExtractor[Try[ServerConfig]] = {
+  val groupExtractors = Map(ServerTypeFile -> fileServerConfigExtractor,
+    ServerTypeHttp -> httpServerConfigExtractor)
+  conditionalGroupValue(serverTypeExtractor, groupExtractors)
+}
+
+private def serverTypeExtractor: CliExtractor[Try[String]] =
+  serverUriExtractor.mapTo { uri =>
+    if (uri.startsWith("http://") || uri.startsWith("https://")) ServerTypeHttp else ServerTypeFile
+  }.mandatory
+
+private def serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
+  inputValue(optKey = Some("serverUri"), index = -1)
+----
+
+Note that by extending the selection logic, it is pretty easy to add support
+for configuration options for other types of servers.
