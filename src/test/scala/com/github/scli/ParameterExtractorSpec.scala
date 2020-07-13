@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.io.IOException
 
-import com.github.scli.CliHelpGenerator.CliHelpContext
+import com.github.scli.ParameterModel.CliHelpContext
 import com.github.scli.ParameterExtractor.{OptionValue, ParameterContext, Parameters}
 import com.github.scli.ParameterParser.ParametersMap
 import org.mockito.Mockito._
@@ -57,7 +57,7 @@ object ParameterExtractorSpec {
 
   /** A test ParameterContext object. */
   private val TestContext = ParameterContext(TestParameters,
-    new CliHelpGenerator.CliHelpContext(Map.empty, SortedSet.empty, None, Nil),
+    new CliHelpContext(Map.empty, SortedSet.empty, None, Nil),
     DummyConsoleReader)
 }
 
@@ -842,12 +842,12 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val updHelpCtx = ParameterExtractor.addFailuresToHelpContext(helpContext, List(failure1, failure3, failure4))
     updHelpCtx.options(Key2) should be(helpContext.options(Key2))
     val attr1 = updHelpCtx.options(Key)
-    attr1.attributes(CliHelpGenerator.AttrHelpText) should be("Help1")
-    attr1.attributes(CliHelpGenerator.AttrErrorMessage) should be(failure1.message)
+    attr1.attributes(ParameterModel.AttrHelpText) should be("Help1")
+    attr1.attributes(ParameterModel.AttrErrorMessage) should be(failure1.message)
     val attr3 = updHelpCtx.options(Key3)
-    attr3.attributes(CliHelpGenerator.AttrErrorMessage) should be(failure3.message)
+    attr3.attributes(ParameterModel.AttrErrorMessage) should be(failure3.message)
     val attr4 = updHelpCtx.options(Key4)
-    attr4.attributes(CliHelpGenerator.AttrOptionType) should be(CliHelpGenerator.OptionTypeOption)
-    attr4.attributes(CliHelpGenerator.AttrErrorMessage) should be(failure4.message)
+    attr4.attributes(ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeOption)
+    attr4.attributes(ParameterModel.AttrErrorMessage) should be(failure4.message)
   }
 }

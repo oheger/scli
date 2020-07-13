@@ -483,7 +483,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "handle failures when creating a representation from components" in {
-    val helpCtx = new CliHelpGenerator.CliHelpContext(Map.empty, SortedSet.empty, None, Nil)
+    val helpCtx = new ParameterModel.CliHelpContext(Map.empty, SortedSet.empty, None, Nil)
     val context = ParameterContext(TestParameters, helpCtx, DummyConsoleReader)
     val failure1 = ExtractionFailure(KeyFlag, "Flag failure", context)
     val failure2 = ExtractionFailure(KeyAnswer, "Answer failure", context)

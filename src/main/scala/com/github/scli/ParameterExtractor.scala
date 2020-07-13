@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.nio.file.{Path, Paths}
 
-import com.github.scli.CliHelpGenerator.CliHelpContext
+import com.github.scli.ParameterModel.CliHelpContext
 import com.github.scli.ParameterParser.ParametersMap
 
 import scala.collection.SortedSet
@@ -693,7 +693,7 @@ object ParameterExtractor {
    */
   def constantExtractor[A](a: A, optValueDesc: Option[String] = None): CliExtractor[A] =
     CliExtractor(context => {
-      val nextContext = context.updateHelpContextConditionally(CliHelpGenerator.AttrFallbackValue, optValueDesc)
+      val nextContext = context.updateHelpContextConditionally(ParameterModel.AttrFallbackValue, optValueDesc)
       (a, nextContext)
     })
 
@@ -1054,7 +1054,7 @@ object ParameterExtractor {
             s"should have a single value, but has multiple values - $optionValue"))
         else Success(values.headOption)
       }
-      (res, context.updateHelpContext(CliHelpGenerator.AttrMultiplicity, "0..1"))
+      (res, context.updateHelpContext(ParameterModel.AttrMultiplicity, "0..1"))
     })
 
   /**
@@ -1072,7 +1072,7 @@ object ParameterExtractor {
         case Some(v) => Success(v)
         case None => Failure(paramException(context, ext.key, "mandatory option has no value"))
       }
-      (res, context.updateHelpContext(CliHelpGenerator.AttrMultiplicity, "1..1"))
+      (res, context.updateHelpContext(ParameterModel.AttrMultiplicity, "1..1"))
     })
 
   /**
@@ -1097,7 +1097,7 @@ object ParameterExtractor {
           Failure(paramException(context, ext.key, s"option must have at most $atMost values"))
         else Success(values)
       }
-      (res, context.updateHelpContext(CliHelpGenerator.AttrMultiplicity,
+      (res, context.updateHelpContext(ParameterModel.AttrMultiplicity,
         Multiplicity(atLeast, atMost).toString))
     })
 
@@ -1750,7 +1750,7 @@ object ParameterExtractor {
   def addFailuresToHelpContext(helpContext: CliHelpContext, failures: Iterable[ExtractionFailure]): CliHelpContext =
     failures.foldLeft(helpContext) { (ctx, failure) =>
       ctx.addOption(failure.key, None)
-        .addAttribute(CliHelpGenerator.AttrErrorMessage, failure.message)
+        .addAttribute(ParameterModel.AttrErrorMessage, failure.message)
     }
 
   /**

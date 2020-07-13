@@ -92,7 +92,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     res should be(ExpParamsMap)
     context.parameters.parametersMap should be(ExpParamsMap)
     context.parameters.accessedParameters should contain only TestOptionKey
-    context.helpContext.options(TestOptionKey).attributes(CliHelpGenerator.AttrHelpText) should be(HelpTestOption)
+    context.helpContext.options(TestOptionKey).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
   }
 
   it should "check for unconsumed parameters" in {
@@ -138,7 +138,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
     val helpContext = exception.parameterContext.helpContext
-    helpContext.options(TestOptionKey).attributes.keys should contain(CliHelpGenerator.AttrErrorMessage)
+    helpContext.options(TestOptionKey).attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 
   it should "support customizing the parsing function" in {
@@ -171,8 +171,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     context.parameters.parametersMap.keys should contain(TestOptionKey)
     val helpContext = context.helpContext
     val testOptionAttrs = helpContext.options(TestOptionKey)
-    testOptionAttrs.attributes(CliHelpGenerator.AttrHelpText) should be(HelpTestOption)
+    testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
     val fileOptionAttrs = helpContext.options(FileOption)
-    fileOptionAttrs.attributes.keys should contain(CliHelpGenerator.AttrErrorMessage)
+    fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 }
