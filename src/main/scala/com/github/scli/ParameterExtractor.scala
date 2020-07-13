@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.nio.file.{Path, Paths}
 
-import com.github.scli.ParameterModel.CliHelpContext
+import com.github.scli.ParameterModel.ModelContext
 import com.github.scli.ParameterParser.ParametersMap
 
 import scala.collection.SortedSet
@@ -49,15 +49,15 @@ object ParameterExtractor {
   /** A mapping storing the boolean literals for conversion. */
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
-  /** Constant for an initial, empty help context. */
-  private val EmptyHelpContext = new CliHelpContext(Map.empty, SortedSet.empty, None, Nil)
+  /** Constant for an initial, empty model context. */
+  private val EmptyModelContext = new ModelContext(Map.empty, SortedSet.empty, None, Nil)
 
   /**
    * A dummy parameter context object that is used if no current context is
    * available. It contains only dummy values.
    */
   private val DummyParameterContext = ParameterContext(Parameters(Map.empty, Set.empty),
-    EmptyHelpContext, DummyConsoleReader)
+    EmptyModelContext, DummyConsoleReader)
 
   /**
    * Type definition for the base type of a command line option. The option
@@ -143,23 +143,23 @@ object ParameterExtractor {
    * @param reader      an object to read data from the console
    */
   case class ParameterContext(parameters: Parameters,
-                              helpContext: CliHelpContext,
+                              helpContext: ModelContext,
                               reader: ConsoleReader) {
     /**
      * Returns a new ''ParameterContext'' object that was updated with the
-     * given ''Parameters'' and help context. All other properties remain
+     * given ''Parameters'' and model context. All other properties remain
      * constant.
      *
-     * @param nextParameters  the ''Parameters'' to replace the current ones
-     * @param nextHelpContext the updated help context
+     * @param nextParameters   the ''Parameters'' to replace the current ones
+     * @param nextModelContext the updated model context
      * @return the updated ''ParameterContext''
      */
-    def update(nextParameters: Parameters, nextHelpContext: CliHelpContext): ParameterContext =
-      copy(parameters = nextParameters, helpContext = nextHelpContext)
+    def update(nextParameters: Parameters, nextModelContext: ModelContext): ParameterContext =
+      copy(parameters = nextParameters, helpContext = nextModelContext)
 
     /**
      * Returns a new ''ParameterContext'' object with an updated
-     * ''CliHelpContext'', to which the given attribute has been added.
+     * ''ModelContext'', to which the given attribute has been added.
      *
      * @param attr  the attribute key
      * @param value the attribute value
@@ -170,8 +170,8 @@ object ParameterExtractor {
 
     /**
      * Returns a ''ParameterContext'' for a conditional update of the
-     * ''CliHelpContext''. If the passed in attribute value is defined, the
-     * help context is replaced; otherwise, the same ''ParameterContext'' is
+     * ''ModelContext''. If the passed in attribute value is defined, the
+     * model context is replaced; otherwise, the same ''ParameterContext'' is
      * returned.
      *
      * @param attr     the attribute key
@@ -1677,7 +1677,7 @@ object ParameterExtractor {
    */
   def runExtractor[T](extractor: CliExtractor[T], parameters: Parameters)
                      (implicit consoleReader: ConsoleReader): (T, ParameterContext) = {
-    val context = ParameterContext(parameters, EmptyHelpContext, consoleReader)
+    val context = ParameterContext(parameters, EmptyModelContext, consoleReader)
     val (result, nextContext) = extractor.run(context)
     (result, nextContext)
   }
@@ -1737,35 +1737,35 @@ object ParameterExtractor {
   }
 
   /**
-   * Updates the given help context to contain all the error messages from the
+   * Updates the given model context to contain all the error messages from the
    * failures provided. For each ''ExtractionFailure'', the error message is
    * added to the corresponding attribute of the option affected. The modified
-   * help context can then be used to generate formatted output with all error
+   * model context can then be used to generate formatted output with all error
    * messages.
    *
-   * @param helpContext the help context to be used as base
-   * @param failures    a collection with failures during extraction
-   * @return the modified help context
+   * @param modelContext the model context to be used as base
+   * @param failures     a collection with failures during extraction
+   * @return the modified model context
    */
-  def addFailuresToHelpContext(helpContext: CliHelpContext, failures: Iterable[ExtractionFailure]): CliHelpContext =
-    failures.foldLeft(helpContext) { (ctx, failure) =>
+  def addFailuresToModelContext(modelContext: ModelContext, failures: Iterable[ExtractionFailure]): ModelContext =
+    failures.foldLeft(modelContext) { (ctx, failure) =>
       ctx.addOption(failure.key, None)
         .addAttribute(ParameterModel.AttrErrorMessage, failure.message)
     }
 
   /**
    * Runs the given ''CliExtractor'' against a dummy parameter context to
-   * obtain meta data from it. This run will populate a ''CliHelpContext''
+   * obtain metadata from it. This run will populate a ''ModelContext''
    * with information about all the options accessed by the extractor.
    *
-   * @param extractor   the ''CliExtractor'' in question
-   * @param parameters  the parameters to store in the context
-   * @param helpContext the initial help context for the context
-   * @return the ''ParameterContext'' with updated meta data
+   * @param extractor    the ''CliExtractor'' in question
+   * @param parameters   the parameters to store in the context
+   * @param modelContext the initial model context for the context
+   * @return the ''ParameterContext'' with updated metadata
    */
   def gatherMetaData(extractor: CliExtractor[_], parameters: ParametersMap = Map.empty,
-                     helpContext: CliHelpContext = EmptyHelpContext): ParameterContext = {
-    val paramCtx = contextForMetaDataRun(parameters, helpContext)
+                     modelContext: ModelContext = EmptyModelContext): ParameterContext = {
+    val paramCtx = contextForMetaDataRun(parameters, modelContext)
     extractor.run(paramCtx)._2
   }
 
@@ -1805,26 +1805,26 @@ object ParameterExtractor {
     ExtractionFailure(message = exception.getMessage, key = "", context = DummyParameterContext)
 
   /**
-   * Updates a help context by running some extractors against it. This
+   * Updates a model context by running some extractors against it. This
    * function is typically used by conditional extractors that select some
    * extractors to be executed from a larger set of extractors. The other
-   * extractors that are not selected still need to be reflected by the help
+   * extractors that are not selected still need to be reflected by the model
    * context. This function expects a list of extractors and the optional
    * groups they belong to. It runs them against a dummy parameter context, so
-   * that the help context is updated, but the original parameter context is
+   * that the model context is updated, but the original parameter context is
    * not modified.
    *
-   * @param helpContext         the current ''CliHelpContext''
+   * @param modelContext        the current ''ModelContext''
    * @param extractorsAndGroups a list with extractors and their groups
    * @tparam A the result type of the extractors
-   * @return the updated help context
+   * @return the updated model context
    */
-  private def updateHelpContext[A](helpContext: CliHelpContext,
-                                   extractorsAndGroups: List[(CliExtractor[A], Option[String])]): CliHelpContext =
+  private def updateHelpContext[A](modelContext: ModelContext,
+                                   extractorsAndGroups: List[(CliExtractor[A], Option[String])]): ModelContext =
     extractorsAndGroups
-      .foldLeft(helpContext) { (helpCtx, p) =>
+      .foldLeft(modelContext) { (helpCtx, p) =>
         val helpCtxWithGroup = helpCtx startGroupConditionally p._2
-        val nextContext = gatherMetaData(p._1, helpContext = helpCtxWithGroup)
+        val nextContext = gatherMetaData(p._1, modelContext = helpCtxWithGroup)
         nextContext.helpContext.endGroupConditionally(p._2)
       }
 
@@ -1864,9 +1864,9 @@ object ParameterExtractor {
    * context is set and will be updated during the run.
    *
    * @param params      the parameters for the context
-   * @param helpContext the ''CliHelpContext''
+   * @param helpContext the ''ModelContext''
    * @return the ''ParameterContext'' for the meta data run
    */
-  private def contextForMetaDataRun(params: ParametersMap, helpContext: CliHelpContext): ParameterContext =
+  private def contextForMetaDataRun(params: ParametersMap, helpContext: ModelContext): ParameterContext =
     ParameterContext(Parameters(params, Set.empty), helpContext, DummyConsoleReader)
 }

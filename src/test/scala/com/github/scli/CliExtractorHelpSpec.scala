@@ -20,7 +20,7 @@ import java.util.Locale
 
 import com.github.scli.CliHelpGenerator.{ColumnGenerator, InputParamOverviewSymbols, OptionFilter, OptionSortFunc}
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{CliHelpContext, InputParameterRef, OptionAttributes, OptionMetaData}
+import com.github.scli.ParameterModel.{ModelContext, InputParameterRef, OptionAttributes, OptionMetaData}
 import org.mockito.Mockito._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -57,15 +57,15 @@ object CliExtractorHelpSpec {
     data => data.attributes.attributes(ParameterModel.AttrHelpText).split(CR).toList
 
   /**
-   * Runs the given ''CliExtractor'' and returns the resulting help context.
+   * Runs the given ''CliExtractor'' and returns the resulting model context.
    *
    * @param ext       the extractor to be executed
    * @param params    the parameters to be used
    * @param optReader optional console reader for the context
-   * @return the resulting help context
+   * @return the resulting model context
    */
   private def generateHelpContext(ext: CliExtractor[_], params: Parameters = EmptyParameters,
-                                  optReader: Option[ConsoleReader] = None): CliHelpContext = {
+                                  optReader: Option[ConsoleReader] = None): ModelContext = {
     implicit val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
     val (_, ctx) = ParameterExtractor.runExtractor(ext, params)
     ctx.helpContext
@@ -80,7 +80,7 @@ object CliExtractorHelpSpec {
    * @param attrKey     the attribute key
    * @return the value of this attribute
    */
-  private def fetchAttribute(helpContext: CliHelpContext, optionKey: String, attrKey: String): String =
+  private def fetchAttribute(helpContext: ModelContext, optionKey: String, attrKey: String): String =
     helpContext.options(optionKey).attributes(attrKey)
 
   /**
@@ -116,28 +116,28 @@ object CliExtractorHelpSpec {
   }
 
   /**
-   * Creates a new help context with standard settings and the given options.
+   * Creates a new model context with standard settings and the given options.
    *
    * @param options the options
-   * @return the help context
+   * @return the model context
    */
-  private def createHelpContext(options: Map[String, OptionAttributes] = Map.empty): CliHelpContext =
-    new CliHelpContext(options, SortedSet.empty, None, List.empty)
+  private def createModelContext(options: Map[String, OptionAttributes] = Map.empty): ModelContext =
+    new ModelContext(options, SortedSet.empty, None, List.empty)
 
   /**
-   * Generates a help context object that contains a number of test options.
+   * Generates a model context object that contains a number of test options.
    *
    * @param count the number of options to generate
-   * @return the test help context
+   * @return the test model context
    */
-  private def helpContextWithOptions(count: Int): CliHelpContext = {
+  private def modelContextWithOptions(count: Int): ModelContext = {
     val options = (1 to count).map(testOptionMetaData)
       .map(data => (data.key, data.attributes)).toMap
-    createHelpContext(options)
+    createModelContext(options)
   }
 
-  private def addInputParameter(helpContext: CliHelpContext, multiplicity: String, key: String = Key,
-                                index: Int = 1): CliHelpContext =
+  private def addInputParameter(helpContext: ModelContext, multiplicity: String, key: String = Key,
+                                index: Int = 1): ModelContext =
     helpContext.addInputParameter(index, Some(key), None)
       .addAttribute(ParameterModel.AttrMultiplicity, multiplicity)
 }
@@ -225,7 +225,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     fetchAttribute(helpContext, Key, ParameterModel.AttrFallbackValue) should be(Value)
   }
 
-  it should "update the help context with a fallback extractor" in {
+  it should "update the model context with a fallback extractor" in {
     val paramsMap = Map(Key -> List("true"))
     val params = Parameters(paramsMap, Set.empty)
     val ext = multiOptionValue(Key)
@@ -236,7 +236,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     fetchAttribute(helpContext, Key, ParameterModel.AttrFallbackValue) should be(false.toString)
   }
 
-  it should "handle an uninitialized help context gracefully" in {
+  it should "handle an uninitialized model context gracefully" in {
     val ext = CliExtractor(context => {
       (42, context.updateHelpContext("test", "success"))
     })
@@ -312,7 +312,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val Attrs1 = OptionAttributes(Map("attr1" -> "value1", "attr2" -> "value2",
       ParameterModel.AttrHelpText -> "old help"))
     val ExpAttrs = Attrs1.attributes + (ParameterModel.AttrHelpText -> HelpText)
-    val helpContext = new CliHelpContext(Map(Key -> Attrs1), SortedSet.empty, None, Nil)
+    val helpContext = new ModelContext(Map(Key -> Attrs1), SortedSet.empty, None, Nil)
 
     val nextContext = helpContext.addOption(Key, Some(HelpText))
     nextContext.options(Key).attributes should contain allElementsOf ExpAttrs
@@ -333,7 +333,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support querying a boolean attribute for a non-existing option" in {
-    val helpContext = new CliHelpContext(Map.empty, SortedSet.empty, None, Nil)
+    val helpContext = new ModelContext(Map.empty, SortedSet.empty, None, Nil)
 
     helpContext.hasAttribute(Key, "foo") shouldBe false
   }
@@ -489,7 +489,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "generate option help texts with default settings" in {
     val Count = 8
     val ExpText = (1 to Count).map(testOptionMetaData).mkString(CR + CR)
-    val helpContext = helpContextWithOptions(Count)
+    val helpContext = modelContextWithOptions(Count)
 
     val text = CliHelpGenerator.generateOptionsHelp(helpContext)(TestColumnGenerator)
     text should be(ExpText)
@@ -498,7 +498,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "support changing the newline string" in {
     val Count = 4
     val ExpText = (1 to Count).map(testOptionMetaData).mkString(CR)
-    val helpContext = helpContextWithOptions(Count)
+    val helpContext = modelContextWithOptions(Count)
 
     val text = CliHelpGenerator.generateOptionsHelp(helpContext, optNewline = None)(TestColumnGenerator)
     text should be(ExpText)
@@ -511,7 +511,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpText = testOptionMetaData(KeyMin, HelpText + KeyMin).toString + CR + CR +
       (1 to Count).map(testOptionMetaData).mkString(CR + CR) + CR + CR +
       testOptionMetaData(KeyMax, HelpText + KeyMax).toString
-    val helpContext = helpContextWithOptions(Count)
+    val helpContext = modelContextWithOptions(Count)
       .addOption(KeyMin, Some(HelpText + KeyMin))
       .addOption(KeyMax, Some(HelpText + KeyMax))
 
@@ -523,7 +523,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val Count = 8
     val sortFunc: OptionSortFunc = _.sortWith(_.key > _.key) // reverse sort
     val ExpText = (1 to Count).map(testOptionMetaData).reverse.mkString(CR + CR)
-    val helpContext = helpContextWithOptions(Count)
+    val helpContext = modelContextWithOptions(Count)
 
     val text = CliHelpGenerator.generateOptionsHelp(helpContext, sortFunc = sortFunc)(TestColumnGenerator)
     text should be(ExpText)
@@ -533,7 +533,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val CountAll = 8
     val CountFiltered = 4
     val ExpText = (1 to CountFiltered).map(testOptionMetaData).mkString(CR + CR)
-    val helpContext = helpContextWithOptions(CountAll)
+    val helpContext = modelContextWithOptions(CountAll)
     val filterFunc: OptionFilter = _.key <= testKey(CountFiltered)
 
     val text = CliHelpGenerator.generateOptionsHelp(helpContext, filterFunc = filterFunc)(TestColumnGenerator)
@@ -541,7 +541,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support multiple columns for the option help" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
     val ExpText = Key + CliHelpGenerator.DefaultPadding + HelpText
 
@@ -551,7 +551,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "align the columns for the option help based on their maximum length" in {
     val ShortHelpText = "short help"
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(testKey(1), Some(ShortHelpText))
       .addOption(testKey(2), Some(HelpText))
     val ExpText = ShortHelpText + (" " * (HelpText.length - ShortHelpText.length)) +
@@ -564,7 +564,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "support multiple lines in columns for option help" in {
     val spaceKey = " " * Key.length
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some("Line1" + CR + "Line2" + CR + "Line3"))
     val ExpText = Key + CliHelpGenerator.DefaultPadding + "Line1" + CR +
       spaceKey + CliHelpGenerator.DefaultPadding + "Line2" + CR +
@@ -576,7 +576,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "handle empty cells when generating option help" in {
     val EmptyColumnGenerator: ColumnGenerator = _ => List.empty
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, None)
     val ExpText = Key + CliHelpGenerator.DefaultPadding
 
@@ -585,7 +585,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate options help if no option is matched" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
     val filter: OptionFilter = _ => false
 
@@ -595,7 +595,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "support changing the padding string for the option help table" in {
     val OtherPadding = " | "
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
     val ExpText = Key + OtherPadding + HelpText
 
@@ -757,7 +757,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "provide a special sort function for input parameters" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addInputParameter(1, Some("source"), None)
       .addInputParameter(2, Some("destination"), None)
       .addInputParameter(3, Some("flags"), None)
@@ -770,7 +770,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "handle non-input parameters in the special sort function" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addInputParameter(1, Some("source"), None)
       .addInputParameter(2, Some("destination"), None)
       .addOption(Key, Some(HelpText))
@@ -784,7 +784,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "provide a filter function that filters for options" in {
     val Key2 = "otherOptionKey"
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
       .addInputParameter(1, Some("ignored"), None)
       .addOption(Key2, Some("other help"))
@@ -797,7 +797,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "provide a filter function that filters for input parameters" in {
     val Key2 = "testInput"
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addInputParameter(1, Some(Key), None)
       .addOption("ignored", None)
       .addInputParameter(2, Some(Key2), Some("text"))
@@ -810,7 +810,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "provide a filter function that accepts elements from a given group" in {
     val Group = "TheGroup"
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption("ignored", Some("test"))
       .startGroup(Group)
       .addOption(Key, Some(HelpText))
@@ -826,7 +826,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "provide a filter function that accepts elements belonging to multiple groups" in {
     val Group1 = "IncludeGroup1"
     val Group2 = "IncludeGroup2"
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption("ignored1", Some("ignored help 1"))
       .startGroup(Group2)
       .addOption("ignored2", None)
@@ -839,7 +839,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "provide a filter function that accepts elements not assigned to any group" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
       .startGroup("anyGroup")
       .addOption("ignored", Some("test"))
@@ -850,7 +850,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "provide a filter function that filters for a specific attribute" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
       .addOption("ignored", None)
     val ExpResult = OptionMetaData(Key, helpContext.options(Key))
@@ -861,7 +861,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "allow combining filters with AND semantics" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
       .addInputParameter(1, None, None)
       .startGroup("anyGroup")
@@ -877,7 +877,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "allow combining filters with OR semantics" in {
     val KeyInput = "myInput"
     val Group = "ImportantGroup"
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption("ignored", Some("foo"))
       .addInputParameter(1, Some(KeyInput), None)
       .startGroup(Group)
@@ -892,7 +892,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support negating a filter" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addOption("ignored", Some("test"))
       .startGroup("anyGroup")
       .addOption(Key, Some(HelpText))
@@ -904,14 +904,14 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an input parameter with multiplicity 1..1" in {
-    val helpContext = addInputParameter(createHelpContext(), "1..1")
+    val helpContext = addInputParameter(createModelContext(), "1..1")
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
     result should contain only "<" + Key + ">"
   }
 
   it should "generate the overview of an input parameter if the upper bound is > than the lower bound" in {
-    val helpContext = addInputParameter(createHelpContext(), "1..3")
+    val helpContext = addInputParameter(createModelContext(), "1..3")
     val ExpResult = s"<${Key}1> [...<${Key}3>]"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
@@ -919,7 +919,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an input parameter if the upper bound is the lower bound + 1" in {
-    val helpContext = addInputParameter(createHelpContext(), "1..2")
+    val helpContext = addInputParameter(createModelContext(), "1..2")
     val ExpResult = s"<${Key}1> [<${Key}2>]"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
@@ -927,7 +927,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an input parameter if the upper bound is unrestricted" in {
-    val helpContext = addInputParameter(createHelpContext(), "1..*")
+    val helpContext = addInputParameter(createModelContext(), "1..*")
     val ExpResult = s"<$Key> [...]"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
@@ -935,7 +935,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an input parameter if the lower bound is > 2" in {
-    val helpContext = addInputParameter(createHelpContext(), "3..*")
+    val helpContext = addInputParameter(createModelContext(), "3..*")
     val ExpResult = s"<${Key}1>...<${Key}3> [...]"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
@@ -943,7 +943,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an input parameter if the lower bound is 2" in {
-    val helpContext = addInputParameter(createHelpContext(), "2..3")
+    val helpContext = addInputParameter(createModelContext(), "2..3")
     val ExpResult = s"<${Key}1> <${Key}2> [<${Key}3>]"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
@@ -951,7 +951,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an optional input parameter" in {
-    val helpContext = addInputParameter(createHelpContext(), "0..*")
+    val helpContext = addInputParameter(createModelContext(), "0..*")
     val ExpResult = s"[<$Key> ...]"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext)
@@ -961,7 +961,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "generate the overview for multiple input parameters" in {
     val Key2 = "source"
     val helpContext = addInputParameter(
-      addInputParameter(createHelpContext(), "1..1", key = Key2),
+      addInputParameter(createModelContext(), "1..1", key = Key2),
       "1..*", index = 2)
     val ExpResult = List(s"<$Key2>", s"<$Key> [...]")
 
@@ -970,7 +970,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "generate the overview of an input parameter if no multiplicity is available" in {
-    val helpContext = createHelpContext()
+    val helpContext = createModelContext()
       .addInputParameter(1, Some(Key), None)
     val ExpResult = s"[<$Key> ...]"
 
@@ -981,7 +981,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "support customizing the symbols for the overview of input parameters" in {
     val symbols = InputParamOverviewSymbols(optionalPrefix = "{", optionalSuffix = "}",
       keyPrefix = "(", keySuffix = ")", ellipsis = "_")
-    val helpContext = addInputParameter(createHelpContext(), "3..*")
+    val helpContext = addInputParameter(createModelContext(), "3..*")
     val ExpResult = s"(${Key}1)_(${Key}3) {_}"
 
     val result = CliHelpGenerator.generateInputParamsOverview(helpContext, symbols)

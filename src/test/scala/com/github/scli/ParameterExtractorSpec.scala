@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.io.IOException
 
-import com.github.scli.ParameterModel.CliHelpContext
+import com.github.scli.ParameterModel.ModelContext
 import com.github.scli.ParameterExtractor.{OptionValue, ParameterContext, Parameters}
 import com.github.scli.ParameterParser.ParametersMap
 import org.mockito.Mockito._
@@ -57,7 +57,7 @@ object ParameterExtractorSpec {
 
   /** A test ParameterContext object. */
   private val TestContext = ParameterContext(TestParameters,
-    new CliHelpContext(Map.empty, SortedSet.empty, None, Nil),
+    new ModelContext(Map.empty, SortedSet.empty, None, Nil),
     DummyConsoleReader)
 }
 
@@ -827,11 +827,11 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     }
   }
 
-  it should "add failures to the help context" in {
+  it should "add failures to the model context" in {
     val Key2 = "someOtherKey"
     val Key3 = "oneMoreKey"
     val Key4 = "additionalKey"
-    val helpContext = new CliHelpContext(Map.empty, SortedSet.empty, None, Nil)
+    val helpContext = new ModelContext(Map.empty, SortedSet.empty, None, Nil)
       .addOption(Key, Some("Help1"))
       .addOption(Key2, None)
       .addOption(Key3, Some("Help3"))
@@ -839,7 +839,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val failure3 = ExtractionFailure(Key3, "error3", TestContext)
     val failure4 = ExtractionFailure(Key4, "error4", TestContext)
 
-    val updHelpCtx = ParameterExtractor.addFailuresToHelpContext(helpContext, List(failure1, failure3, failure4))
+    val updHelpCtx = ParameterExtractor.addFailuresToModelContext(helpContext, List(failure1, failure3, failure4))
     updHelpCtx.options(Key2) should be(helpContext.options(Key2))
     val attr1 = updHelpCtx.options(Key)
     attr1.attributes(ParameterModel.AttrHelpText) should be("Help1")

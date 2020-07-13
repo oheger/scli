@@ -83,7 +83,7 @@ object ParameterManager {
    * [[com.github.scli.ParameterExtractor#ParameterExtractionException]].
    * From this exception, all information is available to generate a
    * meaningful error message and usage information. Specifically, the failure
-   * messages have already been added to the help context in the parameter
+   * messages have already been added to the model context in the parameter
    * context available via the exception.
    *
    * @param args                      the sequence of command line arguments
@@ -122,7 +122,7 @@ object ParameterManager {
       case e: ParameterParseException =>
         val context = gatherMetaData(extractor, parameters = e.currentParameters)
         val failure = ExtractionFailure(e.fileOption, e.getMessage, context)
-        Failure(updateHelpContextWithFailures(List(failure), context))
+        Failure(updateModelContextWithFailures(List(failure), context))
     }
 
   /**
@@ -146,7 +146,7 @@ object ParameterManager {
       (_, _)
     } recoverWith {
       case e: ParameterExtractionException =>
-        Failure(updateHelpContextWithFailures(e.failures, context))
+        Failure(updateModelContextWithFailures(e.failures, context))
     }
   }
 
@@ -164,18 +164,18 @@ object ParameterManager {
     else Success(context)
 
   /**
-   * Generates an updated help context that contains all the failures of the
+   * Generates an updated model context that contains all the failures of the
    * passed in list. Then the failures are updated to reference the
-   * parameter context with the updated help context, and a new exception with
+   * parameter context with the updated model context, and a new exception with
    * these failures is created.
    *
    * @param failures the original list of failures
    * @param context  the most recent parameter context
-   * @return an updated exception referencing the new help context
+   * @return an updated exception referencing the new model context
    */
-  private def updateHelpContextWithFailures(failures: List[ExtractionFailure], context: ParameterContext):
+  private def updateModelContextWithFailures(failures: List[ExtractionFailure], context: ParameterContext):
   ParameterExtractionException = {
-    val helpContext = addFailuresToHelpContext(context.helpContext, failures)
+    val helpContext = addFailuresToModelContext(context.helpContext, failures)
     val newContext = context.copy(helpContext = helpContext)
     val newFailures = failures.map(_.copy(context = newContext))
     ParameterExtractionException(newFailures)

@@ -173,13 +173,14 @@ current values of arguments can be accessed. In addition, an instance stores
 information about which argument keys have been accessed. This is needed to
 detect unknown or unsupported parameters (i.e. parameters that were passed on
 the command line, but never accessed).
-_CliHelpContext_::
-This class holds information relevant for the generation of help or usage
-messages. It is constructed and populated automatically during the extraction
-phase. Based on the declaration of the extraction steps, the context stores
-some properties about single arguments - such as their type, potential default
-values, or the expected multiplicity. This information can then be displayed on
-a help screen.
+_ModelContext_::
+This class holds an internal model of the parameters as declared by the
+application. It is constructed and populated automatically during the
+extraction phase. Based on the declaration of the extraction steps, the context
+stores some properties about single arguments - such as their type, potential
+default values, or the expected multiplicity. This information can then support
+the generation of help screens or other tasks requiring information about
+parameters.
 _ConsoleReader_::
 A _console reader_ is a service object that prompts the user to read in the
 value of a parameter from the console. This is typically used for secrets or
@@ -193,7 +194,7 @@ important actors during command line processing. An extractor is basically a
 function that expects a _ParameterContext_ object and returns a value out of it
 plus an updated _ParameterContext_. (The _ParameterContext_ needs to be updated
 to record the access to a specific parameter and to store some metadata in the
-help context.)
+model context.)
 
 There are some fundamental pre-defined extractors, e.g. to extract the value of
 an option or input parameter as an <<OptionValue>>. _CliExtractor_ is actually

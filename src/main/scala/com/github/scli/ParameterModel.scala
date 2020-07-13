@@ -133,35 +133,36 @@ object ParameterModel {
 
   /**
    * A class for storing and updating meta information about command line
-   * options that can be used to generate help or usage texts.
+   * parameters.
    *
    * An instance of this class is available in the context passed to
    * ''CliExtractor'' objects. The extractors update the instance with specific
-   * information, so that meta data about the options supported by the
-   * application is collected.
+   * information, so that metadata about the options supported by the
+   * application is collected. This data can then be used for various purposes,
+   * e.g. to correctly parse the command line or to generate rich help texts.
    *
    * @param options       a map storing the data available for the single options
    * @param inputs        a set with data about input parameters
    * @param optCurrentKey a key to the option that is currently defined
    * @param groups        a list with the currently active group names
    */
-  class CliHelpContext(val options: Map[String, OptionAttributes],
-                       val inputs: SortedSet[InputParameterRef],
-                       optCurrentKey: Option[String],
-                       groups: List[String]) {
+  class ModelContext(val options: Map[String, OptionAttributes],
+                     val inputs: SortedSet[InputParameterRef],
+                     optCurrentKey: Option[String],
+                     groups: List[String]) {
 
     /**
      * Adds data about another command line option to this object. This
      * function creates a new [[OptionAttributes]] instance and initializes it
-     * from the parameters passed in. It returns a new ''CliHelpContext'' object
+     * from the parameters passed in. It returns a new ''ModelContext'' object
      * whose data map contains this new instance. If there is already an entry
      * for this option key, it is merged with the data passed to this function.
      *
      * @param key  the option key
      * @param text an optional help text
-     * @return the updated ''CliHelpContext''
+     * @return the updated ''ModelContext''
      */
-    def addOption(key: String, text: Option[String]): CliHelpContext =
+    def addOption(key: String, text: Option[String]): ModelContext =
       contextWithOption(key, text, OptionTypeOption, inputs)
 
     /**
@@ -172,9 +173,9 @@ object ParameterModel {
      * @param index  the index of the input parameter
      * @param optKey the optional key; if it is undefined, a key is generated
      * @param text   an optional help text
-     * @return the updated ''CliHelpContext''
+     * @return the updated ''ModelContext''
      */
-    def addInputParameter(index: Int, optKey: Option[String], text: Option[String]): CliHelpContext = {
+    def addInputParameter(index: Int, optKey: Option[String], text: Option[String]): ModelContext = {
       val key = optKey.getOrElse(KeyInput + index)
       val inputRef = InputParameterRef(index, key)
       contextWithOption(key, text, OptionTypeInput, inputs union Set(inputRef))
@@ -187,14 +188,14 @@ object ParameterModel {
      *
      * @param attrKey the key of the attribute
      * @param value   the value of the attribute
-     * @return the updated ''CliHelpContext''
+     * @return the updated ''ModelContext''
      */
-    def addAttribute(attrKey: String, value: String): CliHelpContext =
+    def addAttribute(attrKey: String, value: String): ModelContext =
       optCurrentKey match {
         case Some(key) =>
           val attrs = options(key)
           val newAttrs = OptionAttributes(attrs.attributes + (attrKey -> value))
-          new CliHelpContext(options + (key -> newAttrs), inputs, optCurrentKey, groups)
+          new ModelContext(options + (key -> newAttrs), inputs, optCurrentKey, groups)
         case None =>
           this
       }
@@ -217,10 +218,10 @@ object ParameterModel {
      * are added later are assigned to this group.
      *
      * @param groupName the name of the group
-     * @return the updated ''CliHelpContext''
+     * @return the updated ''ModelContext''
      */
-    def startGroup(groupName: String): CliHelpContext =
-      new CliHelpContext(options, inputs, optCurrentKey, groupName :: groups)
+    def startGroup(groupName: String): ModelContext =
+      new ModelContext(options, inputs, optCurrentKey, groupName :: groups)
 
     /**
      * Notifies this context about a potential start of a new group. If the
@@ -228,19 +229,19 @@ object ParameterModel {
      * context is returned.
      *
      * @param optGroupName the optional group name
-     * @return the updated ''CliHelpContext'' or the same one
+     * @return the updated ''ModelContext'' or the same one
      */
-    def startGroupConditionally(optGroupName: Option[String]): CliHelpContext =
+    def startGroupConditionally(optGroupName: Option[String]): ModelContext =
       optGroupName.fold(this)(startGroup)
 
     /**
      * Notifies this context that a group has been processed. The name of the
      * current group is removed.
      *
-     * @return the updated ''CliHelpContext''
+     * @return the updated ''ModelContext''
      */
-    def endGroup(): CliHelpContext =
-      new CliHelpContext(options, inputs, optCurrentKey, groups.tail)
+    def endGroup(): ModelContext =
+      new ModelContext(options, inputs, optCurrentKey, groups.tail)
 
     /**
      * Notifies this context that a group has potentially been processed. If
@@ -249,9 +250,9 @@ object ParameterModel {
      * unchanged.
      *
      * @param optGroupName the ''Option'' with the group name
-     * @return the updated ''CliHelpContext'' or the same one
+     * @return the updated ''ModelContext'' or the same one
      */
-    def endGroupConditionally(optGroupName: Option[String]): CliHelpContext =
+    def endGroupConditionally(optGroupName: Option[String]): ModelContext =
       optGroupName.fold(this)(_ => endGroup())
 
     /**
@@ -263,24 +264,24 @@ object ParameterModel {
     def optionMetaData: Iterable[OptionMetaData] = options.map(e => OptionMetaData(e._1, e._2))
 
     /**
-     * Creates a new ''CliHelpContext'' with an additional option as defined by
+     * Creates a new ''ModelContext'' with an additional option as defined by
      * the parameters.
      *
      * @param key        the option key
      * @param text       the help text for the option
      * @param optionType the type of the option
      * @param inputRefs  the input data for the new context
-     * @return the updated ''CliHelpContext''
+     * @return the updated ''ModelContext''
      */
     private def contextWithOption(key: String, text: Option[String], optionType: String,
-                                  inputRefs: SortedSet[InputParameterRef]): CliHelpContext = {
+                                  inputRefs: SortedSet[InputParameterRef]): ModelContext = {
       val existingAttrs = options.get(key).map(_.attributes) getOrElse Map.empty
       val existingGroups = existingAttrs.getOrElse(AttrGroup, "")
       val attrs = addOptionalAttribute(
         addOptionalAttribute(Map.empty, AttrHelpText, text),
         AttrGroup, groupAttribute.map(existingGroups + _)) + (AttrOptionType -> optionType)
       val help = OptionAttributes(existingAttrs ++ attrs)
-      new CliHelpContext(options + (key -> help), inputRefs, optCurrentKey = Some(key), groups)
+      new ModelContext(options + (key -> help), inputRefs, optCurrentKey = Some(key), groups)
     }
 
     /**

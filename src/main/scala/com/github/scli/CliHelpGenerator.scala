@@ -149,7 +149,7 @@ object CliHelpGenerator {
 
   /**
    * Type definition for a predicate to filter options from a
-   * [[CliHelpContext]].
+   * [[ModelContext]].
    */
   type OptionFilter = OptionMetaData => Boolean
 
@@ -169,7 +169,7 @@ object CliHelpGenerator {
    * converted to a string that can be directly printed to the console. By
    * passing in additional parameters, the output can be customized.
    *
-   * @param context    the ''CliHelpContext'' with all meta data about options
+   * @param context    the ''ModelContext'' with all meta data about options
    * @param sortFunc   a function to sort the list of options; per default,
    *                   options are sorted alphabetically ignoring case
    * @param filterFunc a function to filter the options to be displayed; per
@@ -181,7 +181,7 @@ object CliHelpGenerator {
    * @param columns    the functions to generate the single columns
    * @return a string with the help for command line options
    */
-  def generateOptionsHelp(context: CliHelpContext,
+  def generateOptionsHelp(context: ModelContext,
                           sortFunc: OptionSortFunc = AlphabeticOptionSortFunc,
                           filterFunc: OptionFilter = AllFilterFunc,
                           padding: String = DefaultPadding,
@@ -232,10 +232,10 @@ object CliHelpGenerator {
    * The function expects the list of options to be ordered has been filtered
    * to contain input parameters only.
    *
-   * @param helpContext the ''CliHelpContext''
+   * @param helpContext the ''ModelContext''
    * @return the function to sort input parameter options
    */
-  def inputParamSortFunc(helpContext: CliHelpContext): OptionSortFunc = {
+  def inputParamSortFunc(helpContext: ModelContext): OptionSortFunc = {
     def paramIndex(key: String): Int =
       helpContext.inputs.find(_.key == key).map(_.index) getOrElse helpContext.inputs.size
 
@@ -406,15 +406,15 @@ object CliHelpGenerator {
    * other output; e.g. by doing a ''mkstring(" ")'', it can be displayed on a
    * single line.
    *
-   * @param helpContext the help context
-   * @param symbols     defines the symbols to indicate certain parameter
-   *                    properties
+   * @param modelContext the model context
+   * @param symbols      defines the symbols to indicate certain parameter
+   *                     properties
    * @return a list with the information about all input parameters
    */
-  def generateInputParamsOverview(helpContext: CliHelpContext,
+  def generateInputParamsOverview(modelContext: ModelContext,
                                   symbols: InputParamOverviewSymbols = DefaultInputParamSymbols): List[String] =
-    helpContext.inputs.toList
-      .map(inputParameterOverview(helpContext, _, symbols))
+    modelContext.inputs.toList
+      .map(inputParameterOverview(modelContext, _, symbols))
 
   /**
    * Calculates the width of all the columns of a single row in a table of
@@ -584,15 +584,15 @@ object CliHelpGenerator {
    * Generates the overview of an input parameter based on its key and
    * multiplicity.
    *
-   * @param helpContext  the help context
+   * @param modelContext the model context
    * @param parameterRef the reference to the parameter in question
    * @param symbols      the formatting symbols
    * @return a string with information about this input parameter
    */
-  private def inputParameterOverview(helpContext: CliHelpContext, parameterRef: InputParameterRef,
+  private def inputParameterOverview(modelContext: ModelContext, parameterRef: InputParameterRef,
                                      symbols: InputParamOverviewSymbols): String = {
     val key = parameterRef.key
-    val multiplicity = helpContext.options(key).attributes.get(AttrMultiplicity)
+    val multiplicity = modelContext.options(key).attributes.get(AttrMultiplicity)
       .map(Multiplicity.parse) getOrElse Multiplicity.Unbounded
     val lowerPart = inputParameterOverviewLowerPart(key, multiplicity, symbols)
     val upperPart = inputParameterOverviewUpperPart(key, multiplicity, symbols)

@@ -37,7 +37,7 @@ object ParameterManagerSpec {
   /**
    * A test extractor that can be used by test cases. The extractor returns
    * the current parameters map as result. It also adds the test option to the
-   * map of accessed options and to the help context.
+   * map of accessed options and to the model context.
    */
   private val TestExtractor = ParameterManager.wrapTryExtractor(CliExtractor(context => {
     if (context.reader == DefaultConsoleReader) {
@@ -132,7 +132,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures.map(_.key) should contain only(TestOptionKey, "missing", "unknownOption")
   }
 
-  it should "add all failures to the help context in the resulting exception" in {
+  it should "add all failures to the model context in the resulting exception" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--unknownOption", "shouldFail")
     val extractor = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
 
