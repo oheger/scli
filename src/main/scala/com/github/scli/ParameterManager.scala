@@ -57,7 +57,7 @@ object ParameterManager {
     val theOptionFunc = getOrDefault(optionFunc, ParameterParser.DefaultOptionPrefixes.isOptionFunc)
     val theExtractorFunc = getOrDefault(keyExtractor, ParameterParser.DefaultOptionPrefixes.extractorFunc)
     args =>
-      ParameterParser.parseParameters(args, isOptionFunc = theOptionFunc, keyExtractor = theExtractorFunc,
+      ParameterParser.parseParametersOld(args, isOptionFunc = theOptionFunc, keyExtractor = theExtractorFunc,
         optFileOption = optFileOption)
   }
 

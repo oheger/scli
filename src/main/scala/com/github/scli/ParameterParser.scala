@@ -67,6 +67,70 @@ object ParameterParser {
    */
   type KeyExtractor = String => String
 
+  /**
+   * A trait describing an item encountered on the command line.
+   *
+   * During parameter parsing the single items on the command line need to be
+   * classified into options, switches, or input parameters. For this purpose,
+   * a classification function is used which returns sub classes of this trait.
+   * The parser needs to handle the sub classes differently.
+   */
+  sealed trait CliElement
+
+  /**
+   * A concrete ''CliElement'' class representing an option.
+   *
+   * The option is identified by its key. If possible, its value is extracted;
+   * but this may noe be possible, for instance if the option key was the last
+   * parameter on the command line.
+   *
+   * @param key   the key of the option
+   * @param value an ''Option'' with the value
+   */
+  case class OptionElement(key: String, value: Option[String]) extends CliElement
+
+  /**
+   * A concrete ''CliElement'' class representing a set of switches.
+   *
+   * A single parameter on the command line can contain multiple switches, e.g.
+   * if multiple short keys are composed, as in ''tar xvzf''. Therefore, this
+   * class holds a list with switches that have been extracted. For each switch
+   * its key and its value (which is derived from the default value defined in
+   * the parameter model) is stored.
+   *
+   * @param switches a list with switches and their values that have been
+   *                 extracted
+   */
+  case class SwitchesElement(switches: List[(String, String)]) extends CliElement
+
+  /**
+   * A concrete ''CliElement'' class representing an input parameter.
+   *
+   * @param value the value to be added to the input parameters
+   */
+  case class InputParameterElement(value: String) extends CliElement
+
+  /**
+   * Definition of a function to classify parameters on the command line.
+   *
+   * The function is passed the sequence with parameters and the index of the
+   * current one to be inspected. It returns the result of the classification
+   * as a [[CliElement]] object.
+   */
+  type CliClassifierFunc = (Seq[String], Int) => CliElement
+
+  /**
+   * Definition of a function to classify specific parameters on the command
+   * line.
+   *
+   * In contrast to [[CliClassifierFunc]], this function can fail to classify a
+   * parameter. The idea here is that multiple functions of this type can be
+   * combined, each of which is specialized for a specific parameter type. If
+   * none of those are able to detect the parameter type, an input parameter
+   * can be assumed as fallback.
+   */
+  type PartialCliClassifierFunc = (Seq[String], Int) => Option[CliElement]
+
   object OptionPrefixes {
     /**
      * Returns a new instance of ''OptionPrefixes'' that accepts the prefixes
@@ -116,6 +180,18 @@ object ParameterParser {
      */
     def extractorFunc: KeyExtractor =
       key => findPrefix(key).fold(key)(prefix => key.drop(prefix.length))
+
+    /**
+     * Tries to extract the key of an option from the given parameter. The
+     * function checks whether the parameter has one of the prefix configured
+     * for this object. If so, the key without the prefix is returned.
+     * Otherwise, result is an empty ''Option''.
+     *
+     * @param parameter the parameter to process
+     * @return an ''Option'' with the key extracted
+     */
+    def tryExtract(parameter: String): Option[String] =
+      findPrefix(parameter).map(parameter drop _.length)
 
     /**
      * Returns an ''Option'' with the prefix that matches the passed in option
@@ -180,10 +256,10 @@ object ParameterParser {
    *                      content is added to the command line
    * @return a ''Try'' with the parsed map of arguments
    */
-  def parseParameters(args: Seq[String],
-                      isOptionFunc: OptionPredicate = DefaultOptionPrefixes.isOptionFunc,
-                      keyExtractor: KeyExtractor = DefaultOptionPrefixes.extractorFunc,
-                      optFileOption: Option[String] = None): Try[ParametersMap] = {
+  def parseParametersOld(args: Seq[String],
+                         isOptionFunc: OptionPredicate = DefaultOptionPrefixes.isOptionFunc,
+                         keyExtractor: KeyExtractor = DefaultOptionPrefixes.extractorFunc,
+                         optFileOption: Option[String] = None): Try[ParametersMap] = {
     def appendOptionValue(argMap: InternalParamMap, opt: String, value: String):
     InternalParamMap = {
       val optValues = argMap.getOrElse(opt, List.empty)
@@ -229,6 +305,82 @@ object ParameterParser {
 
     parseParametersWithFiles(args.toList, Map.empty, Set.empty)
   }
+
+  /**
+   * Parses the command line arguments and tries to convert them into a map
+   * keyed by options. The parsing operation can be customized by specifying
+   * some properties, especially a ''CliClassifierFunc''. This function is
+   * invoked for each argument, and - based on its result - the parameter is
+   * added to the result produced by this function.
+   *
+   * The parsing operation normally succeeds, even if invalid parameters are
+   * passed in; this is detected and handled later in the extraction phase.
+   * The only exception that can occur is that a parameter file cannot be
+   * read (which can happen only if a name for the file option is provided).
+   * So if the ''Try'' returned by this function fails, the exception is of
+   * type [[ParameterParseException]] and contains further information about
+   * the failed read operation.
+   *
+   * @param args           the sequence with command line arguments
+   * @param optFileOption  optional name for an option to reference parameter
+   *                       files; if defined, such files are read, and their
+   *                       content is added to the command line
+   * @param classifierFunc a function to classify parameters
+   * @return a ''Try'' with the parsed map of arguments
+   */
+  def parseParameters(args: Seq[String], optFileOption: Option[String] = None)
+                     (classifierFunc: CliClassifierFunc): Try[ParametersMap] = {
+    def appendOptionValue(argMap: InternalParamMap, opt: String, value: String):
+    InternalParamMap = {
+      val optValues = argMap.getOrElse(opt, List.empty)
+      argMap + (opt -> (optValues :+ value))
+    }
+
+    @tailrec def doParseParameters(argList: Seq[String], index: Int, argsMap: InternalParamMap): InternalParamMap =
+      if (index >= argList.size) argsMap
+      else classifierFunc(argList, index) match {
+        case InputParameterElement(value) =>
+          doParseParameters(argList, index + 1, appendOptionValue(argsMap, InputOption, value))
+
+        case OptionElement(key, optValue) =>
+          val nextArgsMap = optValue.fold(argsMap)(value => appendOptionValue(argsMap, key, value))
+          doParseParameters(argList, index + 2, nextArgsMap)
+
+        case SwitchesElement(switches) =>
+          val nextArgsMap = switches.foldLeft(argsMap) { (map, t) =>
+            appendOptionValue(map, t._1, t._2)
+          }
+          doParseParameters(argList, index + 1, nextArgsMap)
+      }
+
+    def parseParameterSeq(argList: Seq[String]): InternalParamMap =
+      doParseParameters(argList, 0, Map.empty)
+
+    def parseParametersWithFiles(argList: Seq[String], currentParams: InternalParamMap,
+                                 processedFiles: Set[String]): Try[InternalParamMap] = Try {
+      combineParameterMaps(currentParams, parseParameterSeq(argList))
+    } flatMap { argMap =>
+      optFileOption match {
+        case Some(fileOption) =>
+          argMap get fileOption match {
+            case None =>
+              Success(argMap)
+            case Some(files) =>
+              val nextArgs = argMap - fileOption
+              val filesToRead = files.toSet diff processedFiles
+              readAllParameterFiles(filesToRead.toList, fileOption, nextArgs) flatMap { argList =>
+                parseParametersWithFiles(argList, nextArgs, processedFiles ++ filesToRead)
+              }
+          }
+
+        case None =>
+          Success(argMap)
+      }
+    }
+
+    parseParametersWithFiles(args.toList, Map.empty, Set.empty)
+  }
+
 
   /**
    * Creates a combined parameter map from the given source maps. The lists

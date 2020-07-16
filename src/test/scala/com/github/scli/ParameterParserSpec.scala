@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
-import com.github.scli.ParameterParser.{OptionPrefixes, ParameterParseException}
+import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -44,7 +44,20 @@ object ParameterParserSpec {
    * @param s the string
    * @return the byte array
    */
-  def toBytes(s: String): Array[Byte] = s.getBytes(StandardCharsets.UTF_8)
+  private def toBytes(s: String): Array[Byte] = s.getBytes(StandardCharsets.UTF_8)
+
+  /**
+   * Returns a very simple classifier function that distinguishes between
+   * options and input parameters.
+   *
+   * @return the basic classifier function
+   */
+  private def basicClassifierFunc: CliClassifierFunc =
+    (args, idx) => {
+      val arg = args(idx)
+      if (arg.startsWith("--")) OptionElement(arg.substring(2), Some(args(idx + 1)))
+      else InputParameterElement(arg)
+    }
 }
 
 /**
@@ -159,6 +172,19 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   /**
+   * Generates a classifier function that returns defined results.
+   *
+   * @param args    the command line arguments
+   * @param results the results to return for arguments
+   * @return the classifier function
+   */
+  private def classifierFunc(args: Seq[String], results: Seq[CliElement]): CliClassifierFunc =
+    (params, idx) => {
+      params should be(args)
+      results(idx)
+    }
+
+  /**
    * Extracts the map with parameters from the given tried result; fails for
    * other results.
    *
@@ -176,20 +202,22 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
    * expects a successful result. The resulting map is returned.
    *
    * @param args the sequence with arguments
+   * @param cf   the classifier function
    * @return the resulting parameters map
    */
-  private def parseParametersSuccess(args: Seq[String]): ParameterParser.ParametersMap =
-    extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption)))
+  private def parseParametersSuccess(args: Seq[String])(cf: CliClassifierFunc): ParameterParser.ParametersMap =
+    extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf))
 
   /**
    * Invokes the parameter parser on the given sequence with arguments and
    * expects a failure result. The causing exception is returned.
    *
    * @param args the sequence with arguments
+   * @param cf   the classifier function
    * @return the exception causing the failure
    */
-  private def parseParametersFailure(args: Seq[String]): Throwable =
-    ParameterParser.parseParameters(args, optFileOption = Some(FileOption)) match {
+  private def parseParametersFailure(args: Seq[String])(cf: CliClassifierFunc): Throwable =
+    ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf) match {
       case Failure(exception) => exception
       case r => fail("Unexpected result: " + r)
     }
@@ -260,35 +288,58 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     extractor("--" + Key) should be(Key)
   }
 
+  it should "extract keys from valid options" in {
+    val Options = List("--foo", "-foo", "/foo", "<<<<foo")
+    val prefixes = OptionPrefixes("-", "/", "<<<<", "--")
+
+    Options.forall(prefixes.tryExtract(_).contains("foo")) shouldBe true
+  }
+
+  it should "return empty keys for non-option parameters" in {
+    val Params = List("-nope", "neither", "-+alsoNot", "/fullWrong")
+    val prefixes = OptionPrefixes("--")
+
+    Params.forall(prefixes.tryExtract(_).isEmpty) shouldBe true
+  }
+
   "ParameterParser" should "parse an empty sequence of arguments" in {
-    val params = parseParametersSuccess(Nil)
+    val cf: CliClassifierFunc = (_, _) => throw new UnsupportedOperationException("Unexpected invocation")
+    val params = parseParametersSuccess(Nil)(cf)
 
     params should have size 0
   }
 
   it should "correctly parse non-option parameters" in {
     val args = List("uri1", "uri2")
+    val elements = args map (v => InputParameterElement(v))
+    val cf = classifierFunc(args, elements)
     val expArgMap = Map(ParameterParser.InputOption -> args)
 
-    val params = parseParametersSuccess(args)
+    val params = parseParametersSuccess(args)(cf)
     params should be(expArgMap)
   }
 
   it should "correctly parse arguments with options" in {
     val args = List("--opt1", "opt1Val1", "--opt2", "opt2Val1", "--opt1", "opt1Val2")
+    val elements = List(OptionElement("opt1", Some("opt1Val1")),
+      null, OptionElement("opt2", Some("opt2Val1")),
+      null, OptionElement("opt1", Some("opt1Val2")))
+    val cf = classifierFunc(args, elements)
     val expArgMap = Map("opt1" -> List("opt1Val1", "opt1Val2"),
       "opt2" -> List("opt2Val1"))
 
-    val params = parseParametersSuccess(args)
+    val params = parseParametersSuccess(args)(cf)
     params should be(expArgMap)
   }
 
   it should "ignore an option that is the last argument" in {
-    val undefOption = "--undefinedOption"
-    val args = List("--opt1", "optValue", undefOption)
+    val undefOption = "undefinedOption"
+    val args = List("--opt1", "optValue", "--" + undefOption)
+    val elements = List(OptionElement("opt1", Some("optValue")), null, OptionElement(undefOption, None))
+    val cf = classifierFunc(args, elements)
     val expArgsMap = Map("opt1" -> List("optValue"))
 
-    val params = parseParametersSuccess(args)
+    val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
   }
 
@@ -296,22 +347,27 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val Key = "strangeOption"
     val TestOption = "--" + Key
     val args = List(TestOption, "v1", TestOption, "v2", TestOption)
+    val elements = List(OptionElement(Key, Some("v1")), null, OptionElement(Key, Some("v2")),
+      null, OptionElement(Key, None))
+    val cf = classifierFunc(args, elements)
     val expArgsMap = Map(Key -> List("v1", "v2"))
 
-    val params = parseParametersSuccess(args)
+    val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
   }
 
-  it should "support different option prefixes" in {
-    val args = List("/TestOption", "TestValue", "--FOO", "BAR", "testUri")
-    val expArgMap = Map("TestOption" -> List("TestValue"),
-      "FOO" -> List("BAR"),
-      ParameterParser.InputOption -> List("testUri"))
-    val optionPrefixes = OptionPrefixes("/", "--")
+  it should "correctly parse arguments with switches" in {
+    val args = List("--v", "other", "--xzvf", "--flag")
+    val elements = List(SwitchesElement(List(("v", "true"))), InputParameterElement("other"),
+      SwitchesElement(List(("x", "true"), ("z", "false"), ("v", "true"), ("f", "true"))),
+      SwitchesElement(List(("flag", "false"))))
+    val cf = classifierFunc(args, elements)
+    val expArgsMap = Map(ParameterParser.InputOption -> List("other"),
+      "v" -> List("true", "true"), "x" -> List("true"), "z" -> List("false"),
+      "f" -> List("true"), "flag" -> List("false"))
 
-    val params = extractParametersMap(ParameterParser.parseParameters(args,
-      isOptionFunc = optionPrefixes.isOptionFunc, keyExtractor = optionPrefixes.extractorFunc))
-    params should be(expArgMap)
+    val params = parseParametersSuccess(args)(cf)
+    params should be(expArgsMap)
   }
 
   it should "add the content of parameter files to command line options" in {
@@ -326,7 +382,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       appendFileParameter(createParameterFile("--" + OptionName2, Opt2Val),
         "--" + OptionName1 :: Opt1Val2 :: uri2 :: Nil))
 
-    val argsMap = parseParametersSuccess(args)
+    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
     argsMap(OptionName1) should contain only(Opt1Val1, Opt1Val2)
     argsMap(OptionName2) should contain only Opt2Val
     argsMap.keys should not contain FileOption
@@ -347,7 +403,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       OptionName2 -> List(Option2Value),
       OptionName3 -> List(Option3Value))
 
-    val argsMap = parseParametersSuccess(args)
+    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
     argsMap should be(expArgs)
   }
 
@@ -360,7 +416,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = appendFileParameter(file1, Nil)
     val expArgs = Map("op1" -> List("v1"), "op2" -> List("v2"), "op3" -> List("v3"))
 
-    val argsMap = parseParametersSuccess(args)
+    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
     argsMap should be(expArgs)
   }
 
@@ -368,7 +424,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = appendFileParameter(createParameterFile("--foo", "bar", "", "--foo", "baz"),
       "--test" :: "true" :: Nil)
 
-    val argsMap = parseParametersSuccess(args)
+    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
     argsMap.keys should contain only("foo", "test")
   }
 
@@ -377,7 +433,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("--op1", "don't care", "--" + FileOption, FileName)
     val expArgs = Map("op1" -> List("don't care"))
 
-    val exception = parseParametersFailure(args)
+    val exception = parseParametersFailure(args)(basicClassifierFunc)
     exception match {
       case e: ParameterParseException =>
         e.getMessage should include(FileName)
