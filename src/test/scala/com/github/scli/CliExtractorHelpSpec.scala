@@ -158,6 +158,14 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     fetchAttribute(helpContext, Key, ParameterModel.AttrHelpText) should be(HelpText)
   }
 
+  it should "store a help text for a switch" in {
+    val ext = switchValue(Key, optHelp = Some(HelpText))
+
+    val helpContext = generateHelpContext(ext)
+    helpContext.options.keys should contain only Key
+    fetchAttribute(helpContext, Key, ParameterModel.AttrHelpText) should be(HelpText)
+  }
+
   it should "support a description for a constant value extractor" in {
     val FallbackDesc = "This is the fallback value."
     val constExtValue: OptionValue[String] = Success(List("foo"))
@@ -484,6 +492,29 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
     val helpContext = generateHelpContext(ext)
     fetchAttribute(helpContext, Key, ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeInput)
+  }
+
+  it should "set the option type attribute for a switch" in {
+    val ext = switchValue(Key)
+
+    val helpContext = generateHelpContext(ext)
+    fetchAttribute(helpContext, Key, ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeSwitch)
+  }
+
+  it should "set the present and fallback value attributes for a switch" in {
+    val ext = switchValue(Key)
+
+    val helpContext = generateHelpContext(ext)
+    fetchAttribute(helpContext, Key, ParameterModel.AttrFallbackValue) should be("false")
+    fetchAttribute(helpContext, Key, ParameterModel.AttrSwitchValue) should be("true")
+  }
+
+  it should "set the present and fallback value attributes for a switch with a presence value of false" in {
+    val ext = switchValue(Key, presentValue = false)
+
+    val helpContext = generateHelpContext(ext)
+    fetchAttribute(helpContext, Key, ParameterModel.AttrFallbackValue) should be("true")
+    fetchAttribute(helpContext, Key, ParameterModel.AttrSwitchValue) should be("false")
   }
 
   it should "generate option help texts with default settings" in {

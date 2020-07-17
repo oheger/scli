@@ -798,6 +798,32 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     extractor.key should be(paramKey.get)
   }
 
+  it should "provide an extractor for switches" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val args: Parameters = Map(Key -> List("true"))
+    val extractor = ParameterExtractor.switchValue(Key)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, args)
+    next.parameters.accessedParameters should contain only Key
+    res should be(Success(true))
+  }
+
+  it should "provide an extractor for switches that defines a fallback value" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val extractor = ParameterExtractor.switchValue("flag")
+
+    val (res, _) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    res should be(Success(false))
+  }
+
+  it should "provide an extractor for switches that allows overriding the fallback value" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val extractor = ParameterExtractor.switchValue("flag", presentValue = false)
+
+    val (res, _) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    res should be(Success(true))
+  }
+
   it should "check whether all parameters have been consumed" in {
     val Key2 = "otherKey1"
     val Key3 = "otherKey2"

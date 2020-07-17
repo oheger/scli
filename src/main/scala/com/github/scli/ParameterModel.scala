@@ -66,8 +66,17 @@ object ParameterModel {
    */
   final val AttrErrorMessage = "errorMessage"
 
+  /**
+   * The attribute defining the value to be assigned to a switch if it is
+   * present. This is normally a boolean constant.
+   */
+  final val AttrSwitchValue = "switchValue"
+
   /** Option type indicating a plain option. */
   final val OptionTypeOption = "option"
+
+  /** Option type indicating a command line switch. */
+  final val OptionTypeSwitch = "switch"
 
   /** Option type indicating an input parameter. */
   final val OptionTypeInput = "input"

@@ -835,6 +835,29 @@ object ParameterExtractor {
     }, optKey)
 
   /**
+   * Returns an extractor that extracts the value of a command line switch. A
+   * switch is different from an option in that it does not have a value
+   * assigned; instead, its value is determined by its presence or absence (and
+   * is therefore a boolean). This function allows setting the value to return
+   * if the switch is present; the opposite value is then set as fallback.
+   *
+   * @param key          the key of the switch
+   * @param optHelp      an optional help text
+   * @param presentValue the value to assign if the switch is present
+   * @return the extractor to extract a switch parameter
+   */
+  def switchValue(key: String, optHelp: Option[String] = None, presentValue: Boolean = true):
+  CliExtractor[Try[Boolean]] =
+    optionValue(key, optHelp).mapWithContext { (v, ctx) =>
+      val nextCtx = ctx.updateHelpContext(ParameterModel.AttrOptionType, ParameterModel.OptionTypeSwitch)
+        .updateHelpContext(ParameterModel.AttrSwitchValue, presentValue.toString)
+      (v, nextCtx)
+    }
+      .toBoolean
+      .fallbackValue(!presentValue)
+      .mandatory
+
+  /**
    * Returns an extractor that can apply a fallback (or default) value to
    * another extractor. The resulting extractor invokes the first extractor.
    * If this yields a defined result, this result is returned. Otherwise, the
