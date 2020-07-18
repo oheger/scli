@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
-import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
+import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -58,6 +58,15 @@ object ParameterParserSpec {
       if (arg.startsWith("--")) OptionElement(arg.substring(2), Some(args(idx + 1)))
       else InputParameterElement(arg)
     }
+
+  /**
+   * Returns a key classifier function that always throws an exception. This is
+   * used to test that this function is not called.
+   *
+   * @return the classifier function that throws an exception
+   */
+  private def blowUpKeyClassifier: ExtractedKeyClassifierFunc =
+    (_, _, _) => throw new UnsupportedOperationException("Unexpected invocation")
 }
 
 /**
@@ -251,6 +260,25 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   private def appendFileParameter(path: Path, argList: List[String]): List[String] =
     "--" + FileOption :: path.toString :: argList
 
+  /**
+   * Returns a key classifier function that expects the given key to be passed
+   * in and returns the given result.
+   *
+   * @param expKey  the expected key
+   * @param expArgs the expected sequence of arguments
+   * @param expIdx  the expected index in the arguments sequence
+   * @param result  the result to return
+   * @return the key classifier function with these properties
+   */
+  private def definedKeyClassifier(expKey: String, expArgs: Seq[String], expIdx: Int, result: Option[CliElement]):
+  ExtractedKeyClassifierFunc =
+    (key, args, idx) => {
+      key should be(expKey)
+      args should be(expArgs)
+      idx should be(expIdx)
+      result
+    }
+
   "OptionPrefixes" should "return a function to check for an option" in {
     val Options = List("--foo", "-test", "/switch", "<<<<yes", "//double")
     val NonOptions = List("+o1", "o2", "*o3")
@@ -442,5 +470,39 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
         e.currentParameters should be(expArgs)
       case e => fail("Unexpected exception: " + e)
     }
+  }
+
+  it should "create a classifier function that handles input parameters" in {
+    val args = List("foo")
+    val cf = ParameterParser.classifierOf(blowUpKeyClassifier)(ParameterParser.DefaultOptionPrefixes.tryExtract)
+
+    cf(args, 0) should be(InputParameterElement(args.head))
+  }
+
+  it should "create a classifier function with an empty list of key classifiers" in {
+    val args = List("foo", "bar")
+    val cf = ParameterParser.classifierOf()(ParameterParser.DefaultOptionPrefixes.tryExtract)
+
+    cf(args, 1) should be(InputParameterElement(args(1)))
+  }
+
+  it should "create a classifier function that handles key classifiers returning None" in {
+    val Key = "arg"
+    val args = List("--" + Key)
+    val cf = ParameterParser.classifierOf(definedKeyClassifier(Key, args, 0, None),
+      definedKeyClassifier(Key, args, 0, None))(ParameterParser.DefaultOptionPrefixes.tryExtract)
+
+    cf(args, 0) should be(InputParameterElement(args.head))
+  }
+
+  it should "create a classifier function that correctly delegates to key classifiers" in {
+    val Key = "theOptionKey"
+    val Result = OptionElement(Key, Some("someValue"))
+    val args = List("test", "--" + Key)
+    val cf = ParameterParser.classifierOf(definedKeyClassifier(Key, args, 1, None),
+      definedKeyClassifier(Key, args, 1, Some(Result)),
+      blowUpKeyClassifier)(ParameterParser.DefaultOptionPrefixes.tryExtract)
+
+    cf(args, 1) should be(Result)
   }
 }

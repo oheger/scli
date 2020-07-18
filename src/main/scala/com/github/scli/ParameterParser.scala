@@ -120,16 +120,30 @@ object ParameterParser {
   type CliClassifierFunc = (Seq[String], Int) => CliElement
 
   /**
-   * Definition of a function to classify specific parameters on the command
-   * line.
+   * Definition of a function to classify specific parameters whose key has
+   * already been extracted.
    *
-   * In contrast to [[CliClassifierFunc]], this function can fail to classify a
-   * parameter. The idea here is that multiple functions of this type can be
-   * combined, each of which is specialized for a specific parameter type. If
-   * none of those are able to detect the parameter type, an input parameter
-   * can be assumed as fallback.
+   * This function type is similar to [[CliClassifierFunc]], but there are a
+   * couple of differences: First, it is invoked with a parameter key in
+   * addition to the sequence of parameters and the current index; so it will
+   * be called only for options or switches. Second, this function can fail to
+   * classify a parameter. The idea here is that multiple functions of this
+   * type can be combined, each of which is specialized for a specific
+   * parameter type. If none of those are able to detect the parameter type,
+   * an input parameter can be assumed as fallback.
    */
-  type PartialCliClassifierFunc = (Seq[String], Int) => Option[CliElement]
+  type ExtractedKeyClassifierFunc = (String, Seq[String], Int) => Option[CliElement]
+
+  /**
+   * Definition of a function that can extract the key of an option or switch
+   * parameter from a command line element.
+   *
+   * The function is passed the string encountered on the command line. A
+   * concrete implementation probably checks whether this string starts with a
+   * prefix indicating an option or switch. If so, the key is returned (with
+   * the prefix removed); otherwise, result is an empty ''Option''.
+   */
+  type KeyExtractorFunc = String => Option[String]
 
   object OptionPrefixes {
     /**
@@ -229,6 +243,40 @@ object ParameterParser {
    * command line arguments.
    */
   private type InternalParamMap = Map[String, List[String]]
+
+  /**
+   * Generates a ''CliClassifierFunc'' from the given sequence extracted key
+   * classifier functions. The resulting classifier function tries to extract
+   * an option or switch key from the current command line parameter using the
+   * extractor function provided. If this succeeds, the key is passed to the
+   * key classifier functions one by one until one returns a defined result.
+   * This result is returned. If extraction of the key fails or none of the
+   * classifier functions returns a result, an [[InputParameterElement]] is
+   * returned.
+   *
+   * @param keyClassifiers a sequence of ''ExtractedKeyClassifierFunc''
+   *                       functions
+   * @param keyExtractor   the key extractor function
+   * @return a ''CliClassifierFunc'' constructed from these parameters
+   */
+  def classifierOf(keyClassifiers: ExtractedKeyClassifierFunc*)(keyExtractor: KeyExtractorFunc): CliClassifierFunc = {
+    @tailrec
+    def classifyKey(classifiers: List[ExtractedKeyClassifierFunc], key: String, args: Seq[String], idx: Int):
+    Option[CliElement] =
+      classifiers match {
+        case h :: t =>
+          h(key, args, idx) match {
+            case res@Some(_) => res
+            case None => classifyKey(t, key, args, idx)
+          }
+        case _ => None
+      }
+
+    val keyClassifierList = keyClassifiers.toList
+    (args, idx) =>
+      keyExtractor(args(idx)) flatMap (key => classifyKey(keyClassifierList,
+        key, args, idx)) getOrElse InputParameterElement(args(idx))
+  }
 
   /**
    * Parses the command line arguments and tries to convert them into a map
