@@ -300,6 +300,24 @@ object ParameterParser {
   }
 
   /**
+   * Returns a key classifier function for switches. The function checks
+   * whether the passed in key references a switch in the model context. If so,
+   * a corresponding result is returned.
+   *
+   * @param modelContext the model context
+   * @return the key classifier function for switches
+   */
+  def switchKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
+    lazy val context = modelContext
+    (key, _, _) =>
+      if (getModelContextAttribute(context, key, ParameterModel.AttrOptionType,
+        ParameterModel.OptionTypeSwitch) == ParameterModel.OptionTypeSwitch)
+        Some(SwitchesElement(List((key,
+          getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
+      else None
+  }
+
+  /**
    * Parses the command line arguments and tries to convert them into a map
    * keyed by options. The parsing operation can be customized by specifying
    * some properties. To determine whether an argument is an option with a
