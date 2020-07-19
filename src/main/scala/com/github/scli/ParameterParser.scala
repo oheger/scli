@@ -16,6 +16,8 @@
 
 package com.github.scli
 
+import com.github.scli.ParameterModel.ModelContext
+
 import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.{Failure, Success, Try}
@@ -279,6 +281,25 @@ object ParameterParser {
   }
 
   /**
+   * Returns a key classifier func for options. The function checks whether the
+   * passed in key references an option in the model context. If so, a
+   * corresponding result is returned.
+   *
+   * @param modelContext the model context
+   * @return the key classifier function for options
+   */
+  def optionKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
+    lazy val context = modelContext
+    (key, args, idx) =>
+      if (getModelContextAttribute(context, key, ParameterModel.AttrOptionType,
+        ParameterModel.OptionTypeOption) == ParameterModel.OptionTypeOption) {
+        val value = args.lift(idx + 1)
+        Some(OptionElement(key, value))
+      }
+      else None
+  }
+
+  /**
    * Parses the command line arguments and tries to convert them into a map
    * keyed by options. The parsing operation can be customized by specifying
    * some properties. To determine whether an argument is an option with a
@@ -492,4 +513,21 @@ object ParameterParser {
   private def convertSuccessReads(triedReads: List[(String, Try[List[String]])]): Try[List[String]] =
     Try(triedReads.map(_._2.get))
       .map(_.flatten)
+
+  /**
+   * Fetches a specific attribute from a ''ModelContext'' for a given parameter
+   * key. If the key or the attribute cannot be found, the default value is
+   * returned. Note that unknown keys typically do not lead to failures in this
+   * phase; they are detected later after all extractions have been done.
+   *
+   * @param context the ''ModelContext''
+   * @param key     the key of the parameter in question
+   * @param attr    the desired attribute
+   * @param default the default value to use
+   * @return the value of this attribute (or the default)
+   */
+  private def getModelContextAttribute(context: ModelContext, key: String, attr: String, default: String): String =
+    context.options.get(key)
+      .flatMap(_.attributes.get(attr))
+      .getOrElse(default)
 }

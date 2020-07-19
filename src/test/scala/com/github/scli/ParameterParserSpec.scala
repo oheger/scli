@@ -21,11 +21,13 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
+import com.github.scli.ParameterModel.{ModelContext, OptionAttributes}
 import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import scala.collection.SortedSet
 import scala.util.{Failure, Success, Try}
 
 object ParameterParserSpec {
@@ -37,6 +39,12 @@ object ParameterParserSpec {
 
   /** The suffix for temporary files created by this class. */
   private val TempFileSuffix = ".tmp"
+
+  /** A key for a test parameter. */
+  private val TestKey = "theTestKey"
+
+  /** Test value of the test parameter. */
+  private val TestValue = "testValue"
 
   /**
    * Helper method for converting a string to a byte array.
@@ -67,6 +75,18 @@ object ParameterParserSpec {
    */
   private def blowUpKeyClassifier: ExtractedKeyClassifierFunc =
     (_, _, _) => throw new UnsupportedOperationException("Unexpected invocation")
+
+  /**
+   * Creates a ''ModelContext'' with the given set of attributes for the test
+   * option key.
+   *
+   * @param attributes the attributes for the test option key
+   * @return the resulting model context
+   */
+  private def createModelContext(attributes: Map[String, String]): ModelContext = {
+    val optionAttributes = Map(TestKey -> OptionAttributes(attributes))
+    new ModelContext(optionAttributes, SortedSet.empty, None, Nil)
+  }
 }
 
 /**
@@ -504,5 +524,46 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       blowUpKeyClassifier)(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
     cf(args, 1) should be(Result)
+  }
+
+  it should "provide a key classifier for options that handles an option key" in {
+    val args = List("someKey", TestValue)
+    val context = createModelContext(Map(ParameterModel.AttrOptionType -> ParameterModel.OptionTypeOption))
+
+    val classifier = ParameterParser.optionKeyClassifierFunc(context)
+    classifier(TestKey, args, 0) should be(Some(OptionElement(TestKey, Some(TestValue))))
+  }
+
+  it should "provide a key classifier for options that checks the option type" in {
+    val args = List("someKey", TestValue)
+    val context = createModelContext(Map(ParameterModel.AttrOptionType -> ParameterModel.OptionTypeSwitch))
+
+    val classifier = ParameterParser.optionKeyClassifierFunc(context)
+    classifier(TestKey, args, 0) should be(None)
+  }
+
+  it should "provide a key classifier for options that handles a missing attribute" in {
+    val args = List("someKey", "someOtherKey", TestValue)
+    val context = createModelContext(Map(ParameterModel.AttrGroup -> "someGroup"))
+
+    val classifier = ParameterParser.optionKeyClassifierFunc(context)
+    classifier(TestKey, args, 1) should be(Some(OptionElement(TestKey, Some(TestValue))))
+  }
+
+  it should "provide a key classifier for options that handles an unknown parameter key" in {
+    val UnknownKey = "unknownKey"
+    val args = List("someKey", "someOtherKey", TestValue)
+    val context = createModelContext(Map(ParameterModel.AttrOptionType -> ParameterModel.OptionTypeOption))
+
+    val classifier = ParameterParser.optionKeyClassifierFunc(context)
+    classifier(UnknownKey, args, 1) should be(Some(OptionElement(UnknownKey, Some(TestValue))))
+  }
+
+  it should "provide a key classifier for options that handles a missing option value" in {
+    val args = List("key1", "key2", TestKey)
+    val context = createModelContext(Map(ParameterModel.AttrOptionType -> ParameterModel.OptionTypeOption))
+
+    val classifier = ParameterParser.optionKeyClassifierFunc(context)
+    classifier(TestKey, args, 2) should be(Some(OptionElement(TestKey, None)))
   }
 }
