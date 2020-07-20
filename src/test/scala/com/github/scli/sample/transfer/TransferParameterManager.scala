@@ -377,14 +377,8 @@ object TransferParameterManager {
    * @return the extractor for the ''UploadCommandConfig''
    */
   private def uploadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
-    val extUploadHashes = optionValue("upload-hashes")
-      .toBoolean
-      .fallbackValue(false)
-      .mandatory
-    val extRemoveUploaded = optionValue("remove-uploaded-files")
-      .toBoolean
-      .fallbackValue(false)
-      .mandatory
+    val extUploadHashes = switchValue("upload-hashes")
+    val extRemoveUploaded = switchValue("remove-uploaded-files")
     for {
       uploadHashes <- extUploadHashes
       removeUploaded <- extRemoveUploaded
@@ -400,10 +394,7 @@ object TransferParameterManager {
     val extTargetPath = optionValue("target-folder")
       .toPath
       .mandatory
-    val extOverride = optionValue("override-local-files")
-      .toBoolean
-      .fallbackValue(false)
-      .mandatory
+    val extOverride = switchValue("skip-existing", presentValue = false)
     for {
       target <- extTargetPath
       fOverride <- extOverride

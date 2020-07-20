@@ -199,8 +199,8 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   }
 
   it should "extract a command config for uploads and a file server" in {
-    val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes", "true",
-      "--remove-uploaded-files", "true", "--root-path", "/data", "--umask", "660",
+    val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes",
+      "--remove-uploaded-files", "--root-path", "/data", "--umask", "660",
       "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
@@ -220,7 +220,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   }
 
   it should "set default values for the file server config" in {
-    val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes", "true")
+    val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes")
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
     config.serverConfig should be(FileServerConfig(rootPath = None, umask = TransferParameterManager.DefaultUmask))
@@ -228,7 +228,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
 
   it should "extract a command config for downloads and a file server" in {
     val args = List("download", "file1", "file2", "/file/server", "--target-folder", "target",
-      "--override-local-files", "true", "--root-path", "/data", "--umask", "660",
+      "--skip-existing", "--root-path", "/data", "--umask", "660",
       "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
@@ -236,7 +236,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
       TransferParameterManager.DefaultCryptAlgorithm))
     config.transferConfig.serverUrl should be("/file/server")
     config.transferConfig.sourceFiles should contain only(Paths get "file1", Paths get "file2")
-    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
     config.serverConfig should be(FileServerConfig(Some("/data"), 660))
   }
 
@@ -245,7 +245,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
     config.cryptConfig should be(TransferParameterManager.DisabledCryptConfig)
-    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
   }
 
   it should "detect an unsupported transfer command" in {
@@ -259,7 +259,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val args = List("DownLoad", "file1", "file2", "/file/server", "--target-folder", "target")
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
-    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
   }
 
   it should "extract a command config for downloads and an HTTP server" in {
@@ -269,13 +269,13 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
     config.serverConfig should be(HttpServerConfig("scott", "tiger"))
-    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = false))
+    config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
   }
 
   it should "extract a command config for uploads and an HTTP server" in {
     val ServerUri = "https://www.test-server.org"
     val args = List("upload", "file1", "file2", ServerUri, "--user", "scott", "--password", "tiger",
-      "--upload-hashes", "true")
+      "--upload-hashes")
 
     val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
     config.serverConfig should be(HttpServerConfig("scott", "tiger"))
