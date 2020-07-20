@@ -17,7 +17,7 @@
 package com.github.scli
 
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterParser.{KeyExtractor, OptionPredicate, ParameterParseException, ParametersMap}
+import com.github.scli.ParameterParser._
 
 import scala.util.{Failure, Success, Try}
 
@@ -42,23 +42,60 @@ object ParameterManager {
   type ParsingFunc = Seq[String] => Try[ParametersMap]
 
   /**
+   * Returns a list with standard ''ExtractedKeyClassifierFunc'' functions to
+   * deal with elements on the command line. This list contains functions to
+   * deal with all supported elements on the command line. The classifiers need
+   * access to a ''ModelContext''. This is constructed using the
+   * ''CliExtractor'' provided.
+   *
+   * @param extractor the ''CliExtractor'' to execute
+   * @return a list with standard ''ExtractedKeyClassifierFunc'' functions
+   */
+  def defaultExtractedKeyClassifiers(extractor: CliExtractor[_]): List[ExtractedKeyClassifierFunc] = {
+    lazy val modelContext = ParameterExtractor.gatherMetaData(extractor).helpContext
+    List(ParameterParser.optionKeyClassifierFunc(modelContext),
+      ParameterParser.switchKeyClassifierFunc(modelContext))
+  }
+
+  /**
+   * Returns a ''KeyExtractorFunc'' that is based on the given
+   * ''OptionPrefixes'' object. The function detects keys of options or
+   * switches starting with one of the prefix configured in the
+   * ''OptionPrefixes'' object.
+   *
+   * @param prefixes the object with supported prefixes
+   * @return a function to extract keys for options or switches
+   */
+  def defaultKeyExtractor(prefixes: OptionPrefixes): KeyExtractorFunc = prefixes.tryExtract
+
+  /**
+   * Returns a default ''CliClassifierFunc'' for the execution of the
+   * ''CliExtractor'' provided. This function makes use of the default
+   * ''ExtractedKeyClassifierFunc'' functions and uses the default prefixes for
+   * options and switches.
+   *
+   * @param extractor the ''CliExtractor'' to run
+   * @return the default ''CliClassifierFunc'' for this extractor
+   */
+  def defaultClassifierFunc(extractor: CliExtractor[_]): CliClassifierFunc =
+    ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractor): _*)(defaultKeyExtractor(
+      ParameterParser.DefaultOptionPrefixes))
+
+  /**
    * Returns a ''ParsingFunc'' that is configured with the parameters
    * provided. For missing parameters, meaningful default values are used.
    *
-   * @param optionFunc    optional function to detect command line options
-   * @param keyExtractor  optional function to extract the keys of options
-   * @param optFileOption optional name of an option to read command line
-   *                      files
+   * @param extractor      the ''CliExtractor'' to run
+   * @param classifierFunc the function to classify command line elements
+   * @param optFileOption  optional name of an option to read command line
+   *                       files
    * @return the configured parsing function
    */
-  def parsingFunc(optionFunc: OptionPredicate = null,
-                  keyExtractor: KeyExtractor = null,
+  def parsingFunc(extractor: CliExtractor[_], classifierFunc: CliClassifierFunc = null,
                   optFileOption: Option[String] = None): ParsingFunc = {
-    val theOptionFunc = getOrDefault(optionFunc, ParameterParser.DefaultOptionPrefixes.isOptionFunc)
-    val theExtractorFunc = getOrDefault(keyExtractor, ParameterParser.DefaultOptionPrefixes.extractorFunc)
+    val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractor))
     args =>
-      ParameterParser.parseParametersOld(args, isOptionFunc = theOptionFunc, keyExtractor = theExtractorFunc,
-        optFileOption = optFileOption)
+      ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)
   }
 
   /**
@@ -97,7 +134,7 @@ object ParameterManager {
    */
   def processCommandLine[A](args: Seq[String], extractor: CliExtractor[Try[A]], parser: ParsingFunc = null,
                             checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] = {
-    val theParsingFunc = getOrDefault(parser, parsingFunc())
+    val theParsingFunc = getOrDefault(parser, parsingFunc(extractor))
     for {
       parsedArgs <- parse(args, extractor, theParsingFunc)
       extResult <- extract(parsedArgs, extractor, checkUnconsumedParameters)

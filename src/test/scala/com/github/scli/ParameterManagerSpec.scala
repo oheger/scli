@@ -17,6 +17,7 @@
 package com.github.scli
 
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterExtractionException}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -46,6 +47,24 @@ object ParameterManagerSpec {
       (context.parameters.parametersMap, nextContext)
     } else (Map.empty, context)
   }))
+
+  /**
+   * Generates an extractor based on the given one that counts the number of
+   * its invocations. This can be used to test how often the model context is
+   * created.
+   *
+   * @param extractor the base extractor
+   * @tparam A the result type of the extractor
+   * @return a tuple with the counting extractor and the counter it uses
+   */
+  private def countingExtractor[A](extractor: CliExtractor[A]): (CliExtractor[A], AtomicInteger) = {
+    val counter = new AtomicInteger
+    val extCount = extractor.map { result =>
+      counter.incrementAndGet()
+      result
+    }
+    (extCount, counter)
+  }
 }
 
 /**
@@ -120,7 +139,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
   it should "combine failures of the extractor with failures for unconsumed parameters" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--unknownOption", "shouldFail")
     val ext1 = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
-    val ext2 = ParameterExtractor.multiOptionValue("missing").single.mandatory
+    val ext2 = ParameterExtractor.optionValue("missing").mandatory
     val extractor = for {
       v1 <- ext1
       v2 <- ext2
@@ -141,15 +160,30 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     helpContext.options(TestOptionKey).attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 
+  it should "support options and switches per default classifier function" in {
+    val KeySwitch = "flag"
+    val args = List("--" + TestOptionKey, TestOptionValue, "--" + KeySwitch)
+    val extOpt = ParameterExtractor.optionValue(TestOptionKey).mandatory
+    val extSwitch = ParameterExtractor.switchValue(KeySwitch)
+    val extractor = for {
+      opt <- extOpt
+      flag <- extSwitch
+    } yield (opt, flag)
+
+    val (res, _) = triedResult(ParameterManager.processCommandLine(args, ParameterManager.wrapTryExtractor(extractor)))
+    res should be((Success(TestOptionValue), Success(true)))
+  }
+
   it should "support customizing the parsing function" in {
     val args = List("/" + TestOptionKey, TestOptionValue)
     val key = TestOptionKey.toLowerCase(Locale.ROOT)
-    val extractor = ParameterExtractor.multiOptionValue(key).single.mandatory
+    val extractor = ParameterExtractor.optionValue(key).mandatory
     val prefixes = ParameterParser.OptionPrefixes("/")
-    val keyExtractor = prefixes.extractorFunc andThen (s => s.toLowerCase(Locale.ROOT))
+    val keyExtractor = ParameterManager.defaultKeyExtractor(prefixes) andThen (opt => opt.map(_.toLowerCase(Locale.ROOT)))
+    val classifierFunc =
+      ParameterParser.classifierOf(ParameterManager.defaultExtractedKeyClassifiers(extractor): _*)(keyExtractor)
 
-    val parseFunc = ParameterManager.parsingFunc(optionFunc = prefixes.isOptionFunc,
-      keyExtractor = keyExtractor)
+    val parseFunc = ParameterManager.parsingFunc(extractor, classifierFunc)
     val (res, _) = triedResult(ParameterManager.processCommandLine(args, extractor, parser = parseFunc))
     res should be(TestOptionValue)
   }
@@ -160,7 +194,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption, FileName)
     val extractor = ParameterExtractor.multiOptionValue(TestOptionKey, help = Some(HelpTestOption))
 
-    val parseFunc = ParameterManager.parsingFunc(optFileOption = Some(FileOption))
+    val parseFunc = ParameterManager.parsingFunc(extractor, optFileOption = Some(FileOption))
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor, parseFunc,
       checkUnconsumedParameters = false))
     exception.failures should have size 1
@@ -174,5 +208,30 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
     val fileOptionAttrs = helpContext.options(FileOption)
     fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
+  }
+
+  it should "not construct a model context if this is not needed" in {
+    val extractor = ParameterExtractor.inputValue(0, last = true)
+    val args = List("input")
+    val (extCnt, counter) = countingExtractor(extractor)
+
+    val (res, _) = triedResult(ParameterManager.processCommandLine(args, extCnt))
+    res should be(Some(args.head))
+    counter.get() should be(1)
+  }
+
+  it should "construct the model context at most once" in {
+    val KeySwitch = "flag"
+    val args = List("--" + TestOptionKey, TestOptionValue, "--" + KeySwitch)
+    val extOpt = ParameterExtractor.optionValue(TestOptionKey).mandatory
+    val extSwitch = ParameterExtractor.switchValue(KeySwitch)
+    val extractor = for {
+      opt <- extOpt
+      flag <- extSwitch
+    } yield (opt, flag)
+    val (extCnt, counter) = countingExtractor(extractor)
+
+    triedResult(ParameterManager.processCommandLine(args, ParameterManager.wrapTryExtractor(extCnt)))
+    counter.get() should be(2)
   }
 }
