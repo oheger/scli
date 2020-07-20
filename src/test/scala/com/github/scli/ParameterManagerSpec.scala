@@ -43,7 +43,7 @@ object ParameterManagerSpec {
   private val TestExtractor = ParameterManager.wrapTryExtractor(CliExtractor(context => {
     if (context.reader == DefaultConsoleReader) {
       val nextContext = context.update(context.parameters.keyAccessed(TestOptionKey),
-        context.helpContext.addOption(TestOptionKey, Some(HelpTestOption)))
+        context.modelContext.addOption(TestOptionKey, Some(HelpTestOption)))
       (context.parameters.parametersMap, nextContext)
     } else (Map.empty, context)
   }))
@@ -111,7 +111,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     res should be(ExpParamsMap)
     context.parameters.parametersMap should be(ExpParamsMap)
     context.parameters.accessedParameters should contain only TestOptionKey
-    context.helpContext.options(TestOptionKey).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
+    context.modelContext.options(TestOptionKey).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
   }
 
   it should "check for unconsumed parameters" in {
@@ -132,8 +132,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures.head.key should be(TestOptionKey)
     exception.failures.head.message should include("NumberFormatException")
     exception.parameterContext.parameters.parametersMap.keys should contain(TestOptionKey)
-    val helpContext = exception.parameterContext.helpContext
-    helpContext.options.keys should contain(TestOptionKey)
+    val modelContext = exception.parameterContext.modelContext
+    modelContext.options.keys should contain(TestOptionKey)
   }
 
   it should "combine failures of the extractor with failures for unconsumed parameters" in {
@@ -156,8 +156,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val extractor = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
-    val helpContext = exception.parameterContext.helpContext
-    helpContext.options(TestOptionKey).attributes.keys should contain(ParameterModel.AttrErrorMessage)
+    val modelContext = exception.parameterContext.modelContext
+    modelContext.options(TestOptionKey).attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 
   it should "support options and switches per default classifier function" in {
@@ -203,10 +203,10 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     failure.message should include(FileName)
     val context = exception.parameterContext
     context.parameters.parametersMap.keys should contain(TestOptionKey)
-    val helpContext = context.helpContext
-    val testOptionAttrs = helpContext.options(TestOptionKey)
+    val modelContext = context.modelContext
+    val testOptionAttrs = modelContext.options(TestOptionKey)
     testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
-    val fileOptionAttrs = helpContext.options(FileOption)
+    val fileOptionAttrs = modelContext.options(FileOption)
     fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 

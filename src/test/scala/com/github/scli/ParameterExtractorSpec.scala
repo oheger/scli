@@ -212,7 +212,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
                               (implicit expReader: ConsoleReader): CliExtractor[A] = CliExtractor(context => {
     context.parameters should be(expParameters)
     context.reader should be(expReader)
-    (value, context.update(nextParameters, context.helpContext))
+    (value, context.update(nextParameters, context.modelContext))
   }, Some(Key))
 
   "ParameterExtractor" should "support running a CliExtractor" in {
@@ -382,14 +382,14 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val ext = testExtractor(Result)
     val extractor = ParameterExtractor.mappedWithContext(ext) { (i, ctx) =>
       val res = i.toString
-      val nextHelpCtx = ctx.helpContext.addOption(res, None)
-      (res, ctx.copy(helpContext = nextHelpCtx))
+      val nextHelpCtx = ctx.modelContext.addOption(res, None)
+      (res, ctx.copy(modelContext = nextHelpCtx))
     }
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
     res should be(Success(StrValues))
-    next.helpContext.options.keys should contain allOf(StrValues.head, StrValues.tail.head, StrValues.drop(2): _*)
+    next.modelContext.options.keys should contain allOf(StrValues.head, StrValues.tail.head, StrValues.drop(2): _*)
   }
 
   it should "provide a mapping extractor that collects multiple mapping errors" in {
@@ -652,13 +652,16 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
   it should "provide a condition extractor that handles failures" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val Key2 = "keyElse"
     val exception = new Exception("failed")
     val condExt: CliExtractor[Try[Boolean]] = testExtractor(Failure(exception))
-    val extractor = ParameterExtractor.conditionalOptionValue(condExt, ifExt = ParameterExtractor.emptyExtractor[String],
-      elseExt = ParameterExtractor.emptyExtractor[String])
+    val ifExt = multiOptionValue(Key)
+    val elseExt = multiOptionValue(Key2)
+    val extractor = ParameterExtractor.conditionalOptionValue(condExt, ifExt = ifExt, elseExt = elseExt)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
+    next.modelContext.options.keys should contain allElementsOf List(Key2, Key)
     res should be(Failure(exception))
   }
 
@@ -681,23 +684,25 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val failedResult = Failure(new Exception("failure group"))
     val groupExt: CliExtractor[Try[String]] = testExtractor(failedResult)
-    val groupMap = Map("foo" -> constantOptionValue("ignored"))
+    val groupMap = Map("foo" -> optionValue(Key))
     val extractor = conditionalGroupValue(groupExt, groupMap)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
     res should be(failedResult)
+    next.modelContext.options.keys should contain(Key)
   }
 
   it should "provide a conditional group extractor that fails if the group cannot be resolved" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
     val GroupName = "foo"
     val groupExt: CliExtractor[Try[String]] = testExtractor(Success(GroupName))
-    val groupMap = Map("bar" -> constantOptionValue("ignored"))
+    val groupMap = Map("bar" -> optionValue(Key))
     val extractor = conditionalGroupValue(groupExt, groupMap)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
     next.parameters should be(NextParameters)
+    next.modelContext.options.keys should contain(Key)
     checkExtractionException(expectExtractionException(res),
       expParams = TestParameters.parametersMap)(s"'$GroupName''")
   }

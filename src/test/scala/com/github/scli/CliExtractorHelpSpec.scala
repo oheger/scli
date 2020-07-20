@@ -68,7 +68,7 @@ object CliExtractorHelpSpec {
                                   optReader: Option[ConsoleReader] = None): ModelContext = {
     implicit val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
     val (_, ctx) = ParameterExtractor.runExtractor(ext, params)
-    ctx.helpContext
+    ctx.modelContext
   }
 
   /**
@@ -246,7 +246,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "handle an uninitialized model context gracefully" in {
     val ext = CliExtractor(context => {
-      (42, context.updateHelpContext("test", "success"))
+      (42, context.updateModelContext("test", "success"))
     })
 
     val helpContext = generateHelpContext(ext)

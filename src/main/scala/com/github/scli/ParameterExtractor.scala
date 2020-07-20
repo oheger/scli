@@ -138,12 +138,12 @@ object ParameterExtractor {
    * that may be needed to extract meaningful data or provide information
    * about the extractor.
    *
-   * @param parameters  the parameters to be processed
-   * @param helpContext the context to generate help information
-   * @param reader      an object to read data from the console
+   * @param parameters   the parameters to be processed
+   * @param modelContext the context storing model information
+   * @param reader       an object to read data from the console
    */
   case class ParameterContext(parameters: Parameters,
-                              helpContext: ModelContext,
+                              modelContext: ModelContext,
                               reader: ConsoleReader) {
     /**
      * Returns a new ''ParameterContext'' object that was updated with the
@@ -155,7 +155,7 @@ object ParameterExtractor {
      * @return the updated ''ParameterContext''
      */
     def update(nextParameters: Parameters, nextModelContext: ModelContext): ParameterContext =
-      copy(parameters = nextParameters, helpContext = nextModelContext)
+      copy(parameters = nextParameters, modelContext = nextModelContext)
 
     /**
      * Returns a new ''ParameterContext'' object with an updated
@@ -165,8 +165,8 @@ object ParameterExtractor {
      * @param value the attribute value
      * @return the updated ''ParameterContext''
      */
-    def updateHelpContext(attr: String, value: String): ParameterContext =
-      copy(helpContext = helpContext.addAttribute(attr, value))
+    def updateModelContext(attr: String, value: String): ParameterContext =
+      copy(modelContext = modelContext.addAttribute(attr, value))
 
     /**
      * Returns a ''ParameterContext'' for a conditional update of the
@@ -178,8 +178,8 @@ object ParameterExtractor {
      * @param optValue an ''Option'' with the attribute value
      * @return the updated (or same) ''ParameterContext''
      */
-    def updateHelpContextConditionally(attr: String, optValue: Option[String]): ParameterContext =
-      optValue map (value => updateHelpContext(attr, value)) getOrElse this
+    def updateModelContextConditionally(attr: String, optValue: Option[String]): ParameterContext =
+      optValue map (value => updateModelContext(attr, value)) getOrElse this
   }
 
   /**
@@ -693,7 +693,7 @@ object ParameterExtractor {
    */
   def constantExtractor[A](a: A, optValueDesc: Option[String] = None): CliExtractor[A] =
     CliExtractor(context => {
-      val nextContext = context.updateHelpContextConditionally(ParameterModel.AttrFallbackValue, optValueDesc)
+      val nextContext = context.updateModelContextConditionally(ParameterModel.AttrFallbackValue, optValueDesc)
       (a, nextContext)
     })
 
@@ -755,8 +755,8 @@ object ParameterExtractor {
   def multiOptionValue(key: String, help: Option[String] = None): CliExtractor[OptionValue[String]] =
     CliExtractor(context => {
       val values = context.parameters.parametersMap.getOrElse(key, Nil)
-      val nextHelpCtx = context.helpContext.addOption(key, help)
-      (Success(values), context.update(context.parameters keyAccessed key, nextHelpCtx))
+      val nextModelCtx = context.modelContext.addOption(key, help)
+      (Success(values), context.update(context.parameters keyAccessed key, nextModelCtx))
     }, Some(key))
 
   /**
@@ -830,8 +830,8 @@ object ParameterExtractor {
           firstIndex <- adjustAndCheckIndex(fromIdx)
           lastIndex <- adjustAndCheckIndex(toIdx)
         } yield inputs.slice(firstIndex, lastIndex + 1)
-      val helpContext = context.helpContext.addInputParameter(fromIdx, optKey, optHelp)
-      (result, context.update(context.parameters keyAccessed ParameterParser.InputOption, helpContext))
+      val modelContext = context.modelContext.addInputParameter(fromIdx, optKey, optHelp)
+      (result, context.update(context.parameters keyAccessed ParameterParser.InputOption, modelContext))
     }, optKey)
 
   /**
@@ -849,8 +849,8 @@ object ParameterExtractor {
   def switchValue(key: String, optHelp: Option[String] = None, presentValue: Boolean = true):
   CliExtractor[Try[Boolean]] =
     optionValue(key, optHelp).mapWithContext { (v, ctx) =>
-      val nextCtx = ctx.updateHelpContext(ParameterModel.AttrOptionType, ParameterModel.OptionTypeSwitch)
-        .updateHelpContext(ParameterModel.AttrSwitchValue, presentValue.toString)
+      val nextCtx = ctx.updateModelContext(ParameterModel.AttrOptionType, ParameterModel.OptionTypeSwitch)
+        .updateModelContext(ParameterModel.AttrSwitchValue, presentValue.toString)
       (v, nextCtx)
     }
       .toBoolean
@@ -937,23 +937,30 @@ object ParameterExtractor {
    */
   def conditionalValue[A](condExt: CliExtractor[Try[Boolean]], ifExt: CliExtractor[Try[A]],
                           elseExt: CliExtractor[Try[A]], ifGroup: Option[String] = None,
-                          elseGroup: Option[String] = None): CliExtractor[Try[A]] =
+                          elseGroup: Option[String] = None): CliExtractor[Try[A]] = {
+    def processUnselectedExtractors(context: ParameterContext)(f: ((CliExtractor[Try[A]], Option[String])) => Boolean):
+    ModelContext = {
+      val extractorsAndGroups = List((ifExt, ifGroup), (elseExt, elseGroup))
+        .filter(f)
+      updateModelContext(context.modelContext, extractorsAndGroups)
+    }
+
     CliExtractor(context => {
       val (condResult, context2) = condExt.run(context)
       condResult match {
         case Success(value) =>
           val (activeExt, activeGroup) = if (value) (ifExt, ifGroup) else (elseExt, elseGroup)
-          val extractorsAndGroups = List((ifExt, ifGroup), (elseExt, elseGroup))
-            .filter(_._1 != activeExt)
-          val helpContext = updateHelpContext(context2.helpContext, extractorsAndGroups)
+          val modelContext = processUnselectedExtractors(context2)(_._1 != activeExt)
           val (result, context3) =
-            activeExt.run(context2.copy(helpContext = helpContext startGroupConditionally activeGroup))
-          (result, context3.copy(helpContext = context3.helpContext.endGroupConditionally(activeGroup)))
+            activeExt.run(context2.copy(modelContext = modelContext startGroupConditionally activeGroup))
+          (result, context3.copy(modelContext = context3.modelContext.endGroupConditionally(activeGroup)))
 
         case Failure(exception) =>
-          (Failure(exception), context2)
+          val modelContext = processUnselectedExtractors(context2)(_ => true)
+          (Failure(exception), context2.copy(modelContext = modelContext))
       }
     })
+  }
 
   /**
    * A specialized variant of a conditional extractor that operates on sub
@@ -1001,24 +1008,31 @@ object ParameterExtractor {
    * @return the extractor returning the group value
    */
   def conditionalGroupValue[A](groupExt: CliExtractor[Try[String]],
-                               groupMap: Map[String, CliExtractor[Try[A]]]): CliExtractor[Try[A]] =
+                               groupMap: Map[String, CliExtractor[Try[A]]]): CliExtractor[Try[A]] = {
+    def processUnselectedGroups(context: ParameterContext)(f: ((String, CliExtractor[Try[A]])) => Boolean):
+    ModelContext = {
+      val extractorsAndGroups = groupMap.toList.filter(f)
+        .map(entry => (entry._2, Some(entry._1)))
+      updateModelContext(context.modelContext, extractorsAndGroups)
+    }
+
     CliExtractor(context => {
       val (triedGroup, context2) = groupExt.run(context)
       triedGroup match {
         case Success(group) =>
+          val modelContext = processUnselectedGroups(context2)(entry => entry._1 != group)
           groupMap.get(group).
             fold((Try[A](throw paramException(context, groupExt.key, s"Cannot resolve group '$group''")),
-              context2)) { ext =>
-              val extractorsAndGroups = groupMap.toList.filter(entry => entry._2 != ext)
-                .map(entry => (entry._2, Some(entry._1)))
-              val helpContext = updateHelpContext(context2.helpContext, extractorsAndGroups)
-              val (result, context3) = ext.run(context2.copy(helpContext = helpContext startGroup group))
-              (result, context3.copy(helpContext = context3.helpContext.endGroup()))
+              context2.copy(modelContext = modelContext))) { ext =>
+              val (result, context3) = ext.run(context2.copy(modelContext = modelContext startGroup group))
+              (result, context3.copy(modelContext = context3.modelContext.endGroup()))
             }
         case Failure(exception) =>
-          (Failure(exception), context2)
+          val modelContext = processUnselectedGroups(context2)(_ => true)
+          (Failure(exception), context2.copy(modelContext = modelContext))
       }
     })
+  }
 
   /**
    * Returns an extractor that yields a flag whether the ''CliExtractor''
@@ -1077,7 +1091,7 @@ object ParameterExtractor {
             s"should have a single value, but has multiple values - $optionValue"))
         else Success(values.headOption)
       }
-      (res, context.updateHelpContext(ParameterModel.AttrMultiplicity, "0..1"))
+      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, "0..1"))
     })
 
   /**
@@ -1095,7 +1109,7 @@ object ParameterExtractor {
         case Some(v) => Success(v)
         case None => Failure(paramException(context, ext.key, "mandatory option has no value"))
       }
-      (res, context.updateHelpContext(ParameterModel.AttrMultiplicity, "1..1"))
+      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, "1..1"))
     })
 
   /**
@@ -1120,7 +1134,7 @@ object ParameterExtractor {
           Failure(paramException(context, ext.key, s"option must have at most $atMost values"))
         else Success(values)
       }
-      (res, context.updateHelpContext(ParameterModel.AttrMultiplicity,
+      (res, context.updateModelContext(ParameterModel.AttrMultiplicity,
         Multiplicity(atLeast, atMost).toString))
     })
 
@@ -1842,13 +1856,13 @@ object ParameterExtractor {
    * @tparam A the result type of the extractors
    * @return the updated model context
    */
-  private def updateHelpContext[A](modelContext: ModelContext,
-                                   extractorsAndGroups: List[(CliExtractor[A], Option[String])]): ModelContext =
+  private def updateModelContext[A](modelContext: ModelContext,
+                                    extractorsAndGroups: List[(CliExtractor[A], Option[String])]): ModelContext =
     extractorsAndGroups
-      .foldLeft(modelContext) { (helpCtx, p) =>
-        val helpCtxWithGroup = helpCtx startGroupConditionally p._2
-        val nextContext = gatherMetaData(p._1, modelContext = helpCtxWithGroup)
-        nextContext.helpContext.endGroupConditionally(p._2)
+      .foldLeft(modelContext) { (modelCtx, p) =>
+        val modelCtxWithGroup = modelCtx startGroupConditionally p._2
+        val nextContext = gatherMetaData(p._1, modelContext = modelCtxWithGroup)
+        nextContext.modelContext.endGroupConditionally(p._2)
       }
 
   /**
@@ -1887,9 +1901,9 @@ object ParameterExtractor {
    * context is set and will be updated during the run.
    *
    * @param params      the parameters for the context
-   * @param helpContext the ''ModelContext''
+   * @param modelContext the ''ModelContext''
    * @return the ''ParameterContext'' for the meta data run
    */
-  private def contextForMetaDataRun(params: ParametersMap, helpContext: ModelContext): ParameterContext =
-    ParameterContext(Parameters(params, Set.empty), helpContext, DummyConsoleReader)
+  private def contextForMetaDataRun(params: ParametersMap, modelContext: ModelContext): ParameterContext =
+    ParameterContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader)
 }

@@ -52,7 +52,7 @@ object ParameterManager {
    * @return a list with standard ''ExtractedKeyClassifierFunc'' functions
    */
   def defaultExtractedKeyClassifiers(extractor: CliExtractor[_]): List[ExtractedKeyClassifierFunc] = {
-    lazy val modelContext = ParameterExtractor.gatherMetaData(extractor).helpContext
+    lazy val modelContext = ParameterExtractor.gatherMetaData(extractor).modelContext
     List(ParameterParser.optionKeyClassifierFunc(modelContext),
       ParameterParser.switchKeyClassifierFunc(modelContext))
   }
@@ -212,8 +212,8 @@ object ParameterManager {
    */
   private def updateModelContextWithFailures(failures: List[ExtractionFailure], context: ParameterContext):
   ParameterExtractionException = {
-    val helpContext = addFailuresToModelContext(context.helpContext, failures)
-    val newContext = context.copy(helpContext = helpContext)
+    val helpContext = addFailuresToModelContext(context.modelContext, failures)
+    val newContext = context.copy(modelContext = helpContext)
     val newFailures = failures.map(_.copy(context = newContext))
     ParameterExtractionException(newFailures)
   }

@@ -511,7 +511,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
       failure.key should be("")
       failure.message should be(exception.getMessage)
       failure.context.parameters should be(Parameters(Map.empty, Set.empty))
-      val helpCtx = failure.context.helpContext
+      val helpCtx = failure.context.modelContext
       helpCtx.options should have size 0
       helpCtx.inputs should have size 0
     }
