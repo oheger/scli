@@ -299,44 +299,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       result
     }
 
-  "OptionPrefixes" should "return a function to check for an option" in {
-    val Options = List("--foo", "-test", "/switch", "<<<<yes", "//double")
-    val NonOptions = List("+o1", "o2", "*o3")
-    val prefixes = OptionPrefixes("-", "/", "<<<<", "--")
-
-    val optionFunc = prefixes.isOptionFunc
-    Options.forall(optionFunc) shouldBe true
-    NonOptions.find(optionFunc) should be(None)
-  }
-
-  it should "return a function that removes an option prefix" in {
-    val PrefixStrings = List("--", "/")
-    val Key = "the-option"
-    val prefixes = OptionPrefixes(PrefixStrings)
-
-    val extractor = prefixes.extractorFunc
-    PrefixStrings foreach { p =>
-      val arg = p + Key
-      extractor(arg) should be(Key)
-    }
-  }
-
-  it should "return an extractor function that handles invalid keys" in {
-    val Key = "+-unknownOption"
-    val prefixes = OptionPrefixes("--", "++")
-
-    prefixes.extractorFunc(Key) should be(Key)
-  }
-
-  it should "return an extractor function that can deal with option prefixes of different lengths" in {
-    val Key = "option"
-    val prefixes = OptionPrefixes(List("-", "--"))
-
-    val extractor = prefixes.extractorFunc
-    extractor("--" + Key) should be(Key)
-  }
-
-  it should "extract keys from valid options" in {
+  "OptionPrefixes" should "extract keys from valid options" in {
     val Options = List("--foo", "-foo", "/foo", "<<<<foo")
     val prefixes = OptionPrefixes("-", "/", "<<<<", "--")
 

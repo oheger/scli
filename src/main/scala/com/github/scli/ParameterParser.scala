@@ -177,27 +177,6 @@ object ParameterParser {
     private val sortedPrefixes = prefixes.sortWith(_.length > _.length)
 
     /**
-     * Returns a function to check whether a command line argument is an
-     * option based on the data of this object. The function checks whether
-     * the argument starts with one of the prefixes defined for this object.
-     *
-     * @return a function to check whether an argument is an option
-     */
-    def isOptionFunc: OptionPredicate =
-      key => findPrefix(key).isDefined
-
-    /**
-     * Returns a function that extracts an option key from a command line
-     * argument. The function checks whether the passed in string starts with
-     * one of the prefixes defined for this object. If so, the prefix is
-     * removed; otherwise, the string is returned as is.
-     *
-     * @return the function to extract an option key
-     */
-    def extractorFunc: KeyExtractor =
-      key => findPrefix(key).fold(key)(prefix => key.drop(prefix.length))
-
-    /**
      * Tries to extract the key of an option from the given parameter. The
      * function checks whether the parameter has one of the prefix configured
      * for this object. If so, the key without the prefix is returned.
@@ -315,82 +294,6 @@ object ParameterParser {
         Some(SwitchesElement(List((key,
           getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
       else None
-  }
-
-  /**
-   * Parses the command line arguments and tries to convert them into a map
-   * keyed by options. The parsing operation can be customized by specifying
-   * some properties. To determine whether an argument is an option with a
-   * value, a function is used. This function is invoked for each argument; if
-   * it returns '''true''', the following argument is interpreted as the value
-   * of this option. The keys of options are obtained by invoking the key
-   * extractor function; it is responsible for removing option prefixes.
-   *
-   * The parsing operation normally succeeds, even if invalid parameters are
-   * passed in; this is detected and handled later in the extraction phase.
-   * The only exception that can occur is that a parameter file cannot be
-   * read (which can happen only if a name for the file option is provided).
-   * So if the ''Try'' returned by this function fails, the exception is of
-   * type [[ParameterParseException]] and contains further information about
-   * the failed read operation.
-   *
-   * @param args          the sequence with command line arguments
-   * @param isOptionFunc  a function to determine whether a command line
-   *                      argument is an option that has a value
-   * @param keyExtractor  a function to obtain the key of an option
-   * @param optFileOption optional name for an option to reference parameter
-   *                      files; if defined, such files are read, and their
-   *                      content is added to the command line
-   * @return a ''Try'' with the parsed map of arguments
-   */
-  def parseParametersOld(args: Seq[String],
-                         isOptionFunc: OptionPredicate = DefaultOptionPrefixes.isOptionFunc,
-                         keyExtractor: KeyExtractor = DefaultOptionPrefixes.extractorFunc,
-                         optFileOption: Option[String] = None): Try[ParametersMap] = {
-    def appendOptionValue(argMap: InternalParamMap, opt: String, value: String):
-    InternalParamMap = {
-      val optValues = argMap.getOrElse(opt, List.empty)
-      argMap + (opt -> (optValues :+ value))
-    }
-
-    @tailrec def doParseParameters(argsList: Seq[String], argsMap: InternalParamMap):
-    InternalParamMap = argsList match {
-      case opt :: value :: tail if isOptionFunc(opt) =>
-        doParseParameters(tail, appendOptionValue(argsMap, keyExtractor(opt), value))
-      case h :: t if !isOptionFunc(h) =>
-        doParseParameters(t, appendOptionValue(argsMap, InputOption, h))
-      case _ :: t =>
-        doParseParameters(t, argsMap)
-      case Nil =>
-        argsMap
-    }
-
-    def parseParameterSeq(argList: Seq[String]): InternalParamMap =
-      doParseParameters(argList, Map.empty)
-
-    def parseParametersWithFiles(argList: Seq[String], currentParams: InternalParamMap,
-                                 processedFiles: Set[String]): Try[InternalParamMap] = Try {
-      combineParameterMaps(currentParams, parseParameterSeq(argList))
-    } flatMap { argMap =>
-      optFileOption match {
-        case Some(fileOption) =>
-          argMap get fileOption match {
-            case None =>
-              Success(argMap)
-            case Some(files) =>
-              val nextArgs = argMap - fileOption
-              val filesToRead = files.toSet diff processedFiles
-              readAllParameterFiles(filesToRead.toList, fileOption, nextArgs) flatMap { argList =>
-                parseParametersWithFiles(argList, nextArgs, processedFiles ++ filesToRead)
-              }
-          }
-
-        case None =>
-          Success(argMap)
-      }
-    }
-
-    parseParametersWithFiles(args.toList, Map.empty, Set.empty)
   }
 
   /**
