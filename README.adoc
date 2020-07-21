@@ -1,6 +1,11 @@
+:toc:
+:toc-placement!:
+:toclevels: 3
 = SCLI
 
-A functional Command Line Interface library in and for Scala. 
+A functional Command Line Interface library in and for Scala.
+
+toc::[]
 
 == Overview
 

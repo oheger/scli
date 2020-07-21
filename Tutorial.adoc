@@ -1,3 +1,6 @@
+:toc:
+:toc-placement!:
+:toclevels: 3
 = SCLI Tutorial
 
 This document describes the features of the SCLI library in form of usage
@@ -8,6 +11,8 @@ proceed to the section you are interested in the most.
 NOTE: While not strictly necessary, it is helpful to understand the underlying
 concepts used by SCLI before browsing the usage examples in this document. They
 are described in the link:README.adoc[README document].
+
+toc::[]
 
 == Introduction
 
@@ -155,6 +160,86 @@ declaration of the extractor for the user name for the HTTP server:
 ----
 val extUsr = optionValue("user")
   .mandatory
+----
+
+==== Extracting the value of a switch
+
+The basic extractors discussed so far have been concerned with options. Another
+frequently used element on the command line is a switch. Switches do not get a
+value assigned, but their presence or absence on the command line determines
+their value. As their value can only be one of two distinguished states -
+present or absent -, it is represented as a Boolean.
+
+To declare a switch parameter, SCLI offers the `switchValue()` function. The
+function expects at least the key of the switch parameter to be passed in. Its
+result is a `CliExtractor` producing a value of type `Try[Boolean]`.
+
+The _transfer_ sample application defines a couple of switch parameters. For
+instance, when uploading files to a server the user can control whether hashes
+should be uploaded for the files processed, or whether files that were uploaded
+successfully should be removed locally. Both of these features are disabled per
+default; the user can activate them by passing the corresponding switch
+parameters on the command line:
+
+ transfer upload data.txt http://target.server.org/ --upload-hashes --remove-uploaded-files
+
+Note that switches on the command line look similar to options, but they do not
+have any value. The following code fragment shows the declaration of these two
+switch parameters:
+
+[source,scala]
+----
+val extUploadHashes = switchValue("upload-hashes")
+val extRemoveUploaded = switchValue("remove-uploaded-files")
+----
+
+The resulting `CliExtractor` objects are nothing special; they can be further
+transformed or combined in the same way as the extractors produced by the
+`optionValue()` function.
+
+==== Adapting the boolean value of a switch
+
+In most cases - including the examples from the previous subsection - the value
+of a switch should be interpreted as *true* if the corresponding parameter
+appears on the command line. There are, however, exceptions to this rule. So it
+could be the case that the data model used by the application to represent its
+parameters is not fully aligned with the command line interface visible to the
+user. We have constructed such a case in the _transfer_ sample application in
+the configuration of download operations: it contains a flag whether local
+files should be overridden:
+
+[source, scala]
+----
+case class DownloadCommandConfig(targetFolder: Path,
+                                 overrideLocalFiles: Boolean) extends CommandConfig
+----
+
+Per default, this flag is *true*, as newer files from the server should always
+replace local files. So an invocation of:
+
+ transfer download data.txt http://target.server.org --target-folder /data
+
+will download the file `data.txt`, even if it is already existing in the target
+folder. The user should now have the option to change this behavior by
+specifying a switch parameter:
+
+ transfer download data.txt http://target.server.org --target-folder /data --skip-existing
+
+So if the `skip-existing` switch is present, the extractor should yield the
+value *false*, causing the download of `data.txt` to be skipped if the file is
+available locally. Basically, the logic of the evaluation of the switch is just
+inverse: the presence of the switch should yield a result of *false*, while its
+absence is interpreted as *true*.
+
+This behavior is easily achieved by passing an additional flag value to the
+`switchValue()` function. The function supports a boolean parameter
+_presentValue_ controlling the value to assume when the switch is present.
+Using this mechanism, the declaration of the extractor for the `skip-existing`
+parameter looks as follows:
+
+[source,scala]
+----
+val extOverride = switchValue("skip-existing", presentValue = false)
 ----
 
 === Input parameters
@@ -359,10 +444,11 @@ val extBoolean: CliExtractor[SingleOptionValue[Boolean]] = optionValue("flag")
   .toBoolean
 ----
 
-NOTE: An alternative to a type conversion to Boolean can be switches. Here the
-presence or absence of the switch in the command line determines whether the
-value is *true* or *false*. This can be more convenient for the user who is not
-forced to enter the correctly spelled string values.
+NOTE: An alternative to a type conversion to Boolean can be
+<<Extracting the value of a switch,switches>>. Here the presence or absence of
+the switch in the command line determines whether the value is *true* or
+*false*. This can be more convenient for the user who is not forced to enter
+the correctly spelled string values.
 
 ==== Extracting an enum parameter
 
