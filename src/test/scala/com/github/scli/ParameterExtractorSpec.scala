@@ -878,7 +878,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val attr3 = updHelpCtx.options(Key3)
     attr3.attributes(ParameterModel.AttrErrorMessage) should be(failure3.message)
     val attr4 = updHelpCtx.options(Key4)
-    attr4.attributes(ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeOption)
+    attr4.attributes(ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeOption)
     attr4.attributes(ParameterModel.AttrErrorMessage) should be(failure4.message)
   }
 }

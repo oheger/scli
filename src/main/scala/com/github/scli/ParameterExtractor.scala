@@ -849,7 +849,7 @@ object ParameterExtractor {
   def switchValue(key: String, optHelp: Option[String] = None, presentValue: Boolean = true):
   CliExtractor[Try[Boolean]] =
     optionValue(key, optHelp).mapWithContext { (v, ctx) =>
-      val nextCtx = ctx.updateModelContext(ParameterModel.AttrOptionType, ParameterModel.OptionTypeSwitch)
+      val nextCtx = ctx.updateModelContext(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeSwitch)
         .updateModelContext(ParameterModel.AttrSwitchValue, presentValue.toString)
       (v, nextCtx)
     }

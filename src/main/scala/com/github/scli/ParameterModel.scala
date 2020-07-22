@@ -52,11 +52,11 @@ object ParameterModel {
   final val AttrGroup = "group"
 
   /**
-   * The attribute defining the type of an option. This attribute contains the
-   * information whether an option is a regular option, a switch, or an input
+   * The attribute defining the type of a parameter. This attribute contains
+   * the information whether a parameter is an option, a switch, or an input
    * parameter.
    */
-  final val AttrOptionType = "optionType"
+  final val AttrParameterType = "parameterType"
 
   /**
    * The attribute to store an error message for an option. The attribute can
@@ -72,14 +72,14 @@ object ParameterModel {
    */
   final val AttrSwitchValue = "switchValue"
 
-  /** Option type indicating a plain option. */
-  final val OptionTypeOption = "option"
+  /** Parameter type indicating an option. */
+  final val ParameterTypeOption = "option"
 
-  /** Option type indicating a command line switch. */
-  final val OptionTypeSwitch = "switch"
+  /** Parameter type indicating a command line switch. */
+  final val ParameterTypeSwitch = "switch"
 
-  /** Option type indicating an input parameter. */
-  final val OptionTypeInput = "input"
+  /** Parameter type indicating an input parameter. */
+  final val ParameterTypeInput = "input"
 
   /**
    * A prefix for keys for input parameters that are generated. This is used
@@ -92,16 +92,18 @@ object ParameterModel {
   final val GroupSeparator = ","
 
   /**
-   * A data class storing information about a single command line option.
+   * A data class storing information about a single command line parameter.
    *
-   * An instance of this class contains meta data that can be used to generate
-   * the help text of a CLI application. The meta data is extensible and is
-   * therefore stored as a map of attributes (whose values are strings as they
-   * are expected to be printed on the console).
+   * An instance of this class contains meta data about a parameter  that can
+   * be used for various purposes, e.g. to generate the help text of a CLI
+   * application. Some of the attributes are also used to implement specific
+   * features during command line processing. The meta data is extensible and
+   * is therefore stored as a map of attributes (whose values are strings as
+   * they are expected in many cases to be printed on the console).
    *
-   * @param attributes a map with attributes for the associated option
+   * @param attributes a map with attributes for the associated parameter
    */
-  case class OptionAttributes(attributes: Map[String, String])
+  case class ParameterAttributes(attributes: Map[String, String])
 
   /**
    * A data class holding information about input parameters.
@@ -133,12 +135,12 @@ object ParameterModel {
   }
 
   /**
-   * A data class containing all the information available for a CLI option.
+   * A data class containing all the information available for a CLI parameter.
    *
    * @param key        the key of the option
    * @param attributes a data object with the attributes of this option
    */
-  case class OptionMetaData(key: String, attributes: OptionAttributes)
+  case class ParameterMetaData(key: String, attributes: ParameterAttributes)
 
   /**
    * A class for storing and updating meta information about command line
@@ -155,14 +157,14 @@ object ParameterModel {
    * @param optCurrentKey a key to the option that is currently defined
    * @param groups        a list with the currently active group names
    */
-  class ModelContext(val options: Map[String, OptionAttributes],
+  class ModelContext(val options: Map[String, ParameterAttributes],
                      val inputs: SortedSet[InputParameterRef],
                      optCurrentKey: Option[String],
                      groups: List[String]) {
 
     /**
      * Adds data about another command line option to this object. This
-     * function creates a new [[OptionAttributes]] instance and initializes it
+     * function creates a new [[ParameterAttributes]] instance and initializes it
      * from the parameters passed in. It returns a new ''ModelContext'' object
      * whose data map contains this new instance. If there is already an entry
      * for this option key, it is merged with the data passed to this function.
@@ -172,7 +174,7 @@ object ParameterModel {
      * @return the updated ''ModelContext''
      */
     def addOption(key: String, text: Option[String]): ModelContext =
-      contextWithOption(key, text, OptionTypeOption, inputs)
+      contextWithOption(key, text, ParameterTypeOption, inputs)
 
     /**
      * Adds data about an input parameter to this object. This function works
@@ -187,7 +189,7 @@ object ParameterModel {
     def addInputParameter(index: Int, optKey: Option[String], text: Option[String]): ModelContext = {
       val key = optKey.getOrElse(KeyInput + index)
       val inputRef = InputParameterRef(index, key)
-      contextWithOption(key, text, OptionTypeInput, inputs union Set(inputRef))
+      contextWithOption(key, text, ParameterTypeInput, inputs union Set(inputRef))
     }
 
     /**
@@ -203,7 +205,7 @@ object ParameterModel {
       optCurrentKey match {
         case Some(key) =>
           val attrs = options(key)
-          val newAttrs = OptionAttributes(attrs.attributes + (attrKey -> value))
+          val newAttrs = ParameterAttributes(attrs.attributes + (attrKey -> value))
           new ModelContext(options + (key -> newAttrs), inputs, optCurrentKey, groups)
         case None =>
           this
@@ -270,7 +272,7 @@ object ParameterModel {
      *
      * @return an iterable with meta data about all options in this context
      */
-    def optionMetaData: Iterable[OptionMetaData] = options.map(e => OptionMetaData(e._1, e._2))
+    def optionMetaData: Iterable[ParameterMetaData] = options.map(e => ParameterMetaData(e._1, e._2))
 
     /**
      * Creates a new ''ModelContext'' with an additional option as defined by
@@ -288,8 +290,8 @@ object ParameterModel {
       val existingGroups = existingAttrs.getOrElse(AttrGroup, "")
       val attrs = addOptionalAttribute(
         addOptionalAttribute(Map.empty, AttrHelpText, text),
-        AttrGroup, groupAttribute.map(existingGroups + _)) + (AttrOptionType -> optionType)
-      val help = OptionAttributes(existingAttrs ++ attrs)
+        AttrGroup, groupAttribute.map(existingGroups + _)) + (AttrParameterType -> optionType)
+      val help = ParameterAttributes(existingAttrs ++ attrs)
       new ModelContext(options + (key -> help), inputRefs, optCurrentKey = Some(key), groups)
     }
 

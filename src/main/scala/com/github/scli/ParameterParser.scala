@@ -270,8 +270,8 @@ object ParameterParser {
   def optionKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, args, idx) =>
-      if (getModelContextAttribute(context, key, ParameterModel.AttrOptionType,
-        ParameterModel.OptionTypeOption) == ParameterModel.OptionTypeOption) {
+      if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
+        ParameterModel.ParameterTypeOption) == ParameterModel.ParameterTypeOption) {
         val value = args.lift(idx + 1)
         Some(OptionElement(key, value))
       }
@@ -289,8 +289,8 @@ object ParameterParser {
   def switchKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, _, _) =>
-      if (getModelContextAttribute(context, key, ParameterModel.AttrOptionType,
-        ParameterModel.OptionTypeSwitch) == ParameterModel.OptionTypeSwitch)
+      if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
+        ParameterModel.ParameterTypeSwitch) == ParameterModel.ParameterTypeSwitch)
         Some(SwitchesElement(List((key,
           getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
       else None

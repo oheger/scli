@@ -18,9 +18,9 @@ package com.github.scli
 
 import java.util.Locale
 
-import com.github.scli.CliHelpGenerator.{ColumnGenerator, InputParamOverviewSymbols, OptionFilter, OptionSortFunc}
+import com.github.scli.CliHelpGenerator.{ColumnGenerator, InputParamOverviewSymbols, ParameterFilter, ParameterSortFunc}
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{ModelContext, InputParameterRef, OptionAttributes, OptionMetaData}
+import com.github.scli.ParameterModel.{ModelContext, InputParameterRef, ParameterAttributes, ParameterMetaData}
 import org.mockito.Mockito._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -97,7 +97,7 @@ object CliExtractorHelpSpec {
    * @param idx the index of the test option
    * @return the test meta data
    */
-  private def testOptionMetaData(idx: Int): OptionMetaData = {
+  private def testOptionMetaData(idx: Int): ParameterMetaData = {
     val key = testKey(idx)
     testOptionMetaData(key, HelpText + key)
   }
@@ -109,10 +109,10 @@ object CliExtractorHelpSpec {
    * @param help the help text
    * @return the resulting meta data
    */
-  private def testOptionMetaData(key: String, help: String): OptionMetaData = {
+  private def testOptionMetaData(key: String, help: String): ParameterMetaData = {
     val attrs = Map(ParameterModel.AttrHelpText -> help,
-      ParameterModel.AttrOptionType -> ParameterModel.OptionTypeOption)
-    OptionMetaData(key, OptionAttributes(attrs))
+      ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption)
+    ParameterMetaData(key, ParameterAttributes(attrs))
   }
 
   /**
@@ -121,7 +121,7 @@ object CliExtractorHelpSpec {
    * @param options the options
    * @return the model context
    */
-  private def createModelContext(options: Map[String, OptionAttributes] = Map.empty): ModelContext =
+  private def createModelContext(options: Map[String, ParameterAttributes] = Map.empty): ModelContext =
     new ModelContext(options, SortedSet.empty, None, List.empty)
 
   /**
@@ -317,7 +317,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "merge the attributes of command line options that are added multiple times" in {
-    val Attrs1 = OptionAttributes(Map("attr1" -> "value1", "attr2" -> "value2",
+    val Attrs1 = ParameterAttributes(Map("attr1" -> "value1", "attr2" -> "value2",
       ParameterModel.AttrHelpText -> "old help"))
     val ExpAttrs = Attrs1.attributes + (ParameterModel.AttrHelpText -> HelpText)
     val helpContext = new ModelContext(Map(Key -> Attrs1), SortedSet.empty, None, Nil)
@@ -418,19 +418,19 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "handle groups whose name is a prefix of another group" in {
     val mapAttr = Map(ParameterModel.AttrGroup -> "groupSub")
-    val attr = OptionAttributes(mapAttr)
+    val attr = ParameterAttributes(mapAttr)
 
     CliHelpGenerator.isInGroup(attr, "group") shouldBe false
   }
 
   it should "correctly execute a group check if no groups are available" in {
-    val attr = OptionAttributes(Map.empty)
+    val attr = ParameterAttributes(Map.empty)
 
     CliHelpGenerator.isInGroup(attr, "someGroup") shouldBe false
   }
 
   it should "return the groups of an option if no groups are available" in {
-    val attr = OptionAttributes(Map.empty)
+    val attr = ParameterAttributes(Map.empty)
 
     CliHelpGenerator.groups(attr) should have size 0
   }
@@ -480,25 +480,25 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     attr.attributes(ParameterModel.AttrMultiplicity) should be("0..*")
   }
 
-  it should "set the option type attribute for a plain option" in {
+  it should "set the parameter type attribute for a plain option" in {
     val ext = multiOptionValue(Key)
 
     val helpContext = generateHelpContext(ext)
-    fetchAttribute(helpContext, Key, ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeOption)
+    fetchAttribute(helpContext, Key, ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeOption)
   }
 
-  it should "set the option type attribute for an input parameter" in {
+  it should "set the parameter type attribute for an input parameter" in {
     val ext = inputValue(1, optKey = Some(Key))
 
     val helpContext = generateHelpContext(ext)
-    fetchAttribute(helpContext, Key, ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeInput)
+    fetchAttribute(helpContext, Key, ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeInput)
   }
 
-  it should "set the option type attribute for a switch" in {
+  it should "set the parameter type attribute for a switch" in {
     val ext = switchValue(Key)
 
     val helpContext = generateHelpContext(ext)
-    fetchAttribute(helpContext, Key, ParameterModel.AttrOptionType) should be(ParameterModel.OptionTypeSwitch)
+    fetchAttribute(helpContext, Key, ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeSwitch)
   }
 
   it should "set the present and fallback value attributes for a switch" in {
@@ -535,7 +535,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "sort options in a case-insensitive manner" in {
+  it should "sort parameters in a case-insensitive manner" in {
     val Count = 4
     val KeyMin = testKey(0).toLowerCase(Locale.ROOT)
     val KeyMax = testKey(Count + 1).toUpperCase(Locale.ROOT)
@@ -550,9 +550,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "support a custom sort function for options" in {
+  it should "support a custom sort function for parameters" in {
     val Count = 8
-    val sortFunc: OptionSortFunc = _.sortWith(_.key > _.key) // reverse sort
+    val sortFunc: ParameterSortFunc = _.sortWith(_.key > _.key) // reverse sort
     val ExpText = (1 to Count).map(testOptionMetaData).reverse.mkString(CR + CR)
     val helpContext = modelContextWithOptions(Count)
 
@@ -560,18 +560,18 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "support filtering the options to generate help information for" in {
+  it should "support filtering the parameters to generate help information for" in {
     val CountAll = 8
     val CountFiltered = 4
     val ExpText = (1 to CountFiltered).map(testOptionMetaData).mkString(CR + CR)
     val helpContext = modelContextWithOptions(CountAll)
-    val filterFunc: OptionFilter = _.key <= testKey(CountFiltered)
+    val filterFunc: ParameterFilter = _.key <= testKey(CountFiltered)
 
     val text = CliHelpGenerator.generateOptionsHelp(helpContext, filterFunc = filterFunc)(TestColumnGenerator)
     text should be(ExpText)
   }
 
-  it should "support multiple columns for the option help" in {
+  it should "support multiple columns for the parameter help" in {
     val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
     val ExpText = Key + CliHelpGenerator.DefaultPadding + HelpText
@@ -580,7 +580,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "align the columns for the option help based on their maximum length" in {
+  it should "align the columns for the parameter help based on their maximum length" in {
     val ShortHelpText = "short help"
     val helpContext = createModelContext()
       .addOption(testKey(1), Some(ShortHelpText))
@@ -593,7 +593,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "support multiple lines in columns for option help" in {
+  it should "support multiple lines in columns for parameter help" in {
     val spaceKey = " " * Key.length
     val helpContext = createModelContext()
       .addOption(Key, Some("Line1" + CR + "Line2" + CR + "Line3"))
@@ -605,7 +605,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "handle empty cells when generating option help" in {
+  it should "handle empty cells when generating parameter help" in {
     val EmptyColumnGenerator: ColumnGenerator = _ => List.empty
     val helpContext = createModelContext()
       .addOption(Key, None)
@@ -615,16 +615,16 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     text should be(ExpText)
   }
 
-  it should "generate options help if no option is matched" in {
+  it should "generate parameters help if no parameter is matched" in {
     val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
-    val filter: OptionFilter = _ => false
+    val filter: ParameterFilter = _ => false
 
     val text = CliHelpGenerator.generateOptionsHelp(helpContext, filterFunc = filter)(KeyColumnGenerator)
     text should be("")
   }
 
-  it should "support changing the padding string for the option help table" in {
+  it should "support changing the padding string for the parameter help table" in {
     val OtherPadding = " | "
     val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
@@ -697,7 +697,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "provide a ColumnGenerator that composes the results of other generators" in {
     val attributes = Map("a1" -> "v1", "a2" -> "v2", "a3" -> "v3")
-    val data = OptionMetaData(Key, OptionAttributes(attributes))
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
     val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
     val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
     val g3 = CliHelpGenerator.attributeColumnGenerator("a3")
@@ -756,25 +756,25 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     generator(data) should be(ExpResult)
   }
 
-  it should "provide a ColumnGenerator for the option name" in {
+  it should "provide a ColumnGenerator for the parameter name" in {
     val data = testOptionMetaData(Key, HelpText)
 
-    val generator = CliHelpGenerator.optionNameColumnGenerator()
+    val generator = CliHelpGenerator.parameterNameColumnGenerator()
     generator(data) should contain only (CliHelpGenerator.DefaultOptionPrefix + Key)
   }
 
-  it should "support customizing the prefixes for the option name column generator" in {
+  it should "support customizing the prefixes for the parameter name column generator" in {
     val Prefix = "/"
     val data = testOptionMetaData(Key, HelpText)
 
-    val generator = CliHelpGenerator.optionNameColumnGenerator(Prefix)
+    val generator = CliHelpGenerator.parameterNameColumnGenerator(Prefix)
     generator(data) should contain only (Prefix + Key)
   }
 
-  it should "provide a ColumnGenerator for the multiplicity of command line options" in {
+  it should "provide a ColumnGenerator for the multiplicity of command line parameters" in {
     val Multiplicity = "many"
     val attributes = Map(ParameterModel.AttrMultiplicity -> Multiplicity)
-    val data = OptionMetaData(Key, OptionAttributes(attributes))
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
 
     val generator = CliHelpGenerator.multiplicityColumnGenerator
     generator(data) should contain only Multiplicity
@@ -792,9 +792,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addInputParameter(1, Some("source"), None)
       .addInputParameter(2, Some("destination"), None)
       .addInputParameter(3, Some("flags"), None)
-    val ExpResult = List(OptionMetaData("source", helpContext.options("source")),
-      OptionMetaData("destination", helpContext.options("destination")),
-      OptionMetaData("flags", helpContext.options("flags")))
+    val ExpResult = List(ParameterMetaData("source", helpContext.options("source")),
+      ParameterMetaData("destination", helpContext.options("destination")),
+      ParameterMetaData("flags", helpContext.options("flags")))
 
     val result = CliHelpGenerator.inputParamSortFunc(helpContext)(helpContext.optionMetaData.toSeq)
     result should be(ExpResult)
@@ -805,9 +805,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addInputParameter(1, Some("source"), None)
       .addInputParameter(2, Some("destination"), None)
       .addOption(Key, Some(HelpText))
-    val ExpResult = List(OptionMetaData("source", helpContext.options("source")),
-      OptionMetaData("destination", helpContext.options("destination")),
-      OptionMetaData(Key, helpContext.options(Key)))
+    val ExpResult = List(ParameterMetaData("source", helpContext.options("source")),
+      ParameterMetaData("destination", helpContext.options("destination")),
+      ParameterMetaData(Key, helpContext.options(Key)))
 
     val result = CliHelpGenerator.inputParamSortFunc(helpContext)(helpContext.optionMetaData.toSeq)
     result should be(ExpResult)
@@ -819,8 +819,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, Some(HelpText))
       .addInputParameter(1, Some("ignored"), None)
       .addOption(Key2, Some("other help"))
-    val ExpResult = List(OptionMetaData(Key2, helpContext.options(Key2)),
-      OptionMetaData(Key, helpContext.options(Key)))
+    val ExpResult = List(ParameterMetaData(Key2, helpContext.options(Key2)),
+      ParameterMetaData(Key, helpContext.options(Key)))
 
     val result = helpContext.optionMetaData.filter(CliHelpGenerator.OptionsFilterFunc)
     result should contain theSameElementsAs ExpResult
@@ -832,8 +832,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addInputParameter(1, Some(Key), None)
       .addOption("ignored", None)
       .addInputParameter(2, Some(Key2), Some("text"))
-    val ExpResult = List(OptionMetaData(Key2, helpContext.options(Key2)),
-      OptionMetaData(Key, helpContext.options(Key)))
+    val ExpResult = List(ParameterMetaData(Key2, helpContext.options(Key2)),
+      ParameterMetaData(Key, helpContext.options(Key)))
 
     val result = helpContext.optionMetaData.filter(CliHelpGenerator.InputParamsFilterFunc)
     result should contain theSameElementsAs ExpResult
@@ -848,7 +848,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .endGroup()
       .startGroup("otherGroup")
       .addOption("ignored2", None)
-    val ExpResult = OptionMetaData(Key, helpContext.options(Key))
+    val ExpResult = ParameterMetaData(Key, helpContext.options(Key))
 
     val result = helpContext.optionMetaData.filter(CliHelpGenerator.groupFilterFunc(Group))
     result should contain only ExpResult
@@ -863,7 +863,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption("ignored2", None)
       .startGroup(Group1)
       .addOption(Key, Some(HelpText))
-    val ExpResult = OptionMetaData(Key, helpContext.options(Key))
+    val ExpResult = ParameterMetaData(Key, helpContext.options(Key))
 
     val result = helpContext.optionMetaData.filter(CliHelpGenerator.groupFilterFunc(Group1, Group2))
     result should contain only ExpResult
@@ -874,7 +874,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, Some(HelpText))
       .startGroup("anyGroup")
       .addOption("ignored", Some("test"))
-    val ExpResult = OptionMetaData(Key, helpContext.options(Key))
+    val ExpResult = ParameterMetaData(Key, helpContext.options(Key))
 
     val result = helpContext.optionMetaData.filter(CliHelpGenerator.UnassignedGroupFilterFunc)
     result should contain only ExpResult
@@ -884,7 +884,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val helpContext = createModelContext()
       .addOption(Key, Some(HelpText))
       .addOption("ignored", None)
-    val ExpResult = OptionMetaData(Key, helpContext.options(Key))
+    val ExpResult = ParameterMetaData(Key, helpContext.options(Key))
 
     val result = helpContext.optionMetaData
       .filter(CliHelpGenerator.attributeFilterFunc(ParameterModel.AttrHelpText))
@@ -897,7 +897,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addInputParameter(1, None, None)
       .startGroup("anyGroup")
       .addOption("ignored", Some("foo"))
-    val ExpResult = OptionMetaData(Key, helpContext.options(Key))
+    val ExpResult = ParameterMetaData(Key, helpContext.options(Key))
 
     val filter = CliHelpGenerator.andFilter(CliHelpGenerator.OptionsFilterFunc,
       CliHelpGenerator.UnassignedGroupFilterFunc)
@@ -913,8 +913,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addInputParameter(1, Some(KeyInput), None)
       .startGroup(Group)
       .addOption(Key, Some(HelpText))
-    val ExpResult = List(OptionMetaData(KeyInput, helpContext.options(KeyInput)),
-      OptionMetaData(Key, helpContext.options(Key)))
+    val ExpResult = List(ParameterMetaData(KeyInput, helpContext.options(KeyInput)),
+      ParameterMetaData(Key, helpContext.options(Key)))
 
     val filter = CliHelpGenerator.orFilter(CliHelpGenerator.InputParamsFilterFunc,
       CliHelpGenerator.groupFilterFunc(Group))
@@ -927,7 +927,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption("ignored", Some("test"))
       .startGroup("anyGroup")
       .addOption(Key, Some(HelpText))
-    val ExpResult = OptionMetaData(Key, helpContext.options(Key))
+    val ExpResult = ParameterMetaData(Key, helpContext.options(Key))
     val filter = CliHelpGenerator.negate(CliHelpGenerator.UnassignedGroupFilterFunc)
 
     val result = helpContext.optionMetaData.filter(filter)

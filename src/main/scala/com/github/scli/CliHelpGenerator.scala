@@ -36,34 +36,34 @@ object CliHelpGenerator {
   final val DefaultOptionPrefix = "--"
 
   /**
-   * A standard sort function for options that implements an alphabetic
+   * A standard sort function for parameters that implements an alphabetic
    * ordering (which is case-insensitive).
    */
-  final val AlphabeticOptionSortFunc: OptionSortFunc =
+  final val AlphabeticParameterSortFunc: ParameterSortFunc =
     _.sortWith((d1, d2) => toUpperCase(d1.key) < toUpperCase(d2.key))
 
-  /** A standard filter function which accepts all options. */
-  final val AllFilterFunc: OptionFilter = _ => true
+  /** A standard filter function which accepts all parameters. */
+  final val AllFilterFunc: ParameterFilter = _ => true
 
   /**
-   * A standard filter function that accepts only elements with the option
+   * A standard filter function that accepts only elements with the parameter
    * type ''option''.
    */
-  final val OptionsFilterFunc: OptionFilter = optionTypeFilter(OptionTypeOption)
+  final val OptionsFilterFunc: ParameterFilter = parameterTypeFilter(ParameterTypeOption)
 
   /**
-   * A standard filter function that accepts only elements with the option
+   * A standard filter function that accepts only elements with the parameter
    * type ''input''. This function can be used to deal only with input
    * parameters.
    */
-  final val InputParamsFilterFunc: OptionFilter = optionTypeFilter(OptionTypeInput)
+  final val InputParamsFilterFunc: ParameterFilter = parameterTypeFilter(ParameterTypeInput)
 
   /**
    * A standard filter function that accepts only elements that are not
    * assigned to any group. These are usually top-level options that do not
    * depend on a context, but are always valid.
    */
-  final val UnassignedGroupFilterFunc: OptionFilter =
+  final val UnassignedGroupFilterFunc: ParameterFilter =
     data => !data.attributes.attributes.contains(AttrGroup)
 
   /** The default padding string to separate columns of the help text. */
@@ -128,7 +128,7 @@ object CliHelpGenerator {
    * @param group the name of the group
    * @return a flag whether this option belongs to this group
    */
-  def isInGroup(attrs: OptionAttributes, group: String): Boolean =
+  def isInGroup(attrs: ParameterAttributes, group: String): Boolean =
     attrs.attributes.get(AttrGroup) exists (_ contains group + GroupSeparator)
 
   /**
@@ -138,20 +138,20 @@ object CliHelpGenerator {
    * @param attrs the ''OptionAttributes''
    * @return a set with the names of all groups
    */
-  def groups(attrs: OptionAttributes): Set[String] =
+  def groups(attrs: ParameterAttributes): Set[String] =
     attrs.attributes.get(AttrGroup).map(_.split(GroupSeparator).toSet) getOrElse Set.empty
 
   /**
-   * Type definition of a function that sorts the list of options in the
+   * Type definition of a function that sorts the list of parameters in the
    * generated help text.
    */
-  type OptionSortFunc = Seq[OptionMetaData] => Seq[OptionMetaData]
+  type ParameterSortFunc = Seq[ParameterMetaData] => Seq[ParameterMetaData]
 
   /**
-   * Type definition for a predicate to filter options from a
+   * Type definition for a predicate to filter parameters from a
    * [[ModelContext]].
    */
-  type OptionFilter = OptionMetaData => Boolean
+  type ParameterFilter = ParameterMetaData => Boolean
 
   /**
    * Type definition of a function that generates a column of a help text of
@@ -160,7 +160,7 @@ object CliHelpGenerator {
    * generated that are defined by specifying the corresponding generator
    * functions.
    */
-  type ColumnGenerator = OptionMetaData => List[String]
+  type ColumnGenerator = ParameterMetaData => List[String]
 
   /**
    * Generates a tabular help text for the command line options of an
@@ -182,14 +182,14 @@ object CliHelpGenerator {
    * @return a string with the help for command line options
    */
   def generateOptionsHelp(context: ModelContext,
-                          sortFunc: OptionSortFunc = AlphabeticOptionSortFunc,
-                          filterFunc: OptionFilter = AllFilterFunc,
+                          sortFunc: ParameterSortFunc = AlphabeticParameterSortFunc,
+                          filterFunc: ParameterFilter = AllFilterFunc,
                           padding: String = DefaultPadding,
                           optNewline: Option[String] = Some(""))
                          (columns: ColumnGenerator*): String = {
 
     // generates the columns of an option by applying the column generators
-    def generateColumns(data: OptionMetaData): Seq[List[String]] =
+    def generateColumns(data: ParameterMetaData): Seq[List[String]] =
       columns.map(_.apply(data))
 
     val metaData = context.optionMetaData
@@ -235,7 +235,7 @@ object CliHelpGenerator {
    * @param helpContext the ''ModelContext''
    * @return the function to sort input parameter options
    */
-  def inputParamSortFunc(helpContext: ModelContext): OptionSortFunc = {
+  def inputParamSortFunc(helpContext: ModelContext): ParameterSortFunc = {
     def paramIndex(key: String): Int =
       helpContext.inputs.find(_.key == key).map(_.index) getOrElse helpContext.inputs.size
 
@@ -252,7 +252,7 @@ object CliHelpGenerator {
    * @param groups the name of the groups the options must belong to
    * @return the function that filters for all of these groups
    */
-  def groupFilterFunc(groups: String*): OptionFilter =
+  def groupFilterFunc(groups: String*): ParameterFilter =
     data =>
       groups.forall(group => isInGroup(data.attributes, group))
 
@@ -263,7 +263,7 @@ object CliHelpGenerator {
    * @param attrKey the key of the required attribute
    * @return the function that filters for options with this attribute
    */
-  def attributeFilterFunc(attrKey: String): OptionFilter =
+  def attributeFilterFunc(attrKey: String): ParameterFilter =
     data => data.attributes.attributes contains attrKey
 
   /**
@@ -273,7 +273,7 @@ object CliHelpGenerator {
    * @param filters the filters to be combined
    * @return a combined filter function with AND semantics
    */
-  def andFilter(filters: OptionFilter*): OptionFilter =
+  def andFilter(filters: ParameterFilter*): ParameterFilter =
     data => filters.forall(f => f(data))
 
   /**
@@ -283,7 +283,7 @@ object CliHelpGenerator {
    * @param filters the filters to be combined
    * @return a combined filter function with OR semantics
    */
-  def orFilter(filters: OptionFilter*): OptionFilter =
+  def orFilter(filters: ParameterFilter*): ParameterFilter =
     data => filters.exists(f => f(data))
 
   /**
@@ -293,7 +293,7 @@ object CliHelpGenerator {
    * @param filter the original filter
    * @return the negated filter
    */
-  def negate(filter: OptionFilter): OptionFilter =
+  def negate(filter: ParameterFilter): ParameterFilter =
     data => !filter(data)
 
   /**
@@ -309,13 +309,13 @@ object CliHelpGenerator {
 
   /**
    * Returns a ''ColumnGenerator'' function that generates the name of the
-   * current command line option. This can be used for instance in the first
-   * column to display the option the following information is about.
+   * current command line parameter. This can be used for instance in the first
+   * column to display the key the following information is about.
    *
-   * @param optionPrefix a prefix added to the option name
-   * @return the ''ColumnGenerator'' generating the option name
+   * @param optionPrefix a prefix added to the parameter name
+   * @return the ''ColumnGenerator'' generating the parameter name
    */
-  def optionNameColumnGenerator(optionPrefix: String = DefaultOptionPrefix): ColumnGenerator =
+  def parameterNameColumnGenerator(optionPrefix: String = DefaultOptionPrefix): ColumnGenerator =
     data => List(optionPrefix + data.key)
 
   /**
@@ -526,13 +526,13 @@ object CliHelpGenerator {
   }
 
   /**
-   * Returns a filter function that filters for options of the given type.
+   * Returns a filter function that filters for parameters of the given type.
    *
-   * @param wantedType the option type to filter for
+   * @param wantedType the parameter type to filter for
    * @return the filter function for this type
    */
-  private def optionTypeFilter(wantedType: String): OptionFilter =
-    data => data.attributes.attributes.get(AttrOptionType) contains wantedType
+  private def parameterTypeFilter(wantedType: String): ParameterFilter =
+    data => data.attributes.attributes.get(AttrParameterType) contains wantedType
 
   /**
    * Generates the part of the overview of an input parameter that is
