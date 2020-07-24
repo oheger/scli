@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.nio.file.{Path, Paths}
 
-import com.github.scli.ParameterModel.ModelContext
+import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.ParametersMap
 
 import scala.collection.SortedSet
@@ -46,6 +46,20 @@ import scala.util.{Failure, Success, Try}
  * input values passed to the application.
  */
 object ParameterExtractor {
+  /**
+   * Constant for a parameter key that is used if no real key is available.
+   * For all basic extractors, a key should be available; for complex or
+   * transformed ones, however, the key may be missing. (Such extractors
+   * normally do not appear externally, e.g. in help messages.)
+   */
+  private val UndefinedParameterKey = ParameterKey("", shortAlias = false)
+
+  /**
+   * Constant for the parameter key which stores the values of input
+   * parameters.
+   */
+  private val InputParameterKey = ParameterKey(ParameterParser.InputOption, shortAlias = false)
+
   /** A mapping storing the boolean literals for conversion. */
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
@@ -87,7 +101,7 @@ object ParameterExtractor {
    * @param parametersMap      the map with the options and their values
    * @param accessedParameters a set with the option keys that were queried
    */
-  case class Parameters(parametersMap: ParametersMap, accessedParameters: Set[String]) {
+  case class Parameters(parametersMap: ParametersMap, accessedParameters: Set[ParameterKey]) {
     /**
      * Returns a new instance of ''Parameters'' that has the given key marked
      * as accessed.
@@ -95,7 +109,7 @@ object ParameterExtractor {
      * @param key the key affected
      * @return the updated ''Parameters'' instance
      */
-    def keyAccessed(key: String): Parameters =
+    def keyAccessed(key: ParameterKey): Parameters =
       if (accessedParameters contains key) this
       else copy(accessedParameters = accessedParameters + key)
 
@@ -106,7 +120,7 @@ object ParameterExtractor {
      * @param keys the collection with keys affected
      * @return the updated ''Parameters'' instance
      */
-    def keysAccessed(keys: Iterable[String]): Parameters =
+    def keysAccessed(keys: Iterable[ParameterKey]): Parameters =
       copy(accessedParameters = accessedParameters ++ keys)
 
     /**
@@ -126,7 +140,7 @@ object ParameterExtractor {
      *
      * @return a set with the keys that have not been accessed
      */
-    def notAccessedKeys: Set[String] = parametersMap.keySet -- accessedParameters
+    def notAccessedKeys: Set[ParameterKey] = parametersMap.keySet -- accessedParameters
   }
 
   /**
@@ -193,7 +207,7 @@ object ParameterExtractor {
    * @param message an error message
    * @param context the current parameter context
    */
-  case class ExtractionFailure(key: String,
+  case class ExtractionFailure(key: ParameterKey,
                                message: String,
                                context: ParameterContext)
 
@@ -230,7 +244,7 @@ object ParameterExtractor {
      * @return the resulting message
      */
     private def generateExceptionMessage(failures: List[ExtractionFailure]): String =
-      failures.map(f => s"${f.key}: ${f.message}")
+      failures.map(f => s"${f.key.key}: ${f.message}")
         .mkString(", ")
   }
 
@@ -266,7 +280,7 @@ object ParameterExtractor {
    * @param optKey optional key of the option to be extracted
    * @tparam A the type of the result of the extractor
    */
-  case class CliExtractor[A](run: ParameterContext => (A, ParameterContext), optKey: Option[String] = None) {
+  case class CliExtractor[A](run: ParameterContext => (A, ParameterContext), optKey: Option[ParameterKey] = None) {
     /**
      * Returns the key of the option this extractor deals with. If there is no
      * key, result is an empty string. This case should normally not occur in
@@ -274,7 +288,7 @@ object ParameterExtractor {
      *
      * @return the key of the option to be extracted by this extractor
      */
-    def key: String = optKey getOrElse ""
+    def key: ParameterKey = optKey getOrElse UndefinedParameterKey
 
     def flatMap[B](f: A => CliExtractor[B]): CliExtractor[B] = CliExtractor(ctx => {
       val (a, map1) = run(ctx)
@@ -752,12 +766,14 @@ object ParameterExtractor {
    * @param help an optional help text for this option
    * @return the extractor to extract the option values
    */
-  def multiOptionValue(key: String, help: Option[String] = None): CliExtractor[OptionValue[String]] =
+  def multiOptionValue(key: String, help: Option[String] = None): CliExtractor[OptionValue[String]] = {
+      val paramKey = ParameterKey(key, shortAlias = false)
     CliExtractor(context => {
-      val values = context.parameters.parametersMap.getOrElse(key, Nil)
-      val nextModelCtx = context.modelContext.addOption(key, help)
-      (Success(values), context.update(context.parameters keyAccessed key, nextModelCtx))
-    }, Some(key))
+      val values = context.parameters.parametersMap.getOrElse(paramKey, Nil)
+      val nextModelCtx = context.modelContext.addOption(paramKey, help)
+      (Success(values), context.update(context.parameters keyAccessed paramKey, nextModelCtx))
+    }, Some(paramKey))
+  }
 
   /**
    * Returns an extractor that extracts a value from the input parameters. An
@@ -807,14 +823,15 @@ object ParameterExtractor {
   def inputValues(fromIdx: Int, toIdx: Int, optKey: Option[String] = None, optHelp: Option[String] = None,
                   last: Boolean = false): CliExtractor[OptionValue[String]] =
     CliExtractor(context => {
-      val inputs = context.parameters.parametersMap.getOrElse(ParameterParser.InputOption, Nil)
+      val inputs = context.parameters.parametersMap.getOrElse(InputParameterKey, Nil)
 
       // handles special negative index values and checks the index range
       def adjustAndCheckIndex(index: Int): Try[Int] = {
         val adjustedIndex = if (index < 0) inputs.size + index
         else index
+        //TODO use correct key for failure
         if (adjustedIndex >= 0 && adjustedIndex < inputs.size) Success(adjustedIndex)
-        else Failure(paramException(context, ParameterParser.InputOption, tooFewErrorText(adjustedIndex)))
+        else Failure(paramException(context, InputParameterKey, tooFewErrorText(adjustedIndex)))
       }
 
       def tooFewErrorText(index: Int): String = {
@@ -823,7 +840,8 @@ object ParameterExtractor {
       }
 
       val result = if (last && inputs.size > toIdx + 1)
-        Failure(paramException(context, ParameterParser.InputOption,
+        //TODO use correct key for failure
+        Failure(paramException(context, InputParameterKey,
           s"Too many input arguments; expected at most ${toIdx + 1}"))
       else
         for {
@@ -831,8 +849,8 @@ object ParameterExtractor {
           lastIndex <- adjustAndCheckIndex(toIdx)
         } yield inputs.slice(firstIndex, lastIndex + 1)
       val modelContext = context.modelContext.addInputParameter(fromIdx, optKey, optHelp)
-      (result, context.update(context.parameters keyAccessed ParameterParser.InputOption, modelContext))
-    }, optKey)
+      (result, context.update(context.parameters keyAccessed InputParameterKey, modelContext))
+    }, optKey map (k => ParameterKey(k, shortAlias = false)))
 
   /**
    * Returns an extractor that extracts the value of a command line switch. A
@@ -905,7 +923,7 @@ object ParameterExtractor {
       val prompt = optPrompt getOrElse key
       val consoleValue = context.reader.readOption(prompt, password)
       (Try(Some(consoleValue)), context)
-    }, Some(key))
+    }, Some(ParameterKey(key, shortAlias = false)))
 
   /**
    * Returns an extractor that conditionally delegates to other extractors.
@@ -1751,7 +1769,7 @@ object ParameterExtractor {
    * @return a succeeded ''Try'' with the expression value or a failed ''Try''
    *         with a meaningful exception
    */
-  def paramTry[T](context: ParameterContext, key: String)(f: => T): Try[T] =
+  def paramTry[T](context: ParameterContext, key: ParameterKey)(f: => T): Try[T] =
     Try(f) recoverWith {
       case pex: ParameterExtractionException => Failure(pex)
       case ex => Failure(paramException(context, key, ex.getMessage, ex))
@@ -1767,7 +1785,7 @@ object ParameterExtractor {
    * @param cause   an option cause of the error
    * @return the resulting exception
    */
-  def paramException(context: ParameterContext, key: String, message: String, cause: Throwable = null):
+  def paramException(context: ParameterContext, key: ParameterKey, message: String, cause: Throwable = null):
   ParameterExtractionException = {
     val failure = ExtractionFailure(key, generateErrorMessage(message, cause), context)
     ParameterExtractionException(failure)
@@ -1839,7 +1857,7 @@ object ParameterExtractor {
    * @return the resulting ''ExtractionFailure''
    */
   private def failureFor(exception: Throwable): ExtractionFailure =
-    ExtractionFailure(message = exception.getMessage, key = "", context = DummyParameterContext)
+    ExtractionFailure(message = exception.getMessage, key = UndefinedParameterKey, context = DummyParameterContext)
 
   /**
    * Updates a model context by running some extractors against it. This

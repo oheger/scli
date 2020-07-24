@@ -40,7 +40,7 @@ object CliHelpGenerator {
    * ordering (which is case-insensitive).
    */
   final val AlphabeticParameterSortFunc: ParameterSortFunc =
-    _.sortWith((d1, d2) => toUpperCase(d1.key) < toUpperCase(d2.key))
+    _.sortWith((d1, d2) => toUpperCase(d1.key.key) < toUpperCase(d2.key.key))
 
   /** A standard filter function which accepts all parameters. */
   final val AllFilterFunc: ParameterFilter = _ => true
@@ -236,7 +236,7 @@ object CliHelpGenerator {
    * @return the function to sort input parameter options
    */
   def inputParamSortFunc(helpContext: ModelContext): ParameterSortFunc = {
-    def paramIndex(key: String): Int =
+    def paramIndex(key: ParameterKey): Int =
       helpContext.inputs.find(_.key == key).map(_.index) getOrElse helpContext.inputs.size
 
     options =>
@@ -594,8 +594,8 @@ object CliHelpGenerator {
     val key = parameterRef.key
     val multiplicity = modelContext.options(key).attributes.get(AttrMultiplicity)
       .map(Multiplicity.parse) getOrElse Multiplicity.Unbounded
-    val lowerPart = inputParameterOverviewLowerPart(key, multiplicity, symbols)
-    val upperPart = inputParameterOverviewUpperPart(key, multiplicity, symbols)
+    val lowerPart = inputParameterOverviewLowerPart(key.key, multiplicity, symbols)
+    val upperPart = inputParameterOverviewUpperPart(key.key, multiplicity, symbols)
     val result = if (upperPart.nonEmpty) lowerPart + " " + upperPart else lowerPart
     symbols.markAsOptional(result, multiplicity.optional)
   }

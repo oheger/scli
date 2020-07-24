@@ -20,10 +20,12 @@ import java.io.IOException
 import java.nio.file.{Path, Paths}
 
 import com.github.scli.ParameterExtractor._
+import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.collection.SortedSet
+import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
 object CliExtractorOpsSpec {
@@ -168,7 +170,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result match {
       case Failure(exception: ParameterExtractionException) =>
         val failure = exception.failures.head
-        failure.key should be(KeyNumbers)
+        failure.key.key should be(KeyNumbers)
         failure.message should include("should have a single value")
       case r => fail("Unexpected result: " + r)
     }
@@ -226,7 +228,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "convert multiple string values to lower case" in {
     val OrgValues = List("TEST", "test", "Test", "TesT")
     val Key = "multiStringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> OrgValues))
+    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> OrgValues))
     val ext = multiOptionValue(Key).toLower
 
     val result = runExtractor(ext, parameters).get
@@ -236,7 +238,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   it should "convert a string value to lower case" in {
     val Key = "stringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> List("TesT")))
+    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> List("TesT")))
     val ext = optionValue(Key).toLower.mandatory
 
     val result = runExtractor(ext, parameters)
@@ -246,7 +248,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "convert multiple string values to upper case" in {
     val OrgValues = List("TEST", "test", "Test", "TesT")
     val Key = "multiStringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> OrgValues))
+    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> OrgValues))
     val ext = multiOptionValue(Key).toUpper
 
     val result = runExtractor(ext, parameters).get
@@ -256,7 +258,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   it should "convert a string value to upper case" in {
     val Key = "stringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (Key -> List("TesT")))
+    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> List("TesT")))
     val ext = optionValue(Key).toUpper.mandatory
 
     val result = runExtractor(ext, parameters)
@@ -337,7 +339,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val result = runExtractor(ext)
     result match {
       case Failure(exception: ParameterExtractionException) =>
-        exception.failures.head.key should be(UndefinedKey)
+        exception.failures.head.key.key should be(UndefinedKey)
       case r => fail("Unexpected result: " + r)
     }
   }
@@ -363,7 +365,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result match {
       case Failure(exception: ParameterExtractionException) =>
         val failure = exception.failures.head
-        failure.key should be(KeyAnswer)
+        failure.key.key should be(KeyAnswer)
         failure.message should include("at least 2")
       case r => fail("Unexpected result: " + r)
     }
@@ -376,7 +378,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result match {
       case Failure(exception: ParameterExtractionException) =>
         val failure = exception.failures.head
-        failure.key should be(KeyNumbers)
+        failure.key.key should be(KeyNumbers)
         failure.message should include("at most " + (NumberValues.size - 1))
       case r => fail("Unexpected result: " + r)
     }
@@ -414,7 +416,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
     runExtractor(ext) match {
       case Failure(exception: ParameterExtractionException) =>
-        exception.failures.head.key should be(KeyPath)
+        exception.failures.head.key.key should be(KeyPath)
       case r => fail("Unexpected result: " + r)
     }
   }
@@ -455,7 +457,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "handle failures when combining multiple options" in {
     def checkFailureContained(ex: ParameterExtractionException, keys: String*): Unit = {
       keys foreach { key =>
-        ex.failures.find(_.key == key) should not be None
+        ex.failures.find(_.key.key == key) should not be None
       }
     }
 
@@ -485,8 +487,8 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "handle failures when creating a representation from components" in {
     val helpCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, None, Nil)
     val context = ParameterContext(TestParameters, helpCtx, DummyConsoleReader)
-    val failure1 = ExtractionFailure(KeyFlag, "Flag failure", context)
-    val failure2 = ExtractionFailure(KeyAnswer, "Answer failure", context)
+    val failure1 = ExtractionFailure(pk(KeyFlag), "Flag failure", context)
+    val failure2 = ExtractionFailure(pk(KeyAnswer), "Answer failure", context)
     val exception1 = ParameterExtractionException(failure1)
     val exception2 = ParameterExtractionException(failure2)
     val c1 = Failure(exception1)
@@ -508,7 +510,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val c2 = Failure(exception2)
 
     def checkFailure(failure: ExtractionFailure, exception: Throwable): Unit = {
-      failure.key should be("")
+      failure.key.key should be("")
       failure.message should be(exception.getMessage)
       failure.context.parameters should be(Parameters(Map.empty, Set.empty))
       val helpCtx = failure.context.modelContext

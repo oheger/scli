@@ -16,7 +16,7 @@
 
 package com.github.scli
 
-import com.github.scli.ParameterModel.ModelContext
+import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
 
 import scala.annotation.tailrec
 import scala.io.Source
@@ -50,9 +50,9 @@ object ParameterParser {
   /**
    * Type definition for the map with resolved parameter values. The array
    * with command line options is transformed in such a map which allows
-   * direct access to the value(s) assigned to options.
+   * direct access to the value(s) assigned to parameters.
    */
-  type ParametersMap = Map[String, Iterable[String]]
+  type ParametersMap = Map[ParameterKey, Iterable[String]]
 
   /**
    * Type definition for a function that allows querying boolean properties on
@@ -223,7 +223,7 @@ object ParameterParser {
    * Type definition for an internal map type used during processing of
    * command line arguments.
    */
-  private type InternalParamMap = Map[String, List[String]]
+  private type InternalParamMap = Map[ParameterKey, List[String]]
 
   /**
    * Generates a ''CliClassifierFunc'' from the given sequence extracted key
@@ -322,8 +322,10 @@ object ParameterParser {
                      (classifierFunc: CliClassifierFunc): Try[ParametersMap] = {
     def appendOptionValue(argMap: InternalParamMap, opt: String, value: String):
     InternalParamMap = {
-      val optValues = argMap.getOrElse(opt, List.empty)
-      argMap + (opt -> (optValues :+ value))
+      val key = ParameterKey(opt, shortAlias = false)
+      //TODO use correct parameter key
+      val optValues = argMap.getOrElse(key, List.empty)
+      argMap + (key -> (optValues :+ value))
     }
 
     @tailrec def doParseParameters(argList: Seq[String], index: Int, argsMap: InternalParamMap): InternalParamMap =
@@ -352,11 +354,13 @@ object ParameterParser {
     } flatMap { argMap =>
       optFileOption match {
         case Some(fileOption) =>
-          argMap get fileOption match {
+          //TODO use correct ParameterKey for file option
+          val fileOptionKey = ParameterKey(fileOption, shortAlias = false)
+          argMap get fileOptionKey match {
             case None =>
               Success(argMap)
             case Some(files) =>
-              val nextArgs = argMap - fileOption
+              val nextArgs = argMap - fileOptionKey
               val filesToRead = files.toSet diff processedFiles
               readAllParameterFiles(filesToRead.toList, fileOption, nextArgs) flatMap { argList =>
                 parseParametersWithFiles(argList, nextArgs, processedFiles ++ filesToRead)
@@ -448,7 +452,8 @@ object ParameterParser {
    * @return the value of this attribute (or the default)
    */
   private def getModelContextAttribute(context: ModelContext, key: String, attr: String, default: String): String =
-    context.options.get(key)
+  //TODO use correct ParameterKey
+    context.options.get(ParameterKey(key, shortAlias = false))
       .flatMap(_.attributes.get(attr))
       .getOrElse(default)
 }

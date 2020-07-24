@@ -92,6 +92,23 @@ object ParameterModel {
   final val GroupSeparator = ","
 
   /**
+   * A data class to represent the key of a parameter.
+   *
+   * Some CLI applications distinguish between normal (long) parameter names
+   * and short alias names. On the command line, typically a different prefix
+   * is used to indicate a normal name or its alias (e.g. "--" for the normal
+   * names and "-" for short names).
+   *
+   * To support such constellations, a plain string as parameter key is
+   * insufficient. Therefore, this class is used to represent the keys of
+   * parameters. It makes it explicit whether a string is to be interpreted as
+   * normal or short key.
+   * @param key the string-based key
+   * @param shortAlias flag whether this key is a short alias
+   */
+  case class ParameterKey(key: String, shortAlias: Boolean)
+
+  /**
    * A data class storing information about a single command line parameter.
    *
    * An instance of this class contains meta data about a parameter  that can
@@ -119,7 +136,7 @@ object ParameterModel {
    * @param index the index of the input parameter
    * @param key   the key of the input parameter
    */
-  case class InputParameterRef(index: Int, key: String) extends Ordered[InputParameterRef] {
+  case class InputParameterRef(index: Int, key: ParameterKey) extends Ordered[InputParameterRef] {
     /**
      * @inheritdoc This implementation orders input parameter references by
      *             their index, treating negative indices in a special way, so
@@ -137,10 +154,10 @@ object ParameterModel {
   /**
    * A data class containing all the information available for a CLI parameter.
    *
-   * @param key        the key of the option
+   * @param key        the key of the parameter
    * @param attributes a data object with the attributes of this option
    */
-  case class ParameterMetaData(key: String, attributes: ParameterAttributes)
+  case class ParameterMetaData(key: ParameterKey, attributes: ParameterAttributes)
 
   /**
    * A class for storing and updating meta information about command line
@@ -157,9 +174,9 @@ object ParameterModel {
    * @param optCurrentKey a key to the option that is currently defined
    * @param groups        a list with the currently active group names
    */
-  class ModelContext(val options: Map[String, ParameterAttributes],
+  class ModelContext(val options: Map[ParameterKey, ParameterAttributes],
                      val inputs: SortedSet[InputParameterRef],
-                     optCurrentKey: Option[String],
+                     optCurrentKey: Option[ParameterKey],
                      groups: List[String]) {
 
     /**
@@ -167,14 +184,15 @@ object ParameterModel {
      * function creates a new [[ParameterAttributes]] instance and initializes it
      * from the parameters passed in. It returns a new ''ModelContext'' object
      * whose data map contains this new instance. If there is already an entry
-     * for this option key, it is merged with the data passed to this function.
+     * for this parameter key, it is merged with the data passed to this
+     * function.
      *
-     * @param key  the option key
+     * @param key  the parameter key
      * @param text an optional help text
      * @return the updated ''ModelContext''
      */
-    def addOption(key: String, text: Option[String]): ModelContext =
-      contextWithOption(key, text, ParameterTypeOption, inputs)
+    def addOption(key: ParameterKey, text: Option[String]): ModelContext =
+      contextWithParameter(key, text, ParameterTypeOption, inputs)
 
     /**
      * Adds data about an input parameter to this object. This function works
@@ -188,8 +206,10 @@ object ParameterModel {
      */
     def addInputParameter(index: Int, optKey: Option[String], text: Option[String]): ModelContext = {
       val key = optKey.getOrElse(KeyInput + index)
-      val inputRef = InputParameterRef(index, key)
-      contextWithOption(key, text, ParameterTypeInput, inputs union Set(inputRef))
+      val paramKey = ParameterKey(key, shortAlias = false)
+      val inputRef = InputParameterRef(index, paramKey)
+      contextWithParameter(paramKey, text, ParameterTypeInput,
+        inputs union Set(inputRef))
     }
 
     /**
@@ -216,12 +236,12 @@ object ParameterModel {
      * attribute set. Only the presence of the attribute is checked, not the
      * concrete value.
      *
-     * @param key     the key of the option
+     * @param key     the key of the parameter
      * @param attrKey the key of the attribute
      * @return a flag whether this attribute is present for this option; if the
      *         option cannot be resolved, result is '''false'''
      */
-    def hasAttribute(key: String, attrKey: String): Boolean =
+    def hasAttribute(key: ParameterKey, attrKey: String): Boolean =
       options.get(key) exists (_.attributes contains attrKey)
 
     /**
@@ -275,16 +295,16 @@ object ParameterModel {
     def optionMetaData: Iterable[ParameterMetaData] = options.map(e => ParameterMetaData(e._1, e._2))
 
     /**
-     * Creates a new ''ModelContext'' with an additional option as defined by
-     * the parameters.
+     * Creates a new ''ModelContext'' with an additional parameter as defined
+     * by the data provided.
      *
-     * @param key        the option key
+     * @param key        the parameter key
      * @param text       the help text for the option
      * @param optionType the type of the option
      * @param inputRefs  the input data for the new context
      * @return the updated ''ModelContext''
      */
-    private def contextWithOption(key: String, text: Option[String], optionType: String,
+    private def contextWithParameter(key: ParameterKey, text: Option[String], optionType: String,
                                   inputRefs: SortedSet[InputParameterRef]): ModelContext = {
       val existingAttrs = options.get(key).map(_.attributes) getOrElse Map.empty
       val existingGroups = existingAttrs.getOrElse(AttrGroup, "")

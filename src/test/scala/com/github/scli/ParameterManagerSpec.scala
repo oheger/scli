@@ -20,6 +20,7 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterExtractionException}
+import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -28,6 +29,9 @@ import scala.util.{Failure, Success, Try}
 object ParameterManagerSpec {
   /** A key for a test option. */
   private val TestOptionKey = "theTestOption"
+
+  /** The ''ParameterKey'' for the test option. */
+  private val TestOptionPk = pk(TestOptionKey)
 
   /** Test value of the test option. */
   private val TestOptionValue = "testValue"
@@ -42,8 +46,8 @@ object ParameterManagerSpec {
    */
   private val TestExtractor = ParameterManager.wrapTryExtractor(CliExtractor(context => {
     if (context.reader == DefaultConsoleReader) {
-      val nextContext = context.update(context.parameters.keyAccessed(TestOptionKey),
-        context.modelContext.addOption(TestOptionKey, Some(HelpTestOption)))
+      val nextContext = context.update(context.parameters.keyAccessed(TestOptionPk),
+        context.modelContext.addOption(TestOptionPk, Some(HelpTestOption)))
       (context.parameters.parametersMap, nextContext)
     } else (Map.empty, context)
   }))
@@ -102,16 +106,16 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   "ParameterManager" should "process a simple command line with defaults" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--foo", "bar", "--foo", "baz")
-    val ExpParamsMap = Map(TestOptionKey -> List(TestOptionValue),
-      "foo" -> List("bar", "baz"))
+    val ExpParamsMap = Map(TestOptionPk -> List(TestOptionValue),
+      pk("foo") -> List("bar", "baz"))
 
     import scala.language.existentials
     val (res, context) = triedResult(ParameterManager.processCommandLine(args, TestExtractor,
       checkUnconsumedParameters = false))
     res should be(ExpParamsMap)
     context.parameters.parametersMap should be(ExpParamsMap)
-    context.parameters.accessedParameters should contain only TestOptionKey
-    context.modelContext.options(TestOptionKey).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
+    context.parameters.accessedParameters should contain only TestOptionPk
+    context.modelContext.options(TestOptionPk).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
   }
 
   it should "check for unconsumed parameters" in {
@@ -119,7 +123,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
     val exception = failedResult(ParameterManager.processCommandLine(args, TestExtractor))
     exception.failures should have size 1
-    exception.failures.head.key should be("foo")
+    exception.failures.head.key should be(pk("foo"))
   }
 
   it should "handle a failed extractor" in {
@@ -129,11 +133,11 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
     exception.failures should have size 1
-    exception.failures.head.key should be(TestOptionKey)
+    exception.failures.head.key should be(TestOptionPk)
     exception.failures.head.message should include("NumberFormatException")
-    exception.parameterContext.parameters.parametersMap.keys should contain(TestOptionKey)
+    exception.parameterContext.parameters.parametersMap.keys should contain(TestOptionPk)
     val modelContext = exception.parameterContext.modelContext
-    modelContext.options.keys should contain(TestOptionKey)
+    modelContext.options.keys should contain(TestOptionPk)
   }
 
   it should "combine failures of the extractor with failures for unconsumed parameters" in {
@@ -148,7 +152,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     }
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
-    exception.failures.map(_.key) should contain only(TestOptionKey, "missing", "unknownOption")
+    exception.failures.map(_.key) should contain only(TestOptionPk, pk("missing"), pk("unknownOption"))
   }
 
   it should "add all failures to the model context in the resulting exception" in {
@@ -157,7 +161,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
     val modelContext = exception.parameterContext.modelContext
-    modelContext.options(TestOptionKey).attributes.keys should contain(ParameterModel.AttrErrorMessage)
+    modelContext.options(TestOptionPk).attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 
   it should "support options and switches per default classifier function" in {
@@ -189,12 +193,12 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support loading parameter files and handle corresponding exceptions" in {
-    val FileOption = "file"
+    val FileOption = pk("file")
     val FileName = "someFile.txt"
-    val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption, FileName)
+    val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption.key, FileName)
     val extractor = ParameterExtractor.multiOptionValue(TestOptionKey, help = Some(HelpTestOption))
 
-    val parseFunc = ParameterManager.parsingFunc(extractor, optFileOption = Some(FileOption))
+    val parseFunc = ParameterManager.parsingFunc(extractor, optFileOption = Some(FileOption.key))
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor, parseFunc,
       checkUnconsumedParameters = false))
     exception.failures should have size 1
@@ -202,9 +206,9 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     failure.key should be(FileOption)
     failure.message should include(FileName)
     val context = exception.parameterContext
-    context.parameters.parametersMap.keys should contain(TestOptionKey)
+    context.parameters.parametersMap.keys should contain(TestOptionPk)
     val modelContext = context.modelContext
-    val testOptionAttrs = modelContext.options(TestOptionKey)
+    val testOptionAttrs = modelContext.options(TestOptionPk)
     testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
     val fileOptionAttrs = modelContext.options(FileOption)
     fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)

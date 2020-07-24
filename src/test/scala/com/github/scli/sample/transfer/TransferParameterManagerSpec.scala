@@ -20,6 +20,7 @@ import java.nio.file.Paths
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterContext, ParameterExtractionException}
 import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterManager}
+import com.github.scli.ParametersTestHelper._
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptConfig, CryptMode, DownloadCommandConfig, FileServerConfig, HttpServerConfig, UploadCommandConfig}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -92,7 +93,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   private def expectFailureInOptions[T](args: Seq[String], extractor: CliExtractor[Try[T]], failedOptions: String*):
   ParameterExtractionException = {
     val exception = expectFailure(args, extractor)
-    exception.failures.map(_.key) should contain allElementsOf failedOptions
+    exception.failures.map(_.key.key) should contain allElementsOf failedOptions
     exception
   }
 

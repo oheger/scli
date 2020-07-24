@@ -23,6 +23,7 @@ import java.nio.file.attribute.BasicFileAttributes
 
 import com.github.scli.ParameterModel.{ModelContext, ParameterAttributes}
 import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
+import com.github.scli.ParametersTestHelper._
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -84,7 +85,7 @@ object ParameterParserSpec {
    * @return the resulting model context
    */
   private def createModelContext(attributes: Map[String, String]): ModelContext = {
-    val optionAttributes = Map(TestKey -> ParameterAttributes(attributes))
+    val optionAttributes = Map(pk(TestKey) -> ParameterAttributes(attributes))
     new ModelContext(optionAttributes, SortedSet.empty, None, Nil)
   }
 }
@@ -324,7 +325,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("uri1", "uri2")
     val elements = args map (v => InputParameterElement(v))
     val cf = classifierFunc(args, elements)
-    val expArgMap = Map(ParameterParser.InputOption -> args)
+    val expArgMap = Map(pk(ParameterParser.InputOption) -> args)
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgMap)
@@ -336,8 +337,8 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       null, OptionElement("opt2", Some("opt2Val1")),
       null, OptionElement("opt1", Some("opt1Val2")))
     val cf = classifierFunc(args, elements)
-    val expArgMap = Map("opt1" -> List("opt1Val1", "opt1Val2"),
-      "opt2" -> List("opt2Val1"))
+    val expArgMap = Map(pk("opt1") -> List("opt1Val1", "opt1Val2"),
+      pk("opt2") -> List("opt2Val1"))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgMap)
@@ -348,7 +349,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("--opt1", "optValue", "--" + undefOption)
     val elements = List(OptionElement("opt1", Some("optValue")), null, OptionElement(undefOption, None))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map("opt1" -> List("optValue"))
+    val expArgsMap = Map(pk("opt1") -> List("optValue"))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -361,7 +362,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val elements = List(OptionElement(Key, Some("v1")), null, OptionElement(Key, Some("v2")),
       null, OptionElement(Key, None))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map(Key -> List("v1", "v2"))
+    val expArgsMap = Map(pk(Key) -> List("v1", "v2"))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -373,9 +374,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       SwitchesElement(List(("x", "true"), ("z", "false"), ("v", "true"), ("f", "true"))),
       SwitchesElement(List(("flag", "false"))))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map(ParameterParser.InputOption -> List("other"),
-      "v" -> List("true", "true"), "x" -> List("true"), "z" -> List("false"),
-      "f" -> List("true"), "flag" -> List("false"))
+    val expArgsMap = Map(pk(ParameterParser.InputOption) -> List("other"),
+      pk("v") -> List("true", "true"), pk("x") -> List("true"), pk("z") -> List("false"),
+      pk("f") -> List("true"), pk("flag") -> List("false"))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -394,8 +395,8 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
         "--" + OptionName1 :: Opt1Val2 :: uri2 :: Nil))
 
     val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
-    argsMap(OptionName1) should contain only(Opt1Val1, Opt1Val2)
-    argsMap(OptionName2) should contain only Opt2Val
+    argsMap(pk(OptionName1)) should contain only(Opt1Val1, Opt1Val2)
+    argsMap(pk(OptionName2)) should contain only Opt2Val
     argsMap.keys should not contain FileOption
   }
 
@@ -410,9 +411,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = appendFileParameter(
       createParameterFile("--" + FileOption, nestedFile.toString,
         "--" + OptionName2, Option2Value), "--" + OptionName1 :: Option1Value :: Nil)
-    val expArgs = Map(OptionName1 -> List(Option1Value),
-      OptionName2 -> List(Option2Value),
-      OptionName3 -> List(Option3Value))
+    val expArgs = Map(pk(OptionName1) -> List(Option1Value),
+      pk(OptionName2) -> List(Option2Value),
+      pk(OptionName3) -> List(Option3Value))
 
     val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
     argsMap should be(expArgs)
@@ -425,7 +426,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     writeFileContent(file1, parameterFileContent("--" + FileOption, file2.toString,
       "--op1", "v1", "--" + FileOption, file2.toString))
     val args = appendFileParameter(file1, Nil)
-    val expArgs = Map("op1" -> List("v1"), "op2" -> List("v2"), "op3" -> List("v3"))
+    val expArgs = Map(pk("op1") -> List("v1"), pk("op2") -> List("v2"), pk("op3") -> List("v3"))
 
     val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
     argsMap should be(expArgs)
@@ -436,13 +437,13 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
       "--test" :: "true" :: Nil)
 
     val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
-    argsMap.keys should contain only("foo", "test")
+    argsMap.keys should contain only(pk("foo"), pk("test"))
   }
 
   it should "handle an exception when reading a parameter file" in {
     val FileName = "non_existing_file.txt"
     val args = List("--op1", "don't care", "--" + FileOption, FileName)
-    val expArgs = Map("op1" -> List("don't care"))
+    val expArgs = Map(pk("op1") -> List("don't care"))
 
     val exception = parseParametersFailure(args)(basicClassifierFunc)
     exception match {

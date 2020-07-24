@@ -17,6 +17,7 @@
 package com.github.scli
 
 import com.github.scli.ParameterExtractor._
+import com.github.scli.ParameterModel.ParameterKey
 import com.github.scli.ParameterParser._
 
 import scala.util.{Failure, Success, Try}
@@ -158,7 +159,8 @@ object ParameterManager {
     parseFunc(args) recoverWith {
       case e: ParameterParseException =>
         val context = gatherMetaData(extractor, parameters = e.currentParameters)
-        val failure = ExtractionFailure(e.fileOption, e.getMessage, context)
+        //TODO use correct ParameterKey for file option
+        val failure = ExtractionFailure(ParameterKey(e.fileOption, shortAlias = false), e.getMessage, context)
         Failure(updateModelContextWithFailures(List(failure), context))
     }
 
