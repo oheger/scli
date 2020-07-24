@@ -751,23 +751,27 @@ object ParameterExtractor {
    * in its basic string representation. If it checked whether this option has
    * at most one value; if multiple values are found, the extractor fails.
    *
-   * @param key  the key of the option
-   * @param help an optional help text for this option
+   * @param key        the key of the option
+   * @param help       an optional help text for this option
+   * @param shortAlias flag whether the key is a short alias
    * @return the extractor to extract the option value
    */
-  def optionValue(key: String, help: Option[String] = None): CliExtractor[SingleOptionValue[String]] =
-    asSingleOptionValue(multiOptionValue(key, help))
+  def optionValue(key: String, help: Option[String] = None, shortAlias: Boolean = false):
+  CliExtractor[SingleOptionValue[String]] =
+    asSingleOptionValue(multiOptionValue(key, help, shortAlias))
 
   /**
    * Returns an extractor that extracts all values of the specified option key
    * in their basic string representation.
    *
-   * @param key  the key of the option
-   * @param help an optional help text for this option
+   * @param key        the key of the option
+   * @param help       an optional help text for this option
+   * @param shortAlias flag whether the key is a short alias
    * @return the extractor to extract the option values
    */
-  def multiOptionValue(key: String, help: Option[String] = None): CliExtractor[OptionValue[String]] = {
-      val paramKey = ParameterKey(key, shortAlias = false)
+  def multiOptionValue(key: String, help: Option[String] = None, shortAlias: Boolean = false):
+  CliExtractor[OptionValue[String]] = {
+    val paramKey = ParameterKey(key, shortAlias)
     CliExtractor(context => {
       val values = context.parameters.parametersMap.getOrElse(paramKey, Nil)
       val nextModelCtx = context.modelContext.addOption(paramKey, help)
@@ -840,10 +844,10 @@ object ParameterExtractor {
       }
 
       val result = if (last && inputs.size > toIdx + 1)
-        //TODO use correct key for failure
-        Failure(paramException(context, InputParameterKey,
-          s"Too many input arguments; expected at most ${toIdx + 1}"))
-      else
+      //TODO use correct key for failure
+      Failure(paramException(context, InputParameterKey,
+        s"Too many input arguments; expected at most ${toIdx + 1}"))
+        else
         for {
           firstIndex <- adjustAndCheckIndex(fromIdx)
           lastIndex <- adjustAndCheckIndex(toIdx)
@@ -861,12 +865,13 @@ object ParameterExtractor {
    *
    * @param key          the key of the switch
    * @param optHelp      an optional help text
+   * @param shortAlias   flag whether the key is a short alias
    * @param presentValue the value to assign if the switch is present
    * @return the extractor to extract a switch parameter
    */
-  def switchValue(key: String, optHelp: Option[String] = None, presentValue: Boolean = true):
-  CliExtractor[Try[Boolean]] =
-    optionValue(key, optHelp).mapWithContext { (v, ctx) =>
+  def switchValue(key: String, optHelp: Option[String] = None, shortAlias: Boolean = false,
+                  presentValue: Boolean = true): CliExtractor[Try[Boolean]] =
+    optionValue(key, optHelp, shortAlias).mapWithContext { (v, ctx) =>
       val nextCtx = ctx.updateModelContext(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeSwitch)
         .updateModelContext(ParameterModel.AttrSwitchValue, presentValue.toString)
       (v, nextCtx)
@@ -1918,7 +1923,7 @@ object ParameterExtractor {
    * context has no parameter values and dummy helper objects. Only the help
    * context is set and will be updated during the run.
    *
-   * @param params      the parameters for the context
+   * @param params       the parameters for the context
    * @param modelContext the ''ModelContext''
    * @return the ''ParameterContext'' for the meta data run
    */
