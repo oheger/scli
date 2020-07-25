@@ -45,7 +45,7 @@ object ParameterParser {
    * used if for a parse operation no explicit functions to recognize options
    * and extract their keys are specified.
    */
-  final val DefaultOptionPrefixes = OptionPrefixes("--")
+  final val DefaultOptionPrefixes = OptionPrefixes(ParameterKey("--", shortAlias = false))
 
   /**
    * Type definition for the map with resolved parameter values. The array
@@ -53,21 +53,6 @@ object ParameterParser {
    * direct access to the value(s) assigned to parameters.
    */
   type ParametersMap = Map[ParameterKey, Iterable[String]]
-
-  /**
-   * Type definition for a function that allows querying boolean properties on
-   * an option key. Functions of this type are used to categorize arguments
-   * into input parameters, options, etc.
-   */
-  type OptionPredicate = String => Boolean
-
-  /**
-   * Type definition for a function that extracts the key of an option from a
-   * command line argument. Options typically start with a prefix. This
-   * function must remove this prefix; it can do some other normalizations as
-   * well, e.g. convert the key to lowercase.
-   */
-  type KeyExtractor = String => String
 
   /**
    * A trait describing an item encountered on the command line.
@@ -145,7 +130,7 @@ object ParameterParser {
    * prefix indicating an option or switch. If so, the key is returned (with
    * the prefix removed); otherwise, result is an empty ''Option''.
    */
-  type KeyExtractorFunc = String => Option[String]
+  type KeyExtractorFunc = String => Option[ParameterKey]
 
   object OptionPrefixes {
     /**
@@ -155,7 +140,7 @@ object ParameterParser {
      * @param prefixes the supported option prefixes
      * @return the new ''OptionPrefixes'' instance
      */
-    def apply(prefixes: String*): OptionPrefixes = {
+    def apply(prefixes: ParameterKey*): OptionPrefixes = {
       new OptionPrefixes(prefixes.toList)
     }
   }
@@ -165,28 +150,39 @@ object ParameterParser {
    *
    * When parsing the command line each item is checked whether it starts with
    * one of the prefixes defined by this class. If so, the item is considered
-   * an option.
+   * an option or a switch.
+   *
+   * Command line applications often distinguish between full parameter names
+   * and short alias names. The alias has the same meaning as the regular
+   * parameter name, but it is shorter to type on the command line. Typically,
+   * a different prefix is used distinguish between the long and short
+   * parameter names, such as ''--target-directory'' for the full name and
+   * ''-d'' for the short alias. When constructing an instance the prefixes to
+   * be managed are specified as [[ParameterKey]] objects; hence, it can be
+   * stated whether a prefix is used for long or short parameter names.
    *
    * @param prefixes the supported option prefixes
    */
-  case class OptionPrefixes private(prefixes: List[String]) {
+  case class OptionPrefixes private(prefixes: List[ParameterKey]) {
     /**
      * Stores the prefixes sorted by their lengths. This makes sure that they
      * are processed in correct order, if one prefix starts with another one.
      */
-    private val sortedPrefixes = prefixes.sortWith(_.length > _.length)
+    private val sortedPrefixes = prefixes.sortWith(_.key.length > _.key.length)
 
     /**
      * Tries to extract the key of an option from the given parameter. The
-     * function checks whether the parameter has one of the prefix configured
+     * function checks whether the parameter has one of the prefixes configured
      * for this object. If so, the key without the prefix is returned.
      * Otherwise, result is an empty ''Option''.
      *
      * @param parameter the parameter to process
      * @return an ''Option'' with the key extracted
      */
-    def tryExtract(parameter: String): Option[String] =
-      findPrefix(parameter).map(parameter drop _.length)
+    def tryExtract(parameter: String): Option[ParameterKey] =
+      findPrefix(parameter).map { prefix =>
+        ParameterKey(parameter drop prefix.key.length, prefix.shortAlias)
+      }
 
     /**
      * Returns an ''Option'' with the prefix that matches the passed in option
@@ -195,8 +191,8 @@ object ParameterParser {
      * @param key the option key
      * @return an ''Option'' with the prefix the key starts with
      */
-    private def findPrefix(key: String): Option[String] =
-      sortedPrefixes find key.startsWith
+    private def findPrefix(key: String): Option[ParameterKey] =
+      sortedPrefixes find (pk => key.startsWith(pk.key))
   }
 
   /**
@@ -255,7 +251,7 @@ object ParameterParser {
 
     val keyClassifierList = keyClassifiers.toList
     (args, idx) =>
-      keyExtractor(args(idx)) flatMap (key => classifyKey(keyClassifierList,
+      keyExtractor(args(idx)) map (_.key) flatMap (key => classifyKey(keyClassifierList,
         key, args, idx)) getOrElse InputParameterElement(args(idx))
   }
 

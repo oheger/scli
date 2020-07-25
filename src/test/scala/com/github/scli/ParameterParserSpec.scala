@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
-import com.github.scli.ParameterModel.{ModelContext, ParameterAttributes}
+import com.github.scli.ParameterModel.{ModelContext, ParameterAttributes, ParameterKey}
 import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.BeforeAndAfterEach
@@ -302,16 +302,24 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   "OptionPrefixes" should "extract keys from valid options" in {
     val Options = List("--foo", "-foo", "/foo", "<<<<foo")
-    val prefixes = OptionPrefixes("-", "/", "<<<<", "--")
+    val prefixes = OptionPrefixes(pk("-"), pk("/"), pk("<<<<"), pk("--"))
 
-    Options.forall(prefixes.tryExtract(_).contains("foo")) shouldBe true
+    Options.forall(prefixes.tryExtract(_).contains(pk("foo"))) shouldBe true
   }
 
   it should "return empty keys for non-option parameters" in {
     val Params = List("-nope", "neither", "-+alsoNot", "/fullWrong")
-    val prefixes = OptionPrefixes("--")
+    val prefixes = OptionPrefixes(pk("--"))
 
     Params.forall(prefixes.tryExtract(_).isEmpty) shouldBe true
+  }
+
+  it should "support special prefixes for short alias names" in {
+    val Key = ParameterKey("d", shortAlias = true)
+    val prefixes = OptionPrefixes(pk("--"), ParameterKey("-", shortAlias = true))
+
+    val optExtract = prefixes.tryExtract("-" + Key.key)
+    optExtract should be(Some(Key))
   }
 
   "ParameterParser" should "parse an empty sequence of arguments" in {

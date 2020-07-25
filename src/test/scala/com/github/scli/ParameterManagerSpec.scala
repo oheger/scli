@@ -182,8 +182,9 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val args = List("/" + TestOptionKey, TestOptionValue)
     val key = TestOptionKey.toLowerCase(Locale.ROOT)
     val extractor = ParameterExtractor.optionValue(key).mandatory
-    val prefixes = ParameterParser.OptionPrefixes("/")
-    val keyExtractor = ParameterManager.defaultKeyExtractor(prefixes) andThen (opt => opt.map(_.toLowerCase(Locale.ROOT)))
+    val prefixes = ParameterParser.OptionPrefixes(pk("/"))
+    val keyExtractor = ParameterManager.defaultKeyExtractor(prefixes) andThen (opt =>
+      opt.map(key => key.copy(key = key.key.toLowerCase(Locale.ROOT))))
     val classifierFunc =
       ParameterParser.classifierOf(ParameterManager.defaultExtractedKeyClassifiers(extractor): _*)(keyExtractor)
 
