@@ -485,8 +485,9 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "handle failures when creating a representation from components" in {
-    val helpCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, None, Nil)
-    val context = ParameterContext(TestParameters, helpCtx, DummyConsoleReader)
+    val modelCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping,
+      None, Nil)
+    val context = ParameterContext(TestParameters, modelCtx, DummyConsoleReader)
     val failure1 = ExtractionFailure(pk(KeyFlag), "Flag failure", context)
     val failure2 = ExtractionFailure(pk(KeyAnswer), "Answer failure", context)
     val exception1 = ParameterExtractionException(failure1)
@@ -513,9 +514,9 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
       failure.key.key should be("")
       failure.message should be(exception.getMessage)
       failure.context.parameters should be(Parameters(Map.empty, Set.empty))
-      val helpCtx = failure.context.modelContext
-      helpCtx.options should have size 0
-      helpCtx.inputs should have size 0
+      val modelCtx = failure.context.modelContext
+      modelCtx.options should have size 0
+      modelCtx.inputs should have size 0
     }
 
     val triedValues = createRepresentation(c1, c2)((_, _) => throw new IllegalStateException("Failure"))

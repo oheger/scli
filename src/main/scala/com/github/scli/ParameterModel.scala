@@ -91,6 +91,9 @@ object ParameterModel {
   /** The separator string between group names. */
   final val GroupSeparator = ","
 
+  /** Constant for an initial, empty mapping for parameter aliases. */
+  final val EmptyAliasMapping = AliasMapping(Map.empty)
+
   /**
    * A data class to represent the key of a parameter.
    *
@@ -103,10 +106,35 @@ object ParameterModel {
    * insufficient. Therefore, this class is used to represent the keys of
    * parameters. It makes it explicit whether a string is to be interpreted as
    * normal or short key.
-   * @param key the string-based key
+   *
+   * @param key        the string-based key
    * @param shortAlias flag whether this key is a short alias
    */
   case class ParameterKey(key: String, shortAlias: Boolean)
+
+  /**
+   * A data class for keeping track on alias names assigned to parameters.
+   *
+   * This class allows resolving alias names for parameter keys and the
+   * parameter key for a specific alias. It is stored in the [[ModelContext]]
+   * to handle aliases effectively.
+   *
+   * @param aliasesForKey stores the aliases assigned to a parameter
+   */
+  case class AliasMapping(aliasesForKey: Map[ParameterKey, List[ParameterKey]]) {
+    /**
+     * Returns a new ''AliasMapping'' instance with the new alias provided.
+     *
+     * @param key   the key to which an alias should be added
+     * @param alias the new alias
+     * @return the updated ''AliasMapping''
+     */
+    def addAlias(key: ParameterKey, alias: ParameterKey): AliasMapping = {
+      val aliasList = aliasesForKey.getOrElse(key, Nil)
+      val updatedAliasList = aliasList :+ alias
+      AliasMapping(aliasesForKey + (key -> updatedAliasList))
+    }
+  }
 
   /**
    * A data class storing information about a single command line parameter.
@@ -171,11 +199,13 @@ object ParameterModel {
    *
    * @param options       a map storing the data available for the single options
    * @param inputs        a set with data about input parameters
+   * @param aliasMapping  the object with information about aliases
    * @param optCurrentKey a key to the option that is currently defined
    * @param groups        a list with the currently active group names
    */
   class ModelContext(val options: Map[ParameterKey, ParameterAttributes],
                      val inputs: SortedSet[InputParameterRef],
+                     val aliasMapping: AliasMapping,
                      optCurrentKey: Option[ParameterKey],
                      groups: List[String]) {
 
@@ -222,13 +252,10 @@ object ParameterModel {
      * @return the updated ''ModelContext''
      */
     def addAttribute(attrKey: String, value: String): ModelContext =
-      optCurrentKey match {
-        case Some(key) =>
-          val attrs = options(key)
-          val newAttrs = ParameterAttributes(attrs.attributes + (attrKey -> value))
-          new ModelContext(options + (key -> newAttrs), inputs, optCurrentKey, groups)
-        case None =>
-          this
+      updateWithCurrentKey { key =>
+        val attrs = options(key)
+        val newAttrs = ParameterAttributes(attrs.attributes + (attrKey -> value))
+        copy(options = options + (key -> newAttrs))
       }
 
     /**
@@ -252,7 +279,7 @@ object ParameterModel {
      * @return the updated ''ModelContext''
      */
     def startGroup(groupName: String): ModelContext =
-      new ModelContext(options, inputs, optCurrentKey, groupName :: groups)
+      copy(groups = groupName :: groups)
 
     /**
      * Notifies this context about a potential start of a new group. If the
@@ -271,8 +298,7 @@ object ParameterModel {
      *
      * @return the updated ''ModelContext''
      */
-    def endGroup(): ModelContext =
-      new ModelContext(options, inputs, optCurrentKey, groups.tail)
+    def endGroup(): ModelContext = copy(groups = groups.tail)
 
     /**
      * Notifies this context that a group has potentially been processed. If
@@ -285,6 +311,18 @@ object ParameterModel {
      */
     def endGroupConditionally(optGroupName: Option[String]): ModelContext =
       optGroupName.fold(this)(_ => endGroup())
+
+    /**
+     * Returns an updated ''ModelContext'' with a an [[AliasMapping]] that is
+     * modified to contain the new alias provided for the current key.
+     *
+     * @param alias the new alias for this key
+     * @return the updated ''ModelContext''
+     */
+    def addAlias(alias: ParameterKey): ModelContext =
+      updateWithCurrentKey { key =>
+        copy(aliasMapping = aliasMapping.addAlias(key, alias))
+      }
 
     /**
      * Returns an ''Iterable'' with ''OptionMetaData'' objects for the options
@@ -305,15 +343,26 @@ object ParameterModel {
      * @return the updated ''ModelContext''
      */
     private def contextWithParameter(key: ParameterKey, text: Option[String], optionType: String,
-                                  inputRefs: SortedSet[InputParameterRef]): ModelContext = {
+                                     inputRefs: SortedSet[InputParameterRef]): ModelContext = {
       val existingAttrs = options.get(key).map(_.attributes) getOrElse Map.empty
       val existingGroups = existingAttrs.getOrElse(AttrGroup, "")
       val attrs = addOptionalAttribute(
         addOptionalAttribute(Map.empty, AttrHelpText, text),
         AttrGroup, groupAttribute.map(existingGroups + _)) + (AttrParameterType -> optionType)
       val help = ParameterAttributes(existingAttrs ++ attrs)
-      new ModelContext(options + (key -> help), inputRefs, optCurrentKey = Some(key), groups)
+      copy(options = options + (key -> help), inputs = inputRefs, optCurrentKey = Some(key))
     }
+
+    /**
+     * Executes a function to update this context that depends on the current
+     * parameter key. If no current key is available, this context is returned
+     * unchanged.
+     *
+     * @param f the update function
+     * @return the updated model context
+     */
+    private def updateWithCurrentKey(f: ParameterKey => ModelContext): ModelContext =
+      optCurrentKey.fold(this)(f)
 
     /**
      * Returns a string with the concatenated names of all groups that are
@@ -335,6 +384,24 @@ object ParameterModel {
         case GroupSeparator => None
         case s => Some(s)
       }
+
+    /**
+     * Convenience function to create a copy of this object with some
+     * attributes modified.
+     *
+     * @param options       the new map with options
+     * @param inputs        the new set with input parameters
+     * @param aliasMapping  the new alias mapping
+     * @param optCurrentKey the new current key
+     * @param groups        the new groups
+     * @return the modified copy
+     */
+    private def copy(options: Map[ParameterKey, ParameterAttributes] = options,
+                     inputs: SortedSet[InputParameterRef] = inputs,
+                     aliasMapping: AliasMapping = aliasMapping,
+                     optCurrentKey: Option[ParameterKey] = optCurrentKey,
+                     groups: List[String] = groups): ModelContext =
+      new ModelContext(options, inputs, aliasMapping, optCurrentKey, groups)
   }
 
   /**

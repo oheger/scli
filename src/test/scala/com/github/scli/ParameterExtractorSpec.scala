@@ -61,7 +61,7 @@ object ParameterExtractorSpec {
 
   /** A test ParameterContext object. */
   private val TestContext = ParameterContext(TestParameters,
-    new ModelContext(Map.empty, SortedSet.empty, None, Nil),
+    new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil),
     DummyConsoleReader)
 }
 
@@ -832,6 +832,19 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     res should be(Success(true))
   }
 
+  it should "support adding aliases to an extractor" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val AliasLong = "otherNameFor" + Key
+    val AliasShort = "f"
+    val ext = ParameterExtractor.switchValue(Key, presentValue = false)
+    val extractor = ParameterExtractor.withAlias(ParameterExtractor.withAlias(ext, AliasShort),
+      AliasLong, shortAlias = false)
+
+    val (_, ctx) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    ctx.modelContext.aliasMapping.aliasesForKey(TestParamKey) should contain only(pk(AliasLong),
+      ParameterKey(AliasShort, shortAlias = true))
+  }
+
   it should "check whether all parameters have been consumed" in {
     val Key2 = pk("otherKey1")
     val Key3 = pk("otherKey2")
@@ -865,7 +878,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val Key2 = ParameterKey("someOtherKey", shortAlias = false)
     val Key3 = ParameterKey("oneMoreKey", shortAlias = false)
     val Key4 = ParameterKey("additionalKey", shortAlias = false)
-    val helpContext = new ModelContext(Map.empty, SortedSet.empty, None, Nil)
+    val helpContext = new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
       .addOption(TestParamKey, Some("Help1"))
       .addOption(Key2, None)
       .addOption(Key3, Some("Help3"))

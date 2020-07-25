@@ -64,7 +64,8 @@ object ParameterExtractor {
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
   /** Constant for an initial, empty model context. */
-  private val EmptyModelContext = new ModelContext(Map.empty, SortedSet.empty, None, Nil)
+  private val EmptyModelContext = new ModelContext(Map.empty, SortedSet.empty,
+    ParameterModel.EmptyAliasMapping, None, Nil)
 
   /**
    * A dummy parameter context object that is used if no current context is
@@ -1238,6 +1239,22 @@ object ParameterExtractor {
         paramTry(context, ext.key)(optResult.map(f))
       }
       (mappedResult, context)
+    }
+
+  /**
+   * Allows defining an alias for an extractor. This makes it possible to
+   * specify parameters on the command line using both the original key of the
+   * extractor and this alias key.
+   *
+   * @param ext        the extractor to be decorated
+   * @param alias      the new alias key
+   * @param shortAlias a flag whether this is a short alias name
+   * @tparam A the result type of the ''CliExtractor''
+   * @return the ''CliExtractor'' using this alias
+   */
+  def withAlias[A](ext: CliExtractor[A], alias: String, shortAlias: Boolean = true): CliExtractor[A] =
+    ext mapWithContext { (result, context) =>
+      (result, context.copy(modelContext = context.modelContext.addAlias(ParameterKey(alias, shortAlias))))
     }
 
   /**

@@ -86,7 +86,7 @@ object ParameterParserSpec {
    */
   private def createModelContext(attributes: Map[String, String]): ModelContext = {
     val optionAttributes = Map(pk(TestKey) -> ParameterAttributes(attributes))
-    new ModelContext(optionAttributes, SortedSet.empty, None, Nil)
+    new ModelContext(optionAttributes, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
   }
 }
 

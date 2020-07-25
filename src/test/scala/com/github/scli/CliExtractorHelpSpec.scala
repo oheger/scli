@@ -122,7 +122,7 @@ object CliExtractorHelpSpec {
    * @return the model context
    */
   private def createModelContext(params: Map[ParameterKey, ParameterAttributes] = Map.empty): ModelContext =
-    new ModelContext(params, SortedSet.empty, None, List.empty)
+    new ModelContext(params, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, List.empty)
 
   /**
    * Generates a model context object that contains a number of test options.
@@ -276,6 +276,13 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     modelContext.options should have size 0
   }
 
+  it should "handle an uninitialized current key when adding an alias" in {
+    val ext = withAlias(constantOptionValue(42), "x")
+
+    val modelContext = generateModelContext(ext)
+    modelContext.aliasMapping.aliasesForKey should have size 0
+  }
+
   it should "support descriptions and keys for input parameters" in {
     val Key2 = ParameterKey("target", shortAlias = false)
     val Key3 = ParameterKey("sourceFiles", shortAlias = false)
@@ -344,7 +351,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val Attrs1 = ParameterAttributes(Map("attr1" -> "value1", "attr2" -> "value2",
       ParameterModel.AttrHelpText -> "old help"))
     val ExpAttrs = Attrs1.attributes + (ParameterModel.AttrHelpText -> HelpText)
-    val modelContext = new ModelContext(Map(Key -> Attrs1), SortedSet.empty, None, Nil)
+    val modelContext =
+      new ModelContext(Map(Key -> Attrs1), SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
 
     val nextContext = modelContext.addOption(Key, Some(HelpText))
     nextContext.options(Key).attributes should contain allElementsOf ExpAttrs
@@ -365,7 +373,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support querying a boolean attribute for a non-existing option" in {
-    val modelContext = new ModelContext(Map.empty, SortedSet.empty, None, Nil)
+    val modelContext = new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
 
     modelContext.hasAttribute(Key, "foo") shouldBe false
   }
