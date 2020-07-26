@@ -95,8 +95,9 @@ object ParameterManager {
   def parsingFunc(extractor: CliExtractor[_], classifierFunc: CliClassifierFunc = null,
                   optFileOption: Option[String] = None): ParsingFunc = {
     val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractor))
+    //TODO pass in a correct alias resolver function
     args =>
-      ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)
+      ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)(_ => None)
   }
 
   /**

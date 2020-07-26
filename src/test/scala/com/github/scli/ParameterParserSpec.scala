@@ -22,7 +22,7 @@ import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
 import com.github.scli.ParameterModel.{ModelContext, ParameterAttributes, ParameterKey}
-import com.github.scli.ParameterParser.{CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, SwitchesElement}
+import com.github.scli.ParameterParser.{AliasResolverFunc, CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, ParametersMap, SwitchesElement}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
@@ -46,6 +46,9 @@ object ParameterParserSpec {
 
   /** Test value of the test parameter. */
   private val TestValue = "testValue"
+
+  /** A resolver function for aliases that never resolves an alias. */
+  private val NoAliasResolverFunc: AliasResolverFunc = _ => None
 
   /**
    * Helper method for converting a string to a byte array.
@@ -228,15 +231,28 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     }
 
   /**
-   * Invokes the parameter parser on the given sequence with arguments and
-   * expects a successful result. The resulting map is returned.
+   * Invokes the parameter parser on the given sequence with arguments ignoring
+   * aliases and  expects a successful result. The resulting map is returned.
    *
    * @param args the sequence with arguments
    * @param cf   the classifier function
    * @return the resulting parameters map
    */
-  private def parseParametersSuccess(args: Seq[String])(cf: CliClassifierFunc): ParameterParser.ParametersMap =
-    extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf))
+  private def parseParametersSuccess(args: Seq[String])(cf: CliClassifierFunc): ParametersMap =
+    parseParametersWithAliasesSuccess(args)(cf)(NoAliasResolverFunc)
+
+  /**
+   * Invokes the parameter parser on the given sequence with arguments and
+   * expects a successful result. The resulting map is returned.
+   *
+   * @param args the sequence with arguments
+   * @param cf   the classifier function
+   * @param af   the alias resolver function
+   * @return the resulting parameters map
+   */
+  private def parseParametersWithAliasesSuccess(args: Seq[String])(cf: CliClassifierFunc)(af: AliasResolverFunc):
+  ParametersMap =
+    extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf)(af))
 
   /**
    * Invokes the parameter parser on the given sequence with arguments and
@@ -247,7 +263,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
    * @return the exception causing the failure
    */
   private def parseParametersFailure(args: Seq[String])(cf: CliClassifierFunc): Throwable =
-    ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf) match {
+    ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf)(NoAliasResolverFunc) match {
       case Failure(exception) => exception
       case r => fail("Unexpected result: " + r)
     }
@@ -411,6 +427,35 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val expArgsMap = Map(Key -> List("true"))
 
     val params = parseParametersSuccess(args)(cf)
+    params should be(expArgsMap)
+  }
+
+  it should "resolve an alias for an option" in {
+    val AliasKey = ParameterKey("o", shortAlias = true)
+    val AliasValue = "anotherValue"
+    val args = List("--" + TestKey.key, TestValue, "-" + AliasKey.key, AliasValue)
+    val elements = List(OptionElement(TestKey, Some(TestValue)), null, OptionElement(AliasKey, Some(AliasValue)))
+    val cf = classifierFunc(args, elements)
+    val expArgsMap = Map(TestKey -> List(TestValue, AliasValue))
+
+    val params = parseParametersWithAliasesSuccess(args)(cf) { key =>
+      if (key == AliasKey) Some(TestKey)
+      else None
+    }
+    params should be(expArgsMap)
+  }
+
+  it should "resolve aliases for switches" in {
+    val AliasKey = ParameterKey("s", shortAlias = true)
+    val Key2 = pk("flag")
+    val AliasKey2 = ParameterKey("f", shortAlias = true)
+    val args = List("-" + AliasKey.key + AliasKey2.key)
+    val elements = List(SwitchesElement(List((AliasKey, "true"), (AliasKey2, "false"))))
+    val cf = classifierFunc(args, elements)
+    val AliasMapping = Map(AliasKey -> TestKey, AliasKey2 -> Key2)
+    val expArgsMap = Map(TestKey -> List("true"), Key2 -> List("false"))
+
+    val params = parseParametersWithAliasesSuccess(args)(cf)(AliasMapping.get)
     params should be(expArgsMap)
   }
 

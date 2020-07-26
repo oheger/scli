@@ -133,6 +133,17 @@ object ParameterParser {
    */
   type KeyExtractorFunc = String => Option[ParameterKey]
 
+  /**
+   * Definition of a function that can resolve aliases.
+   *
+   * The idea is that the function gets passed in a parameter key. If this key
+   * is known to be an alias, the function should return a defined ''Option''
+   * with the key the alias is for; this key is then used as replacement for
+   * the alias. If the key cannot be resolved as an alias, the function should
+   * return ''None''; the key is then used as is.
+   */
+  type AliasResolverFunc = ParameterKey => Option[ParameterKey]
+
   object OptionPrefixes {
     /**
      * Returns a new instance of ''OptionPrefixes'' that accepts the prefixes
@@ -308,20 +319,25 @@ object ParameterParser {
    * type [[ParameterParseException]] and contains further information about
    * the failed read operation.
    *
-   * @param args           the sequence with command line arguments
-   * @param optFileOption  optional name for an option to reference parameter
-   *                       files; if defined, such files are read, and their
-   *                       content is added to the command line
-   * @param classifierFunc a function to classify parameters
+   * @param args              the sequence with command line arguments
+   * @param optFileOption     optional name for an option to reference parameter
+   *                          files; if defined, such files are read, and their
+   *                          content is added to the command line
+   * @param classifierFunc    a function to classify parameters
+   * @param aliasResolverFunc a function to resolve aliases
    * @return a ''Try'' with the parsed map of arguments
    */
   def parseParameters(args: Seq[String], optFileOption: Option[String] = None)
-                     (classifierFunc: CliClassifierFunc): Try[ParametersMap] = {
+                     (classifierFunc: CliClassifierFunc)
+                     (aliasResolverFunc: AliasResolverFunc): Try[ParametersMap] = {
     def appendOptionValue(argMap: InternalParamMap, key: ParameterKey, value: String):
     InternalParamMap = {
       val optValues = argMap.getOrElse(key, List.empty)
       argMap + (key -> (optValues :+ value))
     }
+
+    def resolveAlias(key: ParameterKey): ParameterKey =
+      aliasResolverFunc(key) getOrElse key
 
     @tailrec def doParseParameters(argList: Seq[String], index: Int, argsMap: InternalParamMap): InternalParamMap =
       if (index >= argList.size) argsMap
@@ -330,12 +346,12 @@ object ParameterParser {
           doParseParameters(argList, index + 1, appendOptionValue(argsMap, InputOption, value))
 
         case OptionElement(key, optValue) =>
-          val nextArgsMap = optValue.fold(argsMap)(value => appendOptionValue(argsMap, key, value))
+          val nextArgsMap = optValue.fold(argsMap)(value => appendOptionValue(argsMap, resolveAlias(key), value))
           doParseParameters(argList, index + 2, nextArgsMap)
 
         case SwitchesElement(switches) =>
           val nextArgsMap = switches.foldLeft(argsMap) { (map, t) =>
-            appendOptionValue(map, t._1, t._2)
+            appendOptionValue(map, resolveAlias(t._1), t._2)
           }
           doParseParameters(argList, index + 1, nextArgsMap)
       }
