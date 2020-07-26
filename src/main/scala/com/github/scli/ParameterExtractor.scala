@@ -54,12 +54,6 @@ object ParameterExtractor {
    */
   private val UndefinedParameterKey = ParameterKey("", shortAlias = false)
 
-  /**
-   * Constant for the parameter key which stores the values of input
-   * parameters.
-   */
-  private val InputParameterKey = ParameterKey(ParameterParser.InputOption, shortAlias = false)
-
   /** A mapping storing the boolean literals for conversion. */
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
@@ -828,7 +822,7 @@ object ParameterExtractor {
   def inputValues(fromIdx: Int, toIdx: Int, optKey: Option[String] = None, optHelp: Option[String] = None,
                   last: Boolean = false): CliExtractor[OptionValue[String]] =
     CliExtractor(context => {
-      val inputs = context.parameters.parametersMap.getOrElse(InputParameterKey, Nil)
+      val inputs = context.parameters.parametersMap.getOrElse(ParameterParser.InputOption, Nil)
 
       // handles special negative index values and checks the index range
       def adjustAndCheckIndex(index: Int): Try[Int] = {
@@ -836,7 +830,7 @@ object ParameterExtractor {
         else index
         //TODO use correct key for failure
         if (adjustedIndex >= 0 && adjustedIndex < inputs.size) Success(adjustedIndex)
-        else Failure(paramException(context, InputParameterKey, tooFewErrorText(adjustedIndex)))
+        else Failure(paramException(context, ParameterParser.InputOption, tooFewErrorText(adjustedIndex)))
       }
 
       def tooFewErrorText(index: Int): String = {
@@ -846,7 +840,7 @@ object ParameterExtractor {
 
       val result = if (last && inputs.size > toIdx + 1)
       //TODO use correct key for failure
-      Failure(paramException(context, InputParameterKey,
+      Failure(paramException(context, ParameterParser.InputOption,
         s"Too many input arguments; expected at most ${toIdx + 1}"))
         else
         for {
@@ -854,7 +848,7 @@ object ParameterExtractor {
           lastIndex <- adjustAndCheckIndex(toIdx)
         } yield inputs.slice(firstIndex, lastIndex + 1)
       val modelContext = context.modelContext.addInputParameter(fromIdx, optKey, optHelp)
-      (result, context.update(context.parameters keyAccessed InputParameterKey, modelContext))
+      (result, context.update(context.parameters keyAccessed ParameterParser.InputOption, modelContext))
     }, optKey map (k => ParameterKey(k, shortAlias = false)))
 
   /**

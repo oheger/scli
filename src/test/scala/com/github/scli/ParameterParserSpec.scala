@@ -42,7 +42,7 @@ object ParameterParserSpec {
   private val TempFileSuffix = ".tmp"
 
   /** A key for a test parameter. */
-  private val TestKey = "theTestKey"
+  private val TestKey = pk("theTestKey")
 
   /** Test value of the test parameter. */
   private val TestValue = "testValue"
@@ -64,7 +64,7 @@ object ParameterParserSpec {
   private def basicClassifierFunc: CliClassifierFunc =
     (args, idx) => {
       val arg = args(idx)
-      if (arg.startsWith("--")) OptionElement(arg.substring(2), Some(args(idx + 1)))
+      if (arg.startsWith("--")) OptionElement(pk(arg.substring(2)), Some(args(idx + 1)))
       else InputParameterElement(arg)
     }
 
@@ -85,7 +85,7 @@ object ParameterParserSpec {
    * @return the resulting model context
    */
   private def createModelContext(attributes: Map[String, String]): ModelContext = {
-    val optionAttributes = Map(pk(TestKey) -> ParameterAttributes(attributes))
+    val optionAttributes = Map(TestKey -> ParameterAttributes(attributes))
     new ModelContext(optionAttributes, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
   }
 }
@@ -291,7 +291,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
    * @param result  the result to return
    * @return the key classifier function with these properties
    */
-  private def definedKeyClassifier(expKey: String, expArgs: Seq[String], expIdx: Int, result: Option[CliElement]):
+  private def definedKeyClassifier(expKey: ParameterKey, expArgs: Seq[String], expIdx: Int, result: Option[CliElement]):
   ExtractedKeyClassifierFunc =
     (key, args, idx) => {
       key should be(expKey)
@@ -333,7 +333,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("uri1", "uri2")
     val elements = args map (v => InputParameterElement(v))
     val cf = classifierFunc(args, elements)
-    val expArgMap = Map(pk(ParameterParser.InputOption) -> args)
+    val expArgMap = Map(ParameterParser.InputOption -> args)
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgMap)
@@ -341,9 +341,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "correctly parse arguments with options" in {
     val args = List("--opt1", "opt1Val1", "--opt2", "opt2Val1", "--opt1", "opt1Val2")
-    val elements = List(OptionElement("opt1", Some("opt1Val1")),
-      null, OptionElement("opt2", Some("opt2Val1")),
-      null, OptionElement("opt1", Some("opt1Val2")))
+    val elements = List(OptionElement(pk("opt1"), Some("opt1Val1")),
+      null, OptionElement(pk("opt2"), Some("opt2Val1")),
+      null, OptionElement(pk("opt1"), Some("opt1Val2")))
     val cf = classifierFunc(args, elements)
     val expArgMap = Map(pk("opt1") -> List("opt1Val1", "opt1Val2"),
       pk("opt2") -> List("opt2Val1"))
@@ -352,10 +352,22 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     params should be(expArgMap)
   }
 
+  it should "correctly evaluate the shortAlias flag for options" in {
+    val Key = ParameterKey("f", shortAlias = true)
+    val args = List("--" + Key.key, TestValue)
+    val elements = List(OptionElement(Key, Some(TestValue)))
+    val cf = classifierFunc(args, elements)
+    val expArgMap = Map(Key -> List(TestValue))
+
+    val params = parseParametersSuccess(args)(cf)
+    params should be(expArgMap)
+  }
+
   it should "ignore an option that is the last argument" in {
     val undefOption = "undefinedOption"
     val args = List("--opt1", "optValue", "--" + undefOption)
-    val elements = List(OptionElement("opt1", Some("optValue")), null, OptionElement(undefOption, None))
+    val elements = List(OptionElement(pk("opt1"), Some("optValue")), null,
+      OptionElement(pk(undefOption), None))
     val cf = classifierFunc(args, elements)
     val expArgsMap = Map(pk("opt1") -> List("optValue"))
 
@@ -364,13 +376,13 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   it should "ignore an option that is the last argument, but keep its other values" in {
-    val Key = "strangeOption"
-    val TestOption = "--" + Key
+    val Key = pk("strangeOption")
+    val TestOption = "--" + Key.key
     val args = List(TestOption, "v1", TestOption, "v2", TestOption)
     val elements = List(OptionElement(Key, Some("v1")), null, OptionElement(Key, Some("v2")),
       null, OptionElement(Key, None))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map(pk(Key) -> List("v1", "v2"))
+    val expArgsMap = Map(Key -> List("v1", "v2"))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -378,13 +390,25 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "correctly parse arguments with switches" in {
     val args = List("--v", "other", "--xzvf", "--flag")
-    val elements = List(SwitchesElement(List(("v", "true"))), InputParameterElement("other"),
-      SwitchesElement(List(("x", "true"), ("z", "false"), ("v", "true"), ("f", "true"))),
-      SwitchesElement(List(("flag", "false"))))
+    val elements = List(SwitchesElement(List((pk("v"), "true"))), InputParameterElement("other"),
+      SwitchesElement(List((pk("x"), "true"), (pk("z"), "false"), (pk("v"), "true"),
+        (pk("f"), "true"))),
+      SwitchesElement(List((pk("flag"), "false"))))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map(pk(ParameterParser.InputOption) -> List("other"),
+    val expArgsMap = Map(ParameterParser.InputOption -> List("other"),
       pk("v") -> List("true", "true"), pk("x") -> List("true"), pk("z") -> List("false"),
       pk("f") -> List("true"), pk("flag") -> List("false"))
+
+    val params = parseParametersSuccess(args)(cf)
+    params should be(expArgsMap)
+  }
+
+  it should "correctly evaluate the shortAlias flag for switches" in {
+    val Key = ParameterKey("f", shortAlias = true)
+    val args = List("--v")
+    val elements = List(SwitchesElement(List((Key, "true"))))
+    val cf = classifierFunc(args, elements)
+    val expArgsMap = Map(Key -> List("true"))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -479,8 +503,8 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   it should "create a classifier function that handles key classifiers returning None" in {
-    val Key = "arg"
-    val args = List("--" + Key)
+    val Key = pk("arg")
+    val args = List("--" + Key.key)
     val cf = ParameterParser.classifierOf(definedKeyClassifier(Key, args, 0, None),
       definedKeyClassifier(Key, args, 0, None))(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
@@ -488,9 +512,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   it should "create a classifier function that correctly delegates to key classifiers" in {
-    val Key = "theOptionKey"
+    val Key = ParameterKey("theOptionKey", shortAlias = true)
     val Result = OptionElement(Key, Some("someValue"))
-    val args = List("test", "--" + Key)
+    val args = List("test", "-" + Key.key)
     val cf = ParameterParser.classifierOf(definedKeyClassifier(Key, args, 1, None),
       definedKeyClassifier(Key, args, 1, Some(Result)),
       blowUpKeyClassifier)(ParameterParser.DefaultOptionPrefixes.tryExtract)
@@ -523,7 +547,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   it should "provide a key classifier for options that handles an unknown parameter key" in {
-    val UnknownKey = "unknownKey"
+    val UnknownKey = pk("unknownKey")
     val args = List("someKey", "someOtherKey", TestValue)
     val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
 
@@ -532,7 +556,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   it should "provide a key classifier for options that handles a missing option value" in {
-    val args = List("key1", "key2", TestKey)
+    val args = List("key1", "key2", TestKey.key)
     val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)

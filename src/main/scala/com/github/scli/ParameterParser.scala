@@ -35,17 +35,18 @@ import scala.util.{Failure, Success, Try}
  */
 object ParameterParser {
   /**
-   * Name of an option that collects the input strings that are no values of
+   * Key of an option that collects the input strings that are no values of
    * options.
    */
-  final val InputOption = "input"
+  final val InputOption = ParameterKey("input", shortAlias = false)
 
   /**
    * An OptionPrefixes object with the default prefix for options. This is
    * used if for a parse operation no explicit functions to recognize options
    * and extract their keys are specified.
    */
-  final val DefaultOptionPrefixes = OptionPrefixes(ParameterKey("--", shortAlias = false))
+  final val DefaultOptionPrefixes = OptionPrefixes(ParameterKey("--", shortAlias = false),
+    ParameterKey("-", shortAlias = true))
 
   /**
    * Type definition for the map with resolved parameter values. The array
@@ -74,7 +75,7 @@ object ParameterParser {
    * @param key   the key of the option
    * @param value an ''Option'' with the value
    */
-  case class OptionElement(key: String, value: Option[String]) extends CliElement
+  case class OptionElement(key: ParameterKey, value: Option[String]) extends CliElement
 
   /**
    * A concrete ''CliElement'' class representing a set of switches.
@@ -88,7 +89,7 @@ object ParameterParser {
    * @param switches a list with switches and their values that have been
    *                 extracted
    */
-  case class SwitchesElement(switches: List[(String, String)]) extends CliElement
+  case class SwitchesElement(switches: List[(ParameterKey, String)]) extends CliElement
 
   /**
    * A concrete ''CliElement'' class representing an input parameter.
@@ -119,7 +120,7 @@ object ParameterParser {
    * parameter type. If none of those are able to detect the parameter type,
    * an input parameter can be assumed as fallback.
    */
-  type ExtractedKeyClassifierFunc = (String, Seq[String], Int) => Option[CliElement]
+  type ExtractedKeyClassifierFunc = (ParameterKey, Seq[String], Int) => Option[CliElement]
 
   /**
    * Definition of a function that can extract the key of an option or switch
@@ -238,7 +239,7 @@ object ParameterParser {
    */
   def classifierOf(keyClassifiers: ExtractedKeyClassifierFunc*)(keyExtractor: KeyExtractorFunc): CliClassifierFunc = {
     @tailrec
-    def classifyKey(classifiers: List[ExtractedKeyClassifierFunc], key: String, args: Seq[String], idx: Int):
+    def classifyKey(classifiers: List[ExtractedKeyClassifierFunc], key: ParameterKey, args: Seq[String], idx: Int):
     Option[CliElement] =
       classifiers match {
         case h :: t =>
@@ -251,7 +252,7 @@ object ParameterParser {
 
     val keyClassifierList = keyClassifiers.toList
     (args, idx) =>
-      keyExtractor(args(idx)) map (_.key) flatMap (key => classifyKey(keyClassifierList,
+      keyExtractor(args(idx)) flatMap (key => classifyKey(keyClassifierList,
         key, args, idx)) getOrElse InputParameterElement(args(idx))
   }
 
@@ -316,10 +317,8 @@ object ParameterParser {
    */
   def parseParameters(args: Seq[String], optFileOption: Option[String] = None)
                      (classifierFunc: CliClassifierFunc): Try[ParametersMap] = {
-    def appendOptionValue(argMap: InternalParamMap, opt: String, value: String):
+    def appendOptionValue(argMap: InternalParamMap, key: ParameterKey, value: String):
     InternalParamMap = {
-      val key = ParameterKey(opt, shortAlias = false)
-      //TODO use correct parameter key
       val optValues = argMap.getOrElse(key, List.empty)
       argMap + (key -> (optValues :+ value))
     }
@@ -447,9 +446,8 @@ object ParameterParser {
    * @param default the default value to use
    * @return the value of this attribute (or the default)
    */
-  private def getModelContextAttribute(context: ModelContext, key: String, attr: String, default: String): String =
-  //TODO use correct ParameterKey
-    context.options.get(ParameterKey(key, shortAlias = false))
+  private def getModelContextAttribute(context: ModelContext, key: ParameterKey, attr: String, default: String): String =
+    context.options.get(key)
       .flatMap(_.attributes.get(attr))
       .getOrElse(default)
 }

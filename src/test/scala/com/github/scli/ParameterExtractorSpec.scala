@@ -54,7 +54,7 @@ object ParameterExtractorSpec {
 
   /** A test parameters object that contains input parameters. */
   private val TestParametersWithInputs: Parameters = TestParameters.parametersMap +
-    (pk(ParameterParser.InputOption) -> InputValues)
+    (ParameterParser.InputOption -> InputValues)
 
   /** Another test Parameters object representing updated parameters. */
   private val NextParameters = Parameters(Map(pk("bar") -> List("v2", "v3")), Set(pk("x"), pk("y")))
@@ -734,7 +734,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValue(0)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    next.parameters.accessedParameters should contain only pk(ParameterParser.InputOption)
+    next.parameters.accessedParameters should contain only ParameterParser.InputOption
     res.get should be(Some(InputValues.head))
   }
 
@@ -743,7 +743,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValues(0, 1)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    next.parameters.accessedParameters should contain only pk(ParameterParser.InputOption)
+    next.parameters.accessedParameters should contain only ParameterParser.InputOption
     res.get.toList should contain theSameElementsInOrderAs InputValues.take(2)
   }
 
@@ -752,7 +752,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValues(0, InputValues.size - 1, last = true)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    next.parameters.accessedParameters should contain only pk(ParameterParser.InputOption)
+    next.parameters.accessedParameters should contain only ParameterParser.InputOption
     res.get.toList should contain theSameElementsInOrderAs InputValues
   }
 
@@ -777,7 +777,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValue(-InputValues.size - 1)
 
     val (res, _) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputOption,
+    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputOption.key,
       expParams = TestParametersWithInputs.parametersMap)("-1")
   }
 
@@ -786,7 +786,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValues(1, InputValues.size, optKey = Some(Key))
 
     val (res, _) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputOption,
+    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputOption.key,
       expParams = TestParametersWithInputs.parametersMap)("few input arguments")
   }
 
@@ -795,7 +795,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValue(1, Some("destination"), last = true)
 
     val res = ParameterExtractor.tryExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputOption,
+    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputOption.key,
       expParams = TestParametersWithInputs.parametersMap)("at most 2")
   }
 
