@@ -17,7 +17,7 @@
 package com.github.scli
 
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.ParameterKey
+import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
 import com.github.scli.ParameterParser._
 
 import scala.util.{Failure, Success, Try}
@@ -43,19 +43,45 @@ object ParameterManager {
   type ParsingFunc = Seq[String] => Try[ParametersMap]
 
   /**
+   * A data class wrapping a ''CliExtractor'' and providing (lazy) access to
+   * its metadata.
+   *
+   * When processing an application's command line it is typically necessary to
+   * obtain metadata about the top-level ''CliExtractor''; based on this the
+   * parsing of the elements on the command line can be done correctly. This
+   * class manages this metadata and makes sure that it is obtained at most
+   * once when it is actually needed.
+   *
+   * @param extractor the ''CliExtractor'' wrapped by this context
+   * @tparam A the result type of the ''CliExtractor''
+   */
+  case class ExtractorContext[A](extractor: CliExtractor[A]) {
+    /**
+     * Stores a ''ParameterContext'' created based on the wrapped
+     * ''CliExtractor''. From this context, all the metadata available about
+     * the extractor can be queried.
+     */
+    lazy val parameterContext: ParameterContext = ParameterExtractor.gatherMetaData(extractor)
+
+    /**
+     * Stores a ''ModelContext'' created based on the wrapped ''CliExtractor''.
+     */
+    lazy val modelContext: ModelContext = parameterContext.modelContext
+  }
+
+  /**
    * Returns a list with standard ''ExtractedKeyClassifierFunc'' functions to
    * deal with elements on the command line. This list contains functions to
    * deal with all supported elements on the command line. The classifiers need
-   * access to a ''ModelContext''. This is constructed using the
-   * ''CliExtractor'' provided.
+   * access to a ''ModelContext''. This is obtained from the
+   * ''ExtractorContext'' provided.
    *
-   * @param extractor the ''CliExtractor'' to execute
+   * @param extractorCtx the context wrapping the current extractor
    * @return a list with standard ''ExtractedKeyClassifierFunc'' functions
    */
-  def defaultExtractedKeyClassifiers(extractor: CliExtractor[_]): List[ExtractedKeyClassifierFunc] = {
-    lazy val modelContext = ParameterExtractor.gatherMetaData(extractor).modelContext
-    List(ParameterParser.optionKeyClassifierFunc(modelContext),
-      ParameterParser.switchKeyClassifierFunc(modelContext))
+  def defaultExtractedKeyClassifiers(extractorCtx: ExtractorContext[_]): List[ExtractedKeyClassifierFunc] = {
+    List(ParameterParser.optionKeyClassifierFunc(extractorCtx.modelContext),
+      ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext))
   }
 
   /**
@@ -75,29 +101,29 @@ object ParameterManager {
    * ''ExtractedKeyClassifierFunc'' functions and uses the default prefixes for
    * options and switches.
    *
-   * @param extractor the ''CliExtractor'' to run
+   * @param extractorCtx the context wrapping the current extractor
    * @return the default ''CliClassifierFunc'' for this extractor
    */
-  def defaultClassifierFunc(extractor: CliExtractor[_]): CliClassifierFunc =
-    ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractor): _*)(defaultKeyExtractor(
+  def defaultClassifierFunc(extractorCtx: ExtractorContext[_]): CliClassifierFunc =
+    ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractorCtx): _*)(defaultKeyExtractor(
       ParameterParser.DefaultOptionPrefixes))
 
   /**
    * Returns a ''ParsingFunc'' that is configured with the parameters
    * provided. For missing parameters, meaningful default values are used.
    *
-   * @param extractor      the ''CliExtractor'' to run
+   * @param extractorCtx   the context wrapping the current extractor
    * @param classifierFunc the function to classify command line elements
    * @param optFileOption  optional name of an option to read command line
    *                       files
    * @return the configured parsing function
    */
-  def parsingFunc(extractor: CliExtractor[_], classifierFunc: CliClassifierFunc = null,
+  def parsingFunc(extractorCtx: ExtractorContext[_], classifierFunc: CliClassifierFunc = null,
                   optFileOption: Option[String] = None): ParsingFunc = {
-    val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractor))
-    //TODO pass in a correct alias resolver function
+    val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractorCtx))
+    lazy val aliasResolverFunc: AliasResolverFunc = extractorCtx.modelContext.aliasMapping.keyForAlias.get
     args =>
-      ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)(_ => None)
+      ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)(aliasResolverFunc)
   }
 
   /**
@@ -112,18 +138,14 @@ object ParameterManager {
     extractor.map(Try(_))
 
   /**
-   * The main function for command line processing.
+   * Convenience function for command line processing.
    *
-   * This function uses a ''ParsingFunc'' to parse the given sequence of
-   * command line arguments and runs a ''CliExtractor'' on the result. A
-   * ''Try'' with the result of this extractor and the parameter context is
-   * returned. If the extraction process fails, result is a ''Failure'' that
-   * contains a
-   * [[com.github.scli.ParameterExtractor#ParameterExtractionException]].
-   * From this exception, all information is available to generate a
-   * meaningful error message and usage information. Specifically, the failure
-   * messages have already been added to the model context in the parameter
-   * context available via the exception.
+   * This function creates an [[ExtractorContext]] for the given
+   * ''CliExtractor'' and then delegates to ''processCommandLineCtx()''. Use
+   * this function if you want to use the default parsing function. Otherwise,
+   * it is more efficient to create an ''ExtractorContext'' manually, use it
+   * for the configuration of the parsing function, and call
+   * ''processCommandLineCtx()'' directly.
    *
    * @param args                      the sequence of command line arguments
    * @param extractor                 the ''CliExtractor'' to generate a result
@@ -135,11 +157,39 @@ object ParameterManager {
    *         context
    */
   def processCommandLine[A](args: Seq[String], extractor: CliExtractor[Try[A]], parser: ParsingFunc = null,
-                            checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] = {
-    val theParsingFunc = getOrDefault(parser, parsingFunc(extractor))
+                            checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] =
+    processCommandLineCtx(args, ExtractorContext(extractor), parser, checkUnconsumedParameters)
+
+  /**
+   * The main function for command line processing.
+   *
+   * This function uses a ''ParsingFunc'' to parse the given sequence of
+   * command line arguments and runs the ''CliExtractor'' contained in the
+   * ''ExtractorContext'' provided on the result. A ''Try'' with the result of
+   * this extractor and the parameter context is returned. If the extraction
+   * process fails, result is a ''Failure'' that contains a
+   * [[com.github.scli.ParameterExtractor#ParameterExtractionException]].
+   * From this exception, all information is available to generate a
+   * meaningful error message and usage information. Specifically, the failure
+   * messages have already been added to the model context in the parameter
+   * context available via the exception.
+   *
+   * @param args                      the sequence of command line arguments
+   * @param extractorCtx              the context wrapping the current
+   *                                  extractor
+   * @param parser                    an optional custom parsing function
+   * @param checkUnconsumedParameters flag whether a check for unexpected
+   *                                  parameters should be performed
+   * @tparam A the result type of the ''CliExtractor''
+   * @return a ''Try'' with the result of the extractor and the parameter
+   *         context
+   */
+  def processCommandLineCtx[A](args: Seq[String], extractorCtx: ExtractorContext[Try[A]], parser: ParsingFunc = null,
+                               checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] = {
+    val theParsingFunc = getOrDefault(parser, parsingFunc(extractorCtx))
     for {
-      parsedArgs <- parse(args, extractor, theParsingFunc)
-      extResult <- extract(parsedArgs, extractor, checkUnconsumedParameters)
+      parsedArgs <- parse(args, extractorCtx.extractor, theParsingFunc)
+      extResult <- extract(parsedArgs, extractorCtx.extractor, checkUnconsumedParameters)
     } yield extResult
   }
 

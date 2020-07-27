@@ -92,7 +92,7 @@ object ParameterModel {
   final val GroupSeparator = ","
 
   /** Constant for an initial, empty mapping for parameter aliases. */
-  final val EmptyAliasMapping = AliasMapping(Map.empty)
+  final val EmptyAliasMapping = AliasMapping(Map.empty, Map.empty)
 
   /**
    * A data class to represent the key of a parameter.
@@ -120,8 +120,10 @@ object ParameterModel {
    * to handle aliases effectively.
    *
    * @param aliasesForKey stores the aliases assigned to a parameter
+   * @param keyForAlias   reverse mapping from an alias to the key
    */
-  case class AliasMapping(aliasesForKey: Map[ParameterKey, List[ParameterKey]]) {
+  case class AliasMapping(aliasesForKey: Map[ParameterKey, List[ParameterKey]],
+                          keyForAlias: Map[ParameterKey, ParameterKey]) {
     /**
      * Returns a new ''AliasMapping'' instance with the new alias provided.
      *
@@ -132,7 +134,8 @@ object ParameterModel {
     def addAlias(key: ParameterKey, alias: ParameterKey): AliasMapping = {
       val aliasList = aliasesForKey.getOrElse(key, Nil)
       val updatedAliasList = aliasList :+ alias
-      AliasMapping(aliasesForKey + (key -> updatedAliasList))
+      AliasMapping(aliasesForKey + (key -> updatedAliasList),
+        keyForAlias + (alias -> key))
     }
   }
 

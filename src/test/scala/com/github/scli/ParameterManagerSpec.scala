@@ -20,6 +20,8 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterExtractionException}
+import com.github.scli.ParameterManager.ExtractorContext
+import com.github.scli.ParameterModel.ParameterKey
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -182,14 +184,15 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val args = List("/" + TestOptionKey, TestOptionValue)
     val key = TestOptionKey.toLowerCase(Locale.ROOT)
     val extractor = ParameterExtractor.optionValue(key).mandatory
+    val extractorCtx = ExtractorContext(extractor)
     val prefixes = ParameterParser.OptionPrefixes(pk("/"))
     val keyExtractor = ParameterManager.defaultKeyExtractor(prefixes) andThen (opt =>
       opt.map(key => key.copy(key = key.key.toLowerCase(Locale.ROOT))))
     val classifierFunc =
-      ParameterParser.classifierOf(ParameterManager.defaultExtractedKeyClassifiers(extractor): _*)(keyExtractor)
+      ParameterParser.classifierOf(ParameterManager.defaultExtractedKeyClassifiers(extractorCtx): _*)(keyExtractor)
 
-    val parseFunc = ParameterManager.parsingFunc(extractor, classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLine(args, extractor, parser = parseFunc))
+    val parseFunc = ParameterManager.parsingFunc(extractorCtx, classifierFunc)
+    val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parser = parseFunc))
     res should be(TestOptionValue)
   }
 
@@ -198,9 +201,10 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val FileName = "someFile.txt"
     val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption.key, FileName)
     val extractor = ParameterExtractor.multiOptionValue(TestOptionKey, help = Some(HelpTestOption))
+    val extractorCtx = ExtractorContext(extractor)
 
-    val parseFunc = ParameterManager.parsingFunc(extractor, optFileOption = Some(FileOption.key))
-    val exception = failedResult(ParameterManager.processCommandLine(args, extractor, parseFunc,
+    val parseFunc = ParameterManager.parsingFunc(extractorCtx, optFileOption = Some(FileOption.key))
+    val exception = failedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parseFunc,
       checkUnconsumedParameters = false))
     exception.failures should have size 1
     val failure = exception.failures.head
@@ -238,5 +242,24 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
     triedResult(ParameterManager.processCommandLine(args, ParameterManager.wrapTryExtractor(extCnt)))
     counter.get() should be(2)
+  }
+
+  it should "handle aliases" in {
+    val Alias = "o"
+    val args = List("-" + Alias, TestOptionValue)
+    val extractor = ParameterExtractor.withAlias(ParameterExtractor.optionValue(TestOptionKey), Alias)
+
+    val (res, _) = triedResult(ParameterManager.processCommandLine(args, extractor))
+    res should be(Some(TestOptionValue))
+  }
+
+  it should "detect an alias using an incorrect prefix" in {
+    val Alias = "o"
+    val args = List("--" + Alias, TestOptionValue)
+    val extractor = ParameterExtractor.withAlias(ParameterExtractor.optionValue(TestOptionKey), Alias)
+
+    val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
+    exception.failures should have size 1
+    exception.failures.head.key should be(ParameterKey(Alias, shortAlias = false))
   }
 }
