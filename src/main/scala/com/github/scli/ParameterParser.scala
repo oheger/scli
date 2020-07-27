@@ -297,11 +297,35 @@ object ParameterParser {
   def switchKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, _, _) =>
-      if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
-        ParameterModel.ParameterTypeSwitch) == ParameterModel.ParameterTypeSwitch)
-        Some(SwitchesElement(List((key,
-          getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
-      else None
+      classifySwitchKey(context, key)
+  }
+
+  /**
+   * Returns a key classifier function for switches that can extract multiple
+   * short alias keys. For long keys, the classifier function behaves in the
+   * same way as the one returned by ''switchKeyClassifierFunc()''. For short
+   * aliases, however, the function assumes that the key passed in consists of
+   * multiple single letter key aliases and returns corresponding keys in the
+   * resulting ''SwitchesElement''. Note that here no checks for the parameter
+   * type are done. So to work correctly, the function should be executed after
+   * a check for option elements.
+   *
+   * @param modelContext the model context
+   * @return the key classifier function for multiple switches
+   */
+  def multiSwitchKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
+    lazy val context = modelContext
+    (key, _, _) =>
+      if (!key.shortAlias) classifySwitchKey(context, key)
+      else {
+        val switches = key.key.map { c =>
+          val switchKey = ParameterKey(c.toString, shortAlias = true)
+          val switchValue = getModelContextAttribute(modelContext, switchKey, ParameterModel.AttrSwitchValue,
+            "true")
+          (switchKey, switchValue)
+        }.toList
+        Some(SwitchesElement(switches))
+      }
   }
 
   /**
@@ -451,6 +475,22 @@ object ParameterParser {
       .map(_.flatten)
 
   /**
+   * Implements the classification for switches based on the key. Checks
+   * whether the parameter with this key references a switch. If so, a
+   * corresponding element is returned.
+   *
+   * @param context the model context
+   * @param key     the key of the switch
+   * @return an ''Option'' with the classified ''SwitchesElement''
+   */
+  private def classifySwitchKey(context: => ModelContext, key: ParameterKey): Option[SwitchesElement] =
+    if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
+      ParameterModel.ParameterTypeSwitch) == ParameterModel.ParameterTypeSwitch)
+      Some(SwitchesElement(List((key,
+        getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
+    else None
+
+  /**
    * Fetches a specific attribute from a ''ModelContext'' for a given parameter
    * key. If the key or the attribute cannot be found, the default value is
    * returned. Note that unknown keys typically do not lead to failures in this
@@ -462,8 +502,11 @@ object ParameterParser {
    * @param default the default value to use
    * @return the value of this attribute (or the default)
    */
-  private def getModelContextAttribute(context: ModelContext, key: ParameterKey, attr: String, default: String): String =
-    context.options.get(key)
+  private def getModelContextAttribute(context: ModelContext, key: ParameterKey, attr: String, default: String):
+  String = {
+    val resolvedKey = context.aliasMapping.keyForAlias.getOrElse(key, key)
+    context.options.get(resolvedKey)
       .flatMap(_.attributes.get(attr))
       .getOrElse(default)
+  }
 }

@@ -47,6 +47,9 @@ object ParameterParserSpec {
   /** Test value of the test parameter. */
   private val TestValue = "testValue"
 
+  /** An alias key for the test parameter. */
+  private val AliasKey = ParameterKey("k", shortAlias = true)
+
   /** A resolver function for aliases that never resolves an alias. */
   private val NoAliasResolverFunc: AliasResolverFunc = _ => None
 
@@ -89,7 +92,8 @@ object ParameterParserSpec {
    */
   private def createModelContext(attributes: Map[String, String]): ModelContext = {
     val optionAttributes = Map(TestKey -> ParameterAttributes(attributes))
-    new ModelContext(optionAttributes, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
+    val aliasMapping = ParameterModel.EmptyAliasMapping.addAlias(TestKey, AliasKey)
+    new ModelContext(optionAttributes, SortedSet.empty, aliasMapping, None, Nil)
   }
 }
 
@@ -636,5 +640,38 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
+  }
+
+  it should "handle aliases when accessing metadata during classification" in {
+    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
+      ParameterModel.AttrSwitchValue -> "false"))
+
+    val classifier = ParameterParser.switchKeyClassifierFunc(context)
+    classifier(AliasKey, Nil, 0) should be(Some(SwitchesElement(List((AliasKey, "false")))))
+  }
+
+  it should "provide a multi key classifier for switches that handles long switch keys" in {
+    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
+      ParameterModel.AttrSwitchValue -> "true"))
+
+    val classifier = ParameterParser.multiSwitchKeyClassifierFunc(context)
+    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
+  }
+
+  it should "provide a multi key classifier for switches that handles long keys for non-switches" in {
+    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
+
+    val classifier = ParameterParser.multiSwitchKeyClassifierFunc(context)
+    classifier(TestKey, Nil, 0) should be(None)
+  }
+
+  it should "provide a multi key classifier for switches that extracts multiple keys" in {
+    val AliasKey2 = ParameterKey("x", shortAlias = true)
+    val multiKey = ParameterKey(AliasKey.key + AliasKey2.key, shortAlias = true)
+    val expElement = SwitchesElement(List((AliasKey, "false"), (AliasKey2, "true")))
+    val context = createModelContext(Map(ParameterModel.AttrSwitchValue -> "false"))
+
+    val classifier = ParameterParser.multiSwitchKeyClassifierFunc(context)
+    classifier(multiKey, Nil, 0) should be(Some(expElement))
   }
 }
