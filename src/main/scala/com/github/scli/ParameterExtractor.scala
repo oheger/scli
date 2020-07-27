@@ -617,6 +617,30 @@ object ParameterExtractor {
   }
 
   /**
+   * A helper class providing additional functionality to all types of
+   * ''CliExtractor'' objects.
+   *
+   * The functionality offered by this class is independent on the value type
+   * the extractor operates on.
+   *
+   * @param ext the ''CliExtractor'' decorated by this class
+   * @tparam A the result type of the ''CliExtractor''
+   */
+  class CliExtractorOps[A](ext: CliExtractor[A]) {
+    /**
+     * Defines an alias name for the managed ''CliExtractor''. Typically, with
+     * this function a short name for an option or switch can be defined. It
+     * is, however, possible as well to define another long parameter key.
+     *
+     * @param alias      the alternative name for the current parameter key
+     * @param shortAlias a flag whether this is a short alias name
+     * @return the ''CliExtractor'' with this alias name
+     */
+    def alias(alias: String, shortAlias: Boolean = true): CliExtractor[A] =
+      withAlias(ext, alias, shortAlias)
+  }
+
+  /**
    * An implicit conversion to create a ''Parameters'' object from a map of
    * parsed command line options.
    *
@@ -668,6 +692,17 @@ object ParameterExtractor {
    */
   implicit def toSingleOps[A](ext: CliExtractor[SingleOptionValue[A]]): CliExtractorSingleOps[A] =
     new CliExtractorSingleOps(ext)
+
+  /**
+   * An implicit conversion function to decorate a ''CliExtractor'' (of an
+   * arbitrary type) with a ''CliExtractorOps'' object.
+   *
+   * @param ext the extractor to be decorated
+   * @tparam A the result type of the extractor
+   * @return the ''CliExtractorOps'' object decorating this extractor
+   */
+  implicit def toExtractorOps[A](ext: CliExtractor[A]): CliExtractorOps[A] =
+    new CliExtractorOps(ext)
 
   /**
    * Returns an option value of the given type that does not contain any data.

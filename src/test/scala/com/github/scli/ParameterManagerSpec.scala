@@ -245,12 +245,16 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "handle aliases" in {
-    val Alias = "o"
-    val args = List("-" + Alias, TestOptionValue)
-    val extractor = ParameterExtractor.withAlias(ParameterExtractor.optionValue(TestOptionKey), Alias)
+    val AliasShort = "o"
+    val AliasLong = "alternative-option-key"
+    val AliasValue = "anotherValue"
+    val args = List("-" + AliasShort, TestOptionValue, "--" + AliasLong, AliasValue)
+    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey)
+      .alias(AliasShort)
+      .alias(AliasLong, shortAlias = false)
 
     val (res, _) = triedResult(ParameterManager.processCommandLine(args, extractor))
-    res should be(Some(TestOptionValue))
+    res.toList should contain theSameElementsInOrderAs List(TestOptionValue, AliasValue)
   }
 
   it should "detect an alias using an incorrect prefix" in {
