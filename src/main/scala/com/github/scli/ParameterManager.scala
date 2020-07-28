@@ -81,7 +81,8 @@ object ParameterManager {
    */
   def defaultExtractedKeyClassifiers(extractorCtx: ExtractorContext[_]): List[ExtractedKeyClassifierFunc] = {
     List(ParameterParser.optionKeyClassifierFunc(extractorCtx.modelContext),
-      ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext))
+      ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext),
+      classifyUnknownOption)
   }
 
   /**
@@ -269,6 +270,23 @@ object ParameterManager {
     val newContext = context.copy(modelContext = helpContext)
     val newFailures = failures.map(_.copy(context = newContext))
     ParameterExtractionException(newFailures)
+  }
+
+  /**
+   * Function used as ''ExtractedKeyClassifierFunc'' for unknown options or
+   * switches. This function returns a defined result, although the parameter
+   * key is unknown. That this parameter is unsupported will be discovered
+   * later in the extraction phase.
+   *
+   * @param key   the current key
+   * @param args  the sequence with arguments
+   * @param index the current parameter index
+   * @return an ''Option'' with the element identified
+   */
+  private def classifyUnknownOption(key: ParameterKey, args: Seq[String], index: Int): Option[CliElement] = {
+    val elem = if (index >= args.size - 1) SwitchesElement(List((key, "true")))
+    else OptionElement(key, Some(args(index + 1)))
+    Some(elem)
   }
 
   /**

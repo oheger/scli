@@ -128,6 +128,14 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures.head.key should be(pk("foo"))
   }
 
+  it should "check for unconsumed parameters at the end of the command line" in {
+    val args = List("--" + TestOptionKey, TestOptionValue, "--foo")
+
+    val exception = failedResult(ParameterManager.processCommandLine(args, TestExtractor))
+    exception.failures should have size 1
+    exception.failures.head.key should be(pk("foo"))
+  }
+
   it should "handle a failed extractor" in {
     val args = List("--" + TestOptionKey, TestOptionValue)
     val extractor = ParameterExtractor.multiOptionValue(TestOptionKey)

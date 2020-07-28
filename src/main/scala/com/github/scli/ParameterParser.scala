@@ -279,7 +279,7 @@ object ParameterParser {
     lazy val context = modelContext
     (key, args, idx) =>
       if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
-        ParameterModel.ParameterTypeOption) == ParameterModel.ParameterTypeOption) {
+        ParameterModel.ParameterTypeSwitch) == ParameterModel.ParameterTypeOption) {
         val value = args.lift(idx + 1)
         Some(OptionElement(key, value))
       }
@@ -485,7 +485,7 @@ object ParameterParser {
    */
   private def classifySwitchKey(context: => ModelContext, key: ParameterKey): Option[SwitchesElement] =
     if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
-      ParameterModel.ParameterTypeSwitch) == ParameterModel.ParameterTypeSwitch)
+      ParameterModel.ParameterTypeOption) == ParameterModel.ParameterTypeSwitch)
       Some(SwitchesElement(List((key,
         getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
     else None
@@ -493,8 +493,7 @@ object ParameterParser {
   /**
    * Fetches a specific attribute from a ''ModelContext'' for a given parameter
    * key. If the key or the attribute cannot be found, the default value is
-   * returned. Note that unknown keys typically do not lead to failures in this
-   * phase; they are detected later after all extractions have been done.
+   * returned.
    *
    * @param context the ''ModelContext''
    * @param key     the key of the parameter in question

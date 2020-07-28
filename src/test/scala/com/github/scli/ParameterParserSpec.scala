@@ -592,7 +592,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(Map(ParameterModel.AttrGroup -> "someGroup"))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)
-    classifier(TestKey, args, 1) should be(Some(OptionElement(TestKey, Some(TestValue))))
+    classifier(TestKey, args, 1) should be(None)
   }
 
   it should "provide a key classifier for options that handles an unknown parameter key" in {
@@ -601,7 +601,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)
-    classifier(UnknownKey, args, 1) should be(Some(OptionElement(UnknownKey, Some(TestValue))))
+    classifier(UnknownKey, args, 1) should be(None)
   }
 
   it should "provide a key classifier for options that handles a missing option value" in {
@@ -635,8 +635,15 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     classifier(TestKey, Nil, 0) should be(None)
   }
 
-  it should "provide a key classifier for switches that deals with missing attributes" in {
+  it should "provide a key classifier for switches that handles an unknown parameter key" in {
     val context = createModelContext(Map.empty)
+
+    val classifier = ParameterParser.switchKeyClassifierFunc(context)
+    classifier(TestKey, Nil, 0) should be(None)
+  }
+
+  it should "provide a key classifier for switches that handles a missing switch value attribute" in {
+    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch))
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
