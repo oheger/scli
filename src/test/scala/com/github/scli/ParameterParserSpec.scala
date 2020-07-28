@@ -661,14 +661,14 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
       ParameterModel.AttrSwitchValue -> "true"))
 
-    val classifier = ParameterParser.multiSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
+    val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
   }
 
   it should "provide a multi key classifier for switches that handles long keys for non-switches" in {
     val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
 
-    val classifier = ParameterParser.multiSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
+    val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(None)
   }
 
@@ -678,7 +678,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val expElement = SwitchesElement(List((AliasKey, "false"), (AliasKey2, "true")))
     val context = createModelContext(Map(ParameterModel.AttrSwitchValue -> "false"))
 
-    val classifier = ParameterParser.multiSwitchKeyClassifierFunc(context)(context.aliasMapping.keyForAlias.get)
+    val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(context.aliasMapping.keyForAlias.get)
     classifier(multiKey, Nil, 0) should be(Some(expElement))
   }
 }

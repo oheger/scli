@@ -318,7 +318,7 @@ object ParameterParser {
    * @param resolverFunc function to resolve alias keys
    * @return the key classifier function for multiple switches
    */
-  def multiSwitchKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
+  def combinedSwitchKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
   ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, _, _) =>

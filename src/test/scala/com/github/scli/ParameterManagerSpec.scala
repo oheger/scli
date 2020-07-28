@@ -274,4 +274,35 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures should have size 1
     exception.failures.head.key should be(ParameterKey(Alias, shortAlias = false))
   }
+
+  it should "support combined single-letter switches" in {
+    val args = List("-dv")
+    val extVerbose = ParameterExtractor.switchValue("verbose").alias("v")
+    val extDebug = ParameterExtractor.switchValue("debug").alias("d")
+    val extractor = for {
+      verbose <- extVerbose
+      debug <- extDebug
+    } yield (verbose, debug)
+    val extCtx = ExtractorContext(ParameterManager.wrapTryExtractor(extractor))
+
+    val classifierFunc = ParameterManager.defaultClassifierFunc(extCtx, supportCombinedSwitches = true)
+    val parser = ParameterManager.parsingFunc(extCtx, classifierFunc = classifierFunc)
+    val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extCtx, parser = parser))
+    res should be((Success(true), Success(true)))
+  }
+
+  it should "disable combined single-letter switches per default" in {
+    val args = List("-dv")
+    val extVerbose = ParameterExtractor.switchValue("verbose").alias("v")
+    val extDebug = ParameterExtractor.switchValue("debug").alias("d")
+    val extractor = for {
+      verbose <- extVerbose
+      debug <- extDebug
+    } yield (verbose, debug)
+    val extCtx = ExtractorContext(ParameterManager.wrapTryExtractor(extractor))
+
+    val exception = failedResult(ParameterManager.processCommandLineCtx(args, extCtx))
+    exception.failures should have size 1
+    exception.failures.head.key should be(ParameterKey("dv", shortAlias = true))
+  }
 }

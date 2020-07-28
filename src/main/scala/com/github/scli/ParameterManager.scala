@@ -76,13 +76,19 @@ object ParameterManager {
    * access to a ''ModelContext''. This is obtained from the
    * ''ExtractorContext'' provided.
    *
-   * @param extractorCtx the context wrapping the current extractor
+   * @param extractorCtx            the context wrapping the current extractor
+   * @param supportCombinedSwitches flag whether combined switches are
+   *                                supported
    * @return a list with standard ''ExtractedKeyClassifierFunc'' functions
    */
-  def defaultExtractedKeyClassifiers(extractorCtx: ExtractorContext[_]): List[ExtractedKeyClassifierFunc] = {
+  def defaultExtractedKeyClassifiers(extractorCtx: ExtractorContext[_], supportCombinedSwitches: Boolean = false):
+  List[ExtractedKeyClassifierFunc] = {
     lazy val resolverFunc = getAliasResolverFunc(extractorCtx)
+    val switchClassifier = if (supportCombinedSwitches)
+      ParameterParser.combinedSwitchKeyClassifierFunc(extractorCtx.modelContext)(resolverFunc)
+    else ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext)(resolverFunc)
     List(ParameterParser.optionKeyClassifierFunc(extractorCtx.modelContext)(resolverFunc),
-      ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext)(resolverFunc),
+      switchClassifier,
       classifyUnknownOption)
   }
 
@@ -101,14 +107,20 @@ object ParameterManager {
    * Returns a default ''CliClassifierFunc'' for the execution of the
    * ''CliExtractor'' provided. This function makes use of the default
    * ''ExtractedKeyClassifierFunc'' functions and uses the default prefixes for
-   * options and switches.
+   * options and switches. For the processing of switches, a mode can be
+   * enabled in which multiple single-letter aliases can be combined in a
+   * single parameter; so for instance, the parameter ''-cvfz'' is interpreted
+   * as the four switches ''c'', ''v'', ''f'', and ''z''.
    *
-   * @param extractorCtx the context wrapping the current extractor
+   * @param extractorCtx            the context wrapping the current extractor
+   * @param supportCombinedSwitches flag whether combined switches are
+   *                                supported
    * @return the default ''CliClassifierFunc'' for this extractor
    */
-  def defaultClassifierFunc(extractorCtx: ExtractorContext[_]): CliClassifierFunc =
-    ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractorCtx): _*)(defaultKeyExtractor(
-      ParameterParser.DefaultOptionPrefixes))
+  def defaultClassifierFunc(extractorCtx: ExtractorContext[_], supportCombinedSwitches: Boolean = false):
+  CliClassifierFunc =
+    ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractorCtx,
+      supportCombinedSwitches): _*)(defaultKeyExtractor(ParameterParser.DefaultOptionPrefixes))
 
   /**
    * Returns a ''ParsingFunc'' that is configured with the parameters
