@@ -80,8 +80,9 @@ object ParameterManager {
    * @return a list with standard ''ExtractedKeyClassifierFunc'' functions
    */
   def defaultExtractedKeyClassifiers(extractorCtx: ExtractorContext[_]): List[ExtractedKeyClassifierFunc] = {
-    List(ParameterParser.optionKeyClassifierFunc(extractorCtx.modelContext),
-      ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext),
+    lazy val resolverFunc = getAliasResolverFunc(extractorCtx)
+    List(ParameterParser.optionKeyClassifierFunc(extractorCtx.modelContext)(resolverFunc),
+      ParameterParser.switchKeyClassifierFunc(extractorCtx.modelContext)(resolverFunc),
       classifyUnknownOption)
   }
 
@@ -122,7 +123,7 @@ object ParameterManager {
   def parsingFunc(extractorCtx: ExtractorContext[_], classifierFunc: CliClassifierFunc = null,
                   optFileOption: Option[String] = None): ParsingFunc = {
     val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractorCtx))
-    lazy val aliasResolverFunc: AliasResolverFunc = extractorCtx.modelContext.aliasMapping.keyForAlias.get
+    lazy val aliasResolverFunc: AliasResolverFunc = getAliasResolverFunc(extractorCtx)
     args =>
       ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)(aliasResolverFunc)
   }
@@ -288,6 +289,16 @@ object ParameterManager {
     else OptionElement(key, Some(args(index + 1)))
     Some(elem)
   }
+
+  /**
+   * Returns an ''AliasResolverFunc'' that is based on the alias mapping
+   * obtained from the ''ExtractorContext'' provided.
+   *
+   * @param extractorCtx the ''ExtractorContext''
+   * @return the function to resolve alias keys
+   */
+  private def getAliasResolverFunc(extractorCtx: ExtractorContext[_]): AliasResolverFunc =
+    extractorCtx.modelContext.aliasMapping.keyForAlias.get
 
   /**
    * Helper function to replace a '''null''' value by a default value.

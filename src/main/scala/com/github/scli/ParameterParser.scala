@@ -273,13 +273,15 @@ object ParameterParser {
    * corresponding result is returned.
    *
    * @param modelContext the model context
+   * @param resolverFunc function to resolve alias keys
    * @return the key classifier function for options
    */
-  def optionKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
+  def optionKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
+  ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, args, idx) =>
       if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
-        ParameterModel.ParameterTypeSwitch) == ParameterModel.ParameterTypeOption) {
+        ParameterModel.ParameterTypeSwitch)(resolverFunc) == ParameterModel.ParameterTypeOption) {
         val value = args.lift(idx + 1)
         Some(OptionElement(key, value))
       }
@@ -292,12 +294,14 @@ object ParameterParser {
    * a corresponding result is returned.
    *
    * @param modelContext the model context
+   * @param resolverFunc function to resolve alias keys
    * @return the key classifier function for switches
    */
-  def switchKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
+  def switchKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
+  ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, _, _) =>
-      classifySwitchKey(context, key)
+      classifySwitchKey(context, key)(resolverFunc)
   }
 
   /**
@@ -311,17 +315,19 @@ object ParameterParser {
    * a check for option elements.
    *
    * @param modelContext the model context
+   * @param resolverFunc function to resolve alias keys
    * @return the key classifier function for multiple switches
    */
-  def multiSwitchKeyClassifierFunc(modelContext: => ModelContext): ExtractedKeyClassifierFunc = {
+  def multiSwitchKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
+  ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
     (key, _, _) =>
-      if (!key.shortAlias) classifySwitchKey(context, key)
+      if (!key.shortAlias) classifySwitchKey(context, key)(resolverFunc)
       else {
         val switches = key.key.map { c =>
           val switchKey = ParameterKey(c.toString, shortAlias = true)
           val switchValue = getModelContextAttribute(modelContext, switchKey, ParameterModel.AttrSwitchValue,
-            "true")
+            "true")(resolverFunc)
           (switchKey, switchValue)
         }.toList
         Some(SwitchesElement(switches))
@@ -360,9 +366,6 @@ object ParameterParser {
       argMap + (key -> (optValues :+ value))
     }
 
-    def resolveAlias(key: ParameterKey): ParameterKey =
-      aliasResolverFunc(key) getOrElse key
-
     @tailrec def doParseParameters(argList: Seq[String], index: Int, argsMap: InternalParamMap): InternalParamMap =
       if (index >= argList.size) argsMap
       else classifierFunc(argList, index) match {
@@ -370,12 +373,13 @@ object ParameterParser {
           doParseParameters(argList, index + 1, appendOptionValue(argsMap, InputOption, value))
 
         case OptionElement(key, optValue) =>
-          val nextArgsMap = optValue.fold(argsMap)(value => appendOptionValue(argsMap, resolveAlias(key), value))
+          val nextArgsMap = optValue.fold(argsMap)(value => appendOptionValue(argsMap,
+            resolveAlias(key)(aliasResolverFunc), value))
           doParseParameters(argList, index + 2, nextArgsMap)
 
         case SwitchesElement(switches) =>
           val nextArgsMap = switches.foldLeft(argsMap) { (map, t) =>
-            appendOptionValue(map, resolveAlias(t._1), t._2)
+            appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), t._2)
           }
           doParseParameters(argList, index + 1, nextArgsMap)
       }
@@ -479,15 +483,17 @@ object ParameterParser {
    * whether the parameter with this key references a switch. If so, a
    * corresponding element is returned.
    *
-   * @param context the model context
-   * @param key     the key of the switch
+   * @param context      the model context
+   * @param key          the key of the switch
+   * @param resolverFunc function to resolve alias keys
    * @return an ''Option'' with the classified ''SwitchesElement''
    */
-  private def classifySwitchKey(context: => ModelContext, key: ParameterKey): Option[SwitchesElement] =
+  private def classifySwitchKey(context: => ModelContext, key: ParameterKey)(resolverFunc: AliasResolverFunc):
+  Option[SwitchesElement] =
     if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
-      ParameterModel.ParameterTypeOption) == ParameterModel.ParameterTypeSwitch)
+      ParameterModel.ParameterTypeOption)(resolverFunc) == ParameterModel.ParameterTypeSwitch)
       Some(SwitchesElement(List((key,
-        getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")))))
+        getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")(resolverFunc)))))
     else None
 
   /**
@@ -495,17 +501,29 @@ object ParameterParser {
    * key. If the key or the attribute cannot be found, the default value is
    * returned.
    *
-   * @param context the ''ModelContext''
-   * @param key     the key of the parameter in question
-   * @param attr    the desired attribute
-   * @param default the default value to use
+   * @param context      the ''ModelContext''
+   * @param key          the key of the parameter in question
+   * @param attr         the desired attribute
+   * @param default      the default value to use
+   * @param resolverFunc function to resolve alias keys
    * @return the value of this attribute (or the default)
    */
-  private def getModelContextAttribute(context: ModelContext, key: ParameterKey, attr: String, default: String):
-  String = {
-    val resolvedKey = context.aliasMapping.keyForAlias.getOrElse(key, key)
+  private def getModelContextAttribute(context: ModelContext, key: ParameterKey, attr: String, default: String)
+                                      (resolverFunc: AliasResolverFunc): String = {
+    val resolvedKey = resolveAlias(key)(resolverFunc)
     context.options.get(resolvedKey)
       .flatMap(_.attributes.get(attr))
       .getOrElse(default)
   }
+
+  /**
+   * Resolves a potential parameter alias using the resolver function
+   * specified. If no alias can be resolved, the key is returned as is.
+   *
+   * @param key          the key to be resolved
+   * @param resolverFunc function to resolve alias keys
+   * @return the resolved key
+   */
+  private def resolveAlias(key: ParameterKey)(resolverFunc: AliasResolverFunc): ParameterKey =
+    resolverFunc(key) getOrElse key
 }
