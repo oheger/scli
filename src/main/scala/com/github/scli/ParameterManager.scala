@@ -137,7 +137,7 @@ object ParameterManager {
     val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractorCtx))
     lazy val aliasResolverFunc: AliasResolverFunc = getAliasResolverFunc(extractorCtx)
     args =>
-      ParameterParser.parseParameters(args, optFileOption)(theClassifierFunc)(aliasResolverFunc)
+      Success(ParameterParser.parseParameters(args)(theClassifierFunc)(aliasResolverFunc))
   }
 
   /**

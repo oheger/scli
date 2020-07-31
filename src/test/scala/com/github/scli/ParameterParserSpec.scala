@@ -234,41 +234,15 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     }
 
   /**
-   * Extracts the map with parameters from the given tried result; fails for
-   * other results.
-   *
-   * @param result the result
-   * @return the map with parameters
-   */
-  private def extractParametersMap(result: Try[ParameterParser.ParametersMap]): ParameterParser.ParametersMap =
-    result match {
-      case Success(value) => value
-      case r => fail("Unexpected result: " + r)
-    }
-
-  /**
    * Invokes the parameter parser on the given sequence with arguments ignoring
-   * aliases and  expects a successful result. The resulting map is returned.
+   * aliases and returns the result.
    *
    * @param args the sequence with arguments
    * @param cf   the classifier function
    * @return the resulting parameters map
    */
   private def parseParametersSuccess(args: Seq[String])(cf: CliClassifierFunc): ParametersMap =
-    parseParametersWithAliasesSuccess(args)(cf)(NoAliasResolverFunc)
-
-  /**
-   * Invokes the parameter parser on the given sequence with arguments and
-   * expects a successful result. The resulting map is returned.
-   *
-   * @param args the sequence with arguments
-   * @param cf   the classifier function
-   * @param af   the alias resolver function
-   * @return the resulting parameters map
-   */
-  private def parseParametersWithAliasesSuccess(args: Seq[String])(cf: CliClassifierFunc)(af: AliasResolverFunc):
-  ParametersMap =
-    extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf)(af))
+    ParameterParser.parseParameters(args)(cf)(NoAliasResolverFunc)
 
   /**
    * Invokes the parameter parser to resolve file options on the given sequence
@@ -469,7 +443,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val cf = classifierFunc(args, elements)
     val expArgsMap = Map(TestKey -> List(TestValue, AliasValue))
 
-    val params = parseParametersWithAliasesSuccess(args)(cf) { key =>
+    val params = ParameterParser.parseParameters(args)(cf) { key =>
       if (key == AliasKey) Some(TestKey)
       else None
     }
@@ -486,7 +460,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val AliasMapping = Map(AliasKey -> TestKey, AliasKey2 -> Key2)
     val expArgsMap = Map(TestKey -> List("true"), Key2 -> List("false"))
 
-    val params = parseParametersWithAliasesSuccess(args)(cf)(AliasMapping.get)
+    val params = ParameterParser.parseParameters(args)(cf)(AliasMapping.get)
     params should be(expArgsMap)
   }
 

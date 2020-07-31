@@ -415,99 +415,46 @@ object ParameterParser {
   }
 
   /**
-   * Parses the command line arguments and tries to convert them into a map
-   * keyed by options. The parsing operation can be customized by specifying
-   * some properties, especially a ''CliClassifierFunc''. This function is
-   * invoked for each argument, and - based on its result - the parameter is
-   * added to the result produced by this function.
-   *
-   * The parsing operation normally succeeds, even if invalid parameters are
-   * passed in; this is detected and handled later in the extraction phase.
-   * The only exception that can occur is that a parameter file cannot be
-   * read (which can happen only if a name for the file option is provided).
-   * So if the ''Try'' returned by this function fails, the exception is of
-   * type [[ParameterParseException]] and contains further information about
-   * the failed read operation.
+   * Parses the command line arguments and converts them into a map keyed by
+   * options. The parsing operation can be customized by specifying some
+   * properties, especially a ''CliClassifierFunc''. This function is invoked
+   * for each argument, and - based on its result - the parameter is added to
+   * the result produced by this function. Note that the parsing operation
+   * always succeeds, even if invalid parameters are passed in; this is
+   * detected and handled later in the extraction phase.
    *
    * @param args              the sequence with command line arguments
-   * @param optFileOption     optional name for an option to reference parameter
-   *                          files; if defined, such files are read, and their
-   *                          content is added to the command line
    * @param classifierFunc    a function to classify parameters
    * @param aliasResolverFunc a function to resolve aliases
    * @return a ''Try'' with the parsed map of arguments
    */
-  def parseParameters(args: Seq[String], optFileOption: Option[String] = None)
+  def parseParameters(args: Seq[String])
                      (classifierFunc: CliClassifierFunc)
-                     (aliasResolverFunc: AliasResolverFunc): Try[ParametersMap] = {
+                     (aliasResolverFunc: AliasResolverFunc): ParametersMap = {
     def appendOptionValue(argMap: InternalParamMap, key: ParameterKey, value: String):
     InternalParamMap = {
       val optValues = argMap.getOrElse(key, List.empty)
       argMap + (key -> (optValues :+ value))
     }
 
-    @tailrec def doParseParameters(argList: Seq[String], index: Int, argsMap: InternalParamMap): InternalParamMap =
-      if (index >= argList.size) argsMap
-      else classifierFunc(argList, index) match {
-        case InputParameterElement(value) =>
-          doParseParameters(argList, index + 1, appendOptionValue(argsMap, InputOption, value))
+    classify(args)(classifierFunc)
+      .reverse
+      .foldLeft(Map.empty[ParameterKey, List[String]]) { (argsMap, elem) =>
+        elem._2 match {
+          case InputParameterElement(value) =>
+            appendOptionValue(argsMap, InputOption, value)
 
-        case OptionElement(key, optValue) =>
-          val nextArgsMap = optValue.fold(argsMap)(value => appendOptionValue(argsMap,
-            resolveAlias(key)(aliasResolverFunc), value))
-          doParseParameters(argList, index + 2, nextArgsMap)
+          case OptionElement(key, optValue) =>
+            optValue.fold(argsMap)(value => appendOptionValue(argsMap,
+              resolveAlias(key)(aliasResolverFunc), value))
 
-        case SwitchesElement(switches) =>
-          val nextArgsMap = switches.foldLeft(argsMap) { (map, t) =>
-            appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), t._2)
-          }
-          doParseParameters(argList, index + 1, nextArgsMap)
+          case SwitchesElement(switches) =>
+            switches.foldLeft(argsMap) { (map, t) =>
+              appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), t._2)
+            }
+        }
       }
-
-    def parseParameterSeq(argList: Seq[String]): InternalParamMap =
-      doParseParameters(argList, 0, Map.empty)
-
-    def parseParametersWithFiles(argList: Seq[String], currentParams: InternalParamMap,
-                                 processedFiles: Set[String]): Try[InternalParamMap] = Try {
-      combineParameterMaps(currentParams, parseParameterSeq(argList))
-    } flatMap { argMap =>
-      optFileOption match {
-        case Some(fileOption) =>
-          //TODO use correct ParameterKey for file option
-          val fileOptionKey = ParameterKey(fileOption, shortAlias = false)
-          argMap get fileOptionKey match {
-            case None =>
-              Success(argMap)
-            case Some(files) =>
-              val nextArgs = argMap - fileOptionKey
-              val filesToRead = files.toSet diff processedFiles
-              readAllParameterFiles(filesToRead.toList, fileOption, nextArgs) flatMap { argList =>
-                parseParametersWithFiles(argList, nextArgs, processedFiles ++ filesToRead)
-              }
-          }
-
-        case None =>
-          Success(argMap)
-      }
-    }
-
-    parseParametersWithFiles(args.toList, Map.empty, Set.empty)
   }
-
-
-  /**
-   * Creates a combined parameter map from the given source maps. The lists
-   * with the values of parameter options need to be concatenated.
-   *
-   * @param m1 the first map
-   * @param m2 the second map
-   * @return the combined map
-   */
-  private def combineParameterMaps(m1: InternalParamMap, m2: InternalParamMap): InternalParamMap =
-    m2.foldLeft(m1) { (resMap, e) =>
-      val values = resMap.getOrElse(e._1, List.empty)
-      resMap + (e._1 -> (e._2 ::: values))
-    }
 
   /**
    * Reads a file with parameters and returns its single lines
@@ -524,25 +471,6 @@ object ParameterParser {
   }
 
   /**
-   * Reads all parameter files referenced by the provided list. The arguments
-   * they contain are combined to a single sequence of strings. If a read
-   * operation fails, the resulting ''Try'' fails with a meaningful exception.
-   *
-   * @param files             list with the files to be read
-   * @param fileOption        the name of the option referencing files
-   * @param currentParameters the parameters parsed so far
-   * @return a ''Try'' with the result of the combined read operation
-   */
-  private def readAllParameterFiles(files: List[String], fileOption: String, currentParameters: ParametersMap):
-  Try[List[String]] = {
-    val triedReads = files map (path => (path, readParameterFile(path)))
-    val optError = triedReads.find(_._2.isFailure)
-    optError.fold(convertSuccessReads(triedReads)) { t =>
-      handleParameterFileException(t._2, ParameterKey(fileOption, shortAlias = false), t._1)
-    }
-  }
-
-  /**
    * Generates a meaningful exception when reading of a parameter file fails.
    *
    * @param readResult    the result of the read operation
@@ -556,18 +484,6 @@ object ParameterParser {
       case e: Exception =>
         Failure(new ParameterParseException(s"Failed to load parameter file $file", e, fileOptionKey))
     }
-
-  /**
-   * Converts the list with tried reads to the final result, a ''Try'' of a
-   * list of arguments. This function is called if all parameter files could
-   * be read successfully.
-   *
-   * @param triedReads the list with tried reads and file names
-   * @return the resulting ''Try'' with a list of arguments
-   */
-  private def convertSuccessReads(triedReads: List[(String, Try[List[String]])]): Try[List[String]] =
-    Try(triedReads.map(_._2.get))
-      .map(_.flatten)
 
   /**
    * Implements the classification for switches based on the key. Checks
