@@ -37,10 +37,10 @@ object ParameterManager {
   /**
    * Type definition for a function that does the initial parsing of the
    * command line arguments. The function expects the sequence of arguments as
-   * input and tries to categorize the single elements into input arguments,
-   * options, and their values.
+   * input and categorizes the single elements into input arguments, options,
+   * and their values. The resulting map with parameters is returned.
    */
-  type ParsingFunc = Seq[String] => Try[ParametersMap]
+  type ParsingFunc = Seq[String] => ParametersMap
 
   /**
    * A data class wrapping a ''CliExtractor'' and providing (lazy) access to
@@ -96,12 +96,14 @@ object ParameterManager {
    * Returns a ''KeyExtractorFunc'' that is based on the given
    * ''OptionPrefixes'' object. The function detects keys of options or
    * switches starting with one of the prefix configured in the
-   * ''OptionPrefixes'' object.
+   * ''OptionPrefixes'' object. If no prefixes are provided, the default ones
+   * defined by [[ParameterParser.DefaultOptionPrefixes]] are used.
    *
    * @param prefixes the object with supported prefixes
    * @return a function to extract keys for options or switches
    */
-  def defaultKeyExtractor(prefixes: OptionPrefixes): KeyExtractorFunc = prefixes.tryExtract
+  def defaultKeyExtractor(prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes): KeyExtractorFunc =
+    prefixes.tryExtract
 
   /**
    * Returns a default ''CliClassifierFunc'' for the execution of the
@@ -113,31 +115,46 @@ object ParameterManager {
    * as the four switches ''c'', ''v'', ''f'', and ''z''.
    *
    * @param extractorCtx            the context wrapping the current extractor
+   * @param prefixes                the object defining prefixes for options
    * @param supportCombinedSwitches flag whether combined switches are
    *                                supported
    * @return the default ''CliClassifierFunc'' for this extractor
    */
-  def defaultClassifierFunc(extractorCtx: ExtractorContext[_], supportCombinedSwitches: Boolean = false):
-  CliClassifierFunc =
+  def classifierFunc(extractorCtx: ExtractorContext[_],
+                     prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes,
+                     supportCombinedSwitches: Boolean = false): CliClassifierFunc =
     ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractorCtx,
-      supportCombinedSwitches): _*)(defaultKeyExtractor(ParameterParser.DefaultOptionPrefixes))
+      supportCombinedSwitches): _*)(defaultKeyExtractor(prefixes))
 
   /**
-   * Returns a ''ParsingFunc'' that is configured with the parameters
-   * provided. For missing parameters, meaningful default values are used.
+   * Returns a ''ParsingFunc'' that is configured with the parameters provided.
+   * Using this function makes it easy to customize special properties of the
+   * parsing process, such as the prefixes used to identify options. For
+   * missing parameters default values are used.
    *
-   * @param extractorCtx   the context wrapping the current extractor
-   * @param classifierFunc the function to classify command line elements
-   * @param optFileOption  optional name of an option to read command line
-   *                       files
+   * @param extractorCtx            the context wrapping the current extractor
+   * @param prefixes                the object defining prefixes for options
+   * @param supportCombinedSwitches flag whether combined switches are
+   *                                supported
    * @return the configured parsing function
    */
-  def parsingFunc(extractorCtx: ExtractorContext[_], classifierFunc: CliClassifierFunc = null,
-                  optFileOption: Option[String] = None): ParsingFunc = {
-    val theClassifierFunc = getOrDefault(classifierFunc, defaultClassifierFunc(extractorCtx))
+  def parsingFunc(extractorCtx: ExtractorContext[_],
+                  prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes,
+                  supportCombinedSwitches: Boolean = false): ParsingFunc =
+    parsingFuncForClassifier(extractorCtx)(classifierFunc(extractorCtx, prefixes, supportCombinedSwitches))
+
+  /**
+   * Returns a ''ParsingFunc'' that is configured with the
+   * ''CliClassifierFunc'' provided.
+   *
+   * @param extractorCtx the context wrapping the current extractor
+   * @param cf           the function to classify command line elements
+   * @return the configured parsing function
+   */
+  def parsingFuncForClassifier(extractorCtx: ExtractorContext[_])(cf: CliClassifierFunc): ParsingFunc = {
     lazy val aliasResolverFunc: AliasResolverFunc = getAliasResolverFunc(extractorCtx)
     args =>
-      Success(ParameterParser.parseParameters(args)(theClassifierFunc)(aliasResolverFunc))
+      ParameterParser.parseParameters(args)(cf)(aliasResolverFunc)
   }
 
   /**
@@ -201,27 +218,67 @@ object ParameterManager {
   def processCommandLineCtx[A](args: Seq[String], extractorCtx: ExtractorContext[Try[A]], parser: ParsingFunc = null,
                                checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] = {
     val theParsingFunc = getOrDefault(parser, parsingFunc(extractorCtx))
-    for {
-      parsedArgs <- parse(args, extractorCtx.extractor, theParsingFunc)
-      extResult <- extract(parsedArgs, extractorCtx.extractor, checkUnconsumedParameters)
-    } yield extResult
+    extract(theParsingFunc(args), extractorCtx.extractor, checkUnconsumedParameters)
   }
 
   /**
-   * Implements the parsing step of parameter processing. This function
-   * invokes the ''ParsingFunc'' to do the actual parsing. It then does a
-   * special exception handling for parse exceptions: Such exceptions are
-   * mapped to [[ParameterExtractionException]] exceptions that have a fully
-   * initialized parameter context. To obtain the latter, the meta data of
-   * the ''CliExtractor'' is retrieved.
+   * Processes options referring to parameter files and returns the resulting,
+   * augmented command line. This function can be called before processing of
+   * the command if the CLI should support reading parameters from files. It
+   * searches for options referencing such files based on the
+   * ''FileOptionFunc'' provided. The files are read, and their content is
+   * placed on the command line. The resulting command line is returned. If
+   * reading a parameter file causes an error, the resulting ''Try'' fails with
+   * a ''ParameterExtractionException'' pointing to the option responsible for
+   * the failure.
    *
-   * @param args      the sequence of command line arguments
-   * @param extractor the current ''CliExtractor''
-   * @param parseFunc the function to handle the parsing
-   * @return a ''Try'' with the result of the parse operation
+   * @param args           the original sequence with command line arguments
+   * @param extractorCtx   the context wrapping the current extractor
+   * @param cf             the classifier function
+   * @param fileOptionFunc a function to detect file options
+   * @return a ''Try'' with the processed command line
    */
-  private def parse(args: Seq[String], extractor: CliExtractor[_], parseFunc: ParsingFunc): Try[ParametersMap] =
-    parseFunc(args) recoverWith {
+  def processParameterFiles(args: Seq[String], extractorCtx: ExtractorContext[_])(cf: CliClassifierFunc)
+                           (fileOptionFunc: FileOptionFunc): Try[Seq[String]] =
+    handleParameterFileExceptions(ParameterParser.processFileOptions(args)(cf)(fileOptionFunc),
+      extractorCtx.extractor)
+
+  /**
+   * Searches for the options specified on the command line and processes the
+   * files with parameters they refer to. This function is analogous to
+   * ''processParameterFiles()'', but it constructs a ''FileOptionFunc'' that
+   * recognizes options with the given keys.
+   *
+   * @param args         the original sequence with command line arguments
+   * @param extractorCtx the context wrapping the current extractor
+   * @param options      the options referencing parameter files
+   * @param cf           the classifier function
+   * @return
+   */
+  def processParameterFilesWithOptions(args: Seq[String], extractorCtx: ExtractorContext[_], options: ParameterKey*)
+                                      (cf: CliClassifierFunc): Try[Seq[String]] = {
+    val fileOptionFunc = ParameterParser.fileOptionFuncForOptions(options)
+    processParameterFiles(args, extractorCtx)(cf)(fileOptionFunc)
+  }
+
+  /**
+   * Handles an exception caused by a failure to process a parameter file.
+   * Processing of parameter files can fail, e.g. if a parameter file cannot be
+   * found. In this case, [[ParameterParser]] produces a specific exception.
+   * This function checks whether the ''Try'' passed in has failed with this
+   * exception. If so, the exception is converted to a
+   * [[ParameterExtractionException]] that can be used to display an error text
+   * in the usual way. ''Note'': When calling one of the
+   * ''processParameterFiles()'' functions, this function is invoked
+   * automatically; it should be used only if the [[ParameterParser]] was
+   * called directly.
+   *
+   * @param processedArgs the ''Try'' with the processed command line
+   * @param extractor     the current extractor
+   * @return the modified ''Try'' with the exception handled
+   */
+  def handleParameterFileExceptions(processedArgs: Try[Seq[String]], extractor: CliExtractor[_]): Try[Seq[String]] =
+    processedArgs recoverWith {
       case e: ParameterParseException =>
         val context = gatherMetaData(extractor)
         val failure = ExtractionFailure(e.fileOption, e.getMessage, context)

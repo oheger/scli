@@ -188,18 +188,29 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     res should be((Success(TestOptionValue), Success(true)))
   }
 
-  it should "support customizing the parsing function" in {
+  it should "support different option prefixes" in {
     val args = List("/" + TestOptionKey, TestOptionValue)
+    val extractor = ParameterExtractor.optionValue(TestOptionKey).mandatory
+    val extractorCtx = ExtractorContext(extractor)
+    val prefixes = ParameterParser.OptionPrefixes(pk("/"))
+
+    val classifierFunc = ParameterManager.classifierFunc(extractorCtx, prefixes = prefixes)
+    val parserFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
+    val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parser = parserFunc))
+    res should be(TestOptionValue)
+  }
+
+  it should "support advanced customization of the parsing function" in {
+    val args = List("--" + TestOptionKey, TestOptionValue)
     val key = TestOptionKey.toLowerCase(Locale.ROOT)
     val extractor = ParameterExtractor.optionValue(key).mandatory
     val extractorCtx = ExtractorContext(extractor)
-    val prefixes = ParameterParser.OptionPrefixes(pk("/"))
-    val keyExtractor = ParameterManager.defaultKeyExtractor(prefixes) andThen (opt =>
+    val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
       opt.map(key => key.copy(key = key.key.toLowerCase(Locale.ROOT))))
     val classifierFunc =
       ParameterParser.classifierOf(ParameterManager.defaultExtractedKeyClassifiers(extractorCtx): _*)(keyExtractor)
 
-    val parseFunc = ParameterManager.parsingFunc(extractorCtx, classifierFunc)
+    val parseFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
     val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parser = parseFunc))
     res should be(TestOptionValue)
   }
@@ -262,8 +273,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     } yield (verbose, debug)
     val extCtx = ExtractorContext(ParameterManager.wrapTryExtractor(extractor))
 
-    val classifierFunc = ParameterManager.defaultClassifierFunc(extCtx, supportCombinedSwitches = true)
-    val parser = ParameterManager.parsingFunc(extCtx, classifierFunc = classifierFunc)
+    val classifierFunc = ParameterManager.classifierFunc(extCtx, supportCombinedSwitches = true)
+    val parser = ParameterManager.parsingFuncForClassifier(extCtx)(classifierFunc)
     val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extCtx, parser = parser))
     res should be((Success(true), Success(true)))
   }
@@ -281,5 +292,27 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val exception = failedResult(ParameterManager.processCommandLineCtx(args, extCtx))
     exception.failures should have size 1
     exception.failures.head.key should be(ParameterKey("dv", shortAlias = true))
+  }
+
+  it should "support loading parameter files and handle corresponding exceptions" in {
+    val FileOption = pk("file")
+    val FileName = "someFile.txt"
+    val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption.key, FileName)
+    val extractor = ParameterExtractor.optionValue(TestOptionKey, help = Some(HelpTestOption))
+    val extractorCtx = ExtractorContext(extractor)
+
+    val classifierFunc = ParameterManager.classifierFunc(extractorCtx)
+    val exception = failedResult(ParameterManager.processParameterFilesWithOptions(args, extractorCtx,
+      FileOption)(classifierFunc))
+    exception.failures should have size 1
+    val failure = exception.failures.head
+    failure.key should be(FileOption)
+    failure.message should include(FileName)
+    val context = exception.parameterContext
+    val modelContext = context.modelContext
+    val testOptionAttrs = modelContext.options(TestOptionPk)
+    testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
+    val fileOptionAttrs = modelContext.options(FileOption)
+    fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 }
