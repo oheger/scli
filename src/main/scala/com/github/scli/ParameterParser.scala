@@ -222,22 +222,21 @@ object ParameterParser {
   }
 
   /**
-   * A specialized exception class to report problems during parameter
-   * parsing.
+   * A specialized exception class to report problems during the processing of
+   * parameter files.
    *
-   * The parsing process itself is lenient; failures are detected later in the
-   * extraction phase. An unrecoverable problem, however, is an exception
-   * thrown when reading a parameter file. Such exceptions are converted to
-   * exceptions of this type. They transport some more information which is
-   * useful when handling errors, e.g. printing help or error information.
+   * During parameter file processing, I/O exceptions can occur. Such
+   * exceptions are converted to exceptions of this type. They transport some
+   * more information which is useful when handling errors, e.g. printing help
+   * or error information.
    *
    * @param msg        an error message
    * @param cause      the causing exception, typically an ''IOException''
    * @param fileOption the key of the option to read parameter files
    */
-  class ParameterParseException(msg: String,
-                                cause: Throwable,
-                                val fileOption: ParameterKey) extends Exception(msg, cause)
+  class ParameterFileException(msg: String,
+                               cause: Throwable,
+                               val fileOption: ParameterKey) extends Exception(msg, cause)
 
   /**
    * Type definition for an internal map type used during processing of
@@ -255,12 +254,12 @@ object ParameterParser {
    * classifier functions returns a result, an [[InputParameterElement]] is
    * returned.
    *
-   * @param keyClassifiers a sequence of ''ExtractedKeyClassifierFunc''
-   *                       functions
+   * @param keyClassifiers a list of ''ExtractedKeyClassifierFunc'' functions
    * @param keyExtractor   the key extractor function
    * @return a ''CliClassifierFunc'' constructed from these parameters
    */
-  def classifierOf(keyClassifiers: ExtractedKeyClassifierFunc*)(keyExtractor: KeyExtractorFunc): CliClassifierFunc = {
+  def classifierOf(keyClassifiers: List[ExtractedKeyClassifierFunc])(keyExtractor: KeyExtractorFunc):
+  CliClassifierFunc = {
     @tailrec
     def classifyKey(classifiers: List[ExtractedKeyClassifierFunc], key: ParameterKey, args: Seq[String], idx: Int):
     Option[CliElement] =
@@ -273,9 +272,8 @@ object ParameterParser {
         case _ => None
       }
 
-    val keyClassifierList = keyClassifiers.toList
     (args, idx) =>
-      keyExtractor(args(idx)) flatMap (key => classifyKey(keyClassifierList,
+      keyExtractor(args(idx)) flatMap (key => classifyKey(keyClassifiers,
         key, args, idx)) getOrElse InputParameterElement(args(idx))
   }
 
@@ -373,7 +371,7 @@ object ParameterParser {
    * parameters with all parameter files included.
    *
    * As I/O operations may fail, this function returns a ''Try''. In case of a
-   * failure, the exception is of type [[ParameterParseException]] and contains
+   * failure, the exception is of type [[ParameterFileException]] and contains
    * further information about the failed read operation.
    *
    * @param args           the sequence with command line arguments
@@ -381,7 +379,7 @@ object ParameterParser {
    * @param fileOptionFunc a function to detect file options
    * @return the final sequence of parameters including all parameter files
    */
-  def processFileOptions(args: Seq[String])(classifierFunc: CliClassifierFunc)(fileOptionFunc: FileOptionFunc):
+  def processParameterFiles(args: Seq[String])(classifierFunc: CliClassifierFunc)(fileOptionFunc: FileOptionFunc):
   Try[Seq[String]] = {
     def processFileOptionsInArgs(args: Seq[String], processedFiles: Set[String]): Try[(Seq[String], Set[String])] = {
       val argList = args.toList
@@ -482,7 +480,7 @@ object ParameterParser {
   Try[List[String]] =
     readResult recoverWith {
       case e: Exception =>
-        Failure(new ParameterParseException(s"Failed to load parameter file $file", e, fileOptionKey))
+        Failure(new ParameterFileException(s"Failed to load parameter file $file", e, fileOptionKey))
     }
 
   /**

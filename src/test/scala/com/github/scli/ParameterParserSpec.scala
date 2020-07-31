@@ -22,7 +22,7 @@ import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
 import com.github.scli.ParameterModel.{ModelContext, ParameterAttributes, ParameterKey}
-import com.github.scli.ParameterParser.{AliasResolverFunc, CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterParseException, ParametersMap, SwitchesElement}
+import com.github.scli.ParameterParser.{AliasResolverFunc, CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterFileException, ParametersMap, SwitchesElement}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.flatspec.AnyFlatSpec
@@ -253,7 +253,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
    */
   private def processFileOptions(args: Seq[String]): Try[Seq[String]] = {
     val fileOptionFunc = ParameterParser.fileOptionFuncForOptions(FileOptionKeys)
-    ParameterParser.processFileOptions(args)(basicClassifierFunc)(fileOptionFunc)
+    ParameterParser.processParameterFiles(args)(basicClassifierFunc)(fileOptionFunc)
   }
 
   /**
@@ -533,7 +533,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("--op1", "don't care", "--" + FileOption, FileName)
 
     processFileOptions(args) match {
-      case Failure(e: ParameterParseException) =>
+      case Failure(e: ParameterFileException) =>
         e.getMessage should include(FileName)
         e.getCause shouldBe a[IOException]
         e.fileOption should be(pk(FileOption))
@@ -543,14 +543,14 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "create a classifier function that handles input parameters" in {
     val args = List("foo")
-    val cf = ParameterParser.classifierOf(blowUpKeyClassifier)(ParameterParser.DefaultOptionPrefixes.tryExtract)
+    val cf = ParameterParser.classifierOf(List(blowUpKeyClassifier))(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
     cf(args, 0) should be(InputParameterElement(args.head))
   }
 
   it should "create a classifier function with an empty list of key classifiers" in {
     val args = List("foo", "bar")
-    val cf = ParameterParser.classifierOf()(ParameterParser.DefaultOptionPrefixes.tryExtract)
+    val cf = ParameterParser.classifierOf(List.empty)(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
     cf(args, 1) should be(InputParameterElement(args(1)))
   }
@@ -558,8 +558,8 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   it should "create a classifier function that handles key classifiers returning None" in {
     val Key = pk("arg")
     val args = List("--" + Key.key)
-    val cf = ParameterParser.classifierOf(definedKeyClassifier(Key, args, 0, None),
-      definedKeyClassifier(Key, args, 0, None))(ParameterParser.DefaultOptionPrefixes.tryExtract)
+    val cf = ParameterParser.classifierOf(List(definedKeyClassifier(Key, args, 0, None),
+      definedKeyClassifier(Key, args, 0, None)))(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
     cf(args, 0) should be(InputParameterElement(args.head))
   }
@@ -568,9 +568,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val Key = ParameterKey("theOptionKey", shortAlias = true)
     val Result = OptionElement(Key, Some("someValue"))
     val args = List("test", "-" + Key.key)
-    val cf = ParameterParser.classifierOf(definedKeyClassifier(Key, args, 1, None),
+    val cf = ParameterParser.classifierOf(List(definedKeyClassifier(Key, args, 1, None),
       definedKeyClassifier(Key, args, 1, Some(Result)),
-      blowUpKeyClassifier)(ParameterParser.DefaultOptionPrefixes.tryExtract)
+      blowUpKeyClassifier))(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
     cf(args, 1) should be(Result)
   }

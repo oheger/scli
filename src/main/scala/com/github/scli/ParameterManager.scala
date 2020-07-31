@@ -124,7 +124,7 @@ object ParameterManager {
                      prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes,
                      supportCombinedSwitches: Boolean = false): CliClassifierFunc =
     ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractorCtx,
-      supportCombinedSwitches): _*)(defaultKeyExtractor(prefixes))
+      supportCombinedSwitches))(defaultKeyExtractor(prefixes))
 
   /**
    * Returns a ''ParsingFunc'' that is configured with the parameters provided.
@@ -240,7 +240,7 @@ object ParameterManager {
    */
   def processParameterFiles(args: Seq[String], extractorCtx: ExtractorContext[_])(cf: CliClassifierFunc)
                            (fileOptionFunc: FileOptionFunc): Try[Seq[String]] =
-    handleParameterFileExceptions(ParameterParser.processFileOptions(args)(cf)(fileOptionFunc),
+    handleParameterFileExceptions(ParameterParser.processParameterFiles(args)(cf)(fileOptionFunc),
       extractorCtx.extractor)
 
   /**
@@ -279,7 +279,7 @@ object ParameterManager {
    */
   def handleParameterFileExceptions(processedArgs: Try[Seq[String]], extractor: CliExtractor[_]): Try[Seq[String]] =
     processedArgs recoverWith {
-      case e: ParameterParseException =>
+      case e: ParameterFileException =>
         val context = gatherMetaData(extractor)
         val failure = ExtractionFailure(e.fileOption, e.getMessage, context)
         Failure(updateModelContextWithFailures(List(failure), context))
