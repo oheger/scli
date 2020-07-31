@@ -144,6 +144,20 @@ object ParameterParser {
    */
   type AliasResolverFunc = ParameterKey => Option[ParameterKey]
 
+  /**
+   * Definition of a function that detects options referencing a parameters
+   * file.
+   *
+   * The library supports externalizing complex parameter lists in files.
+   * These files can be specified on the command line using specific options.
+   * This function type is used by the ''processFileOptions()'' function to
+   * determine the parameter files to be loaded. The function is passed a
+   * [[CliElement]]; if this element references a parameters file, it returns a
+   * defined ''Option'' with the key of the file option (to be used in error
+   * messages) and the file name.
+   */
+  type FileOptionFunc = CliElement => Option[(ParameterKey, String)]
+
   object OptionPrefixes {
     /**
      * Returns a new instance of ''OptionPrefixes'' that accepts the prefixes
@@ -217,15 +231,13 @@ object ParameterParser {
    * exceptions of this type. They transport some more information which is
    * useful when handling errors, e.g. printing help or error information.
    *
-   * @param msg               an error message
-   * @param cause             the causing exception, typically an ''IOException''
-   * @param fileOption        the name of the option to read parameter files
-   * @param currentParameters the current parameters parsed so far
+   * @param msg        an error message
+   * @param cause      the causing exception, typically an ''IOException''
+   * @param fileOption the key of the option to read parameter files
    */
   class ParameterParseException(msg: String,
                                 cause: Throwable,
-                                val fileOption: String,
-                                val currentParameters: ParametersMap) extends Exception(msg, cause)
+                                val fileOption: ParameterKey) extends Exception(msg, cause)
 
   /**
    * Type definition for an internal map type used during processing of
@@ -332,6 +344,74 @@ object ParameterParser {
         }.toList
         Some(SwitchesElement(switches))
       }
+  }
+
+  /**
+   * Returns a ''FileOptionFunc'' that detects the given parameter keys as file
+   * options. During file option processing, the command line elements are
+   * classified. If an element is an option with a key in the given list, the
+   * value of this option is returned as name of a parameter file.
+   *
+   * @param options a sequence with options referencing parameter files
+   * @return the ''FileOptionFunc'' detecting these keys
+   */
+  def fileOptionFuncForOptions(options: Iterable[ParameterKey]): FileOptionFunc = {
+    val fileOptionKeys = options.toSet
+    elem =>
+      elem match {
+        case OptionElement(key, value) if fileOptionKeys.contains(key) =>
+          value map (v => (key, v))
+        case _ => None
+      }
+  }
+
+  /**
+   * Processes the passed in sequence of parameters and resolves all parameter
+   * files detected by the given ''FileOptionFunc''. The files are read, and
+   * their content is added to the command line, replacing the original file
+   * options. If successful, result is the full sequence of command line
+   * parameters with all parameter files included.
+   *
+   * As I/O operations may fail, this function returns a ''Try''. In case of a
+   * failure, the exception is of type [[ParameterParseException]] and contains
+   * further information about the failed read operation.
+   *
+   * @param args           the sequence with command line arguments
+   * @param classifierFunc a function to classify parameters
+   * @param fileOptionFunc a function to detect file options
+   * @return the final sequence of parameters including all parameter files
+   */
+  def processFileOptions(args: Seq[String])(classifierFunc: CliClassifierFunc)(fileOptionFunc: FileOptionFunc):
+  Try[Seq[String]] = {
+    def processFileOptionsInArgs(args: Seq[String], processedFiles: Set[String]): Try[(Seq[String], Set[String])] = {
+      val argList = args.toList
+      val parameterFiles = classify(args)(classifierFunc)
+        .map(t => (t._1, fileOptionFunc(t._2)))
+        .filter(_._2.isDefined)
+        .map(t => (t._1, t._2.get))
+      if (parameterFiles.isEmpty) Success((args, processedFiles))
+      else {
+        val init = Try((List.empty[String], args.length, processedFiles))
+        val result = parameterFiles.foldLeft(init) { (triedState, file) =>
+          triedState flatMap { state =>
+            val (currentArgs, pos, knownFiles) = state
+            val (fileKey, paramFile) = file._2
+            val triedFileArgs = if (knownFiles contains paramFile) Success((List.empty[String], knownFiles))
+            else handleParameterFileException(readParameterFile(paramFile), fileKey, paramFile)
+              .flatMap(fileArgs => processFileOptionsInArgs(fileArgs, knownFiles + paramFile))
+            triedFileArgs map { fileArgs =>
+              val nextArgs = fileArgs._1.toList ::: argList.slice(file._1 + 2, pos) ::: currentArgs
+              (nextArgs, file._1, knownFiles ++ fileArgs._2)
+            }
+          }
+        }
+        result map { state =>
+          (argList.slice(0, state._2) ::: state._1, state._3)
+        }
+      }
+    }
+
+    processFileOptionsInArgs(args, Set.empty) map (_._1)
   }
 
   /**
@@ -458,13 +538,24 @@ object ParameterParser {
     val triedReads = files map (path => (path, readParameterFile(path)))
     val optError = triedReads.find(_._2.isFailure)
     optError.fold(convertSuccessReads(triedReads)) { t =>
-      t._2 recoverWith {
-        case e: Exception =>
-          Failure(new ParameterParseException(s"Failed to load parameter file ${t._1}", e, fileOption,
-            currentParameters))
-      }
+      handleParameterFileException(t._2, ParameterKey(fileOption, shortAlias = false), t._1)
     }
   }
+
+  /**
+   * Generates a meaningful exception when reading of a parameter file fails.
+   *
+   * @param readResult    the result of the read operation
+   * @param fileOptionKey the key of the file option
+   * @param file          the name of the file that was read
+   * @return the updated read result
+   */
+  private def handleParameterFileException(readResult: Try[List[String]], fileOptionKey: ParameterKey, file: String):
+  Try[List[String]] =
+    readResult recoverWith {
+      case e: Exception =>
+        Failure(new ParameterParseException(s"Failed to load parameter file $file", e, fileOptionKey))
+    }
 
   /**
    * Converts the list with tried reads to the final result, a ''Try'' of a
@@ -495,6 +586,32 @@ object ParameterParser {
       Some(SwitchesElement(List((key,
         getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")(resolverFunc)))))
     else None
+
+  /**
+   * Classifies all command line elements in the given sequence. Result is a
+   * list with the elements found and their indices on the command line. This
+   * list is in reverse order based on the positions.
+   *
+   * @param args           the sequence of arguments
+   * @param classifierFunc the classifier function
+   * @return a list with the classified elements and their positions
+   */
+  private def classify(args: Seq[String])(classifierFunc: CliClassifierFunc): List[(Int, CliElement)] = {
+    @tailrec def doClassify(index: Int, processed: List[(Int, CliElement)]): List[(Int, CliElement)] =
+      if (index >= args.size) processed
+      else {
+        val element = classifierFunc(args, index)
+        val updatedProcessed = (index, element) :: processed
+        val increment = element match {
+          case _: OptionElement => 2
+          case _ => 1
+        }
+        doClassify(index + increment, updatedProcessed)
+      }
+
+    doClassify(0, Nil)
+  }
+
 
   /**
    * Fetches a specific attribute from a ''ModelContext'' for a given parameter

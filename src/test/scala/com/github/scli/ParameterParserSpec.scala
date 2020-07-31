@@ -35,6 +35,13 @@ object ParameterParserSpec {
   /** Name of an option that references parameter files. */
   private val FileOption = "param-file"
 
+  /** Short name of an option that references parameter files. */
+  private val ShortFileOption = "f"
+
+  /** A list with all options referencing parameter files. */
+  private val FileOptionKeys = List(ParameterKey(FileOption, shortAlias = false),
+    ParameterKey(ShortFileOption, shortAlias = true))
+
   /** The prefix for temporary files created by this class. */
   private val TempFilePrefix = "FileTestHelper"
 
@@ -70,7 +77,12 @@ object ParameterParserSpec {
   private def basicClassifierFunc: CliClassifierFunc =
     (args, idx) => {
       val arg = args(idx)
-      if (arg.startsWith("--")) OptionElement(pk(arg.substring(2)), Some(args(idx + 1)))
+      val isOption = arg startsWith "-"
+      val isLongOption = arg startsWith "--"
+      if (isOption) {
+        val keyPos = if (isLongOption) 2 else 1
+        OptionElement(ParameterKey(arg.substring(keyPos), !isLongOption), Some(args(idx + 1)))
+      }
       else InputParameterElement(arg)
     }
 
@@ -259,16 +271,27 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     extractParametersMap(ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf)(af))
 
   /**
-   * Invokes the parameter parser on the given sequence with arguments and
-   * expects a failure result. The causing exception is returned.
+   * Invokes the parameter parser to resolve file options on the given sequence
+   * of arguments. Uses a default classifier and file options function.
    *
-   * @param args the sequence with arguments
-   * @param cf   the classifier function
-   * @return the exception causing the failure
+   * @param args the sequence of arguments
+   * @return the resulting processed sequence of arguments
    */
-  private def parseParametersFailure(args: Seq[String])(cf: CliClassifierFunc): Throwable =
-    ParameterParser.parseParameters(args, optFileOption = Some(FileOption))(cf)(NoAliasResolverFunc) match {
-      case Failure(exception) => exception
+  private def processFileOptions(args: Seq[String]): Try[Seq[String]] = {
+    val fileOptionFunc = ParameterParser.fileOptionFuncForOptions(FileOptionKeys)
+    ParameterParser.processFileOptions(args)(basicClassifierFunc)(fileOptionFunc)
+  }
+
+  /**
+   * Invokes the parameter parser to resolve file options and returns the
+   * success result or fails miserably.
+   *
+   * @param args the sequence of arguments
+   * @return the resulting processed sequence of arguments
+   */
+  private def processFileOptionsSuccess(args: Seq[String]): Seq[String] =
+    processFileOptions(args) match {
+      case Success(result) => result
       case r => fail("Unexpected result: " + r)
     }
 
@@ -294,12 +317,16 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   /**
    * Adds a parameter to read the given file to a parameter list.
    *
-   * @param path    the path to the file to be read
-   * @param argList the original parameter list
+   * @param path       the path to the file to be read
+   * @param argList    the original parameter list
+   * @param shortAlias flag whether the short alias key should be used
    * @return the parameter list with the file parameter added
    */
-  private def appendFileParameter(path: Path, argList: List[String]): List[String] =
-    "--" + FileOption :: path.toString :: argList
+  private def appendFileParameter(path: Path, argList: List[String], shortAlias: Boolean = false): List[String] = {
+    val optKey = if (shortAlias) "-" + ShortFileOption
+    else "--" + FileOption
+    optKey :: path.toString :: argList
+  }
 
   /**
    * Returns a key classifier function that expects the given key to be passed
@@ -463,6 +490,13 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     params should be(expArgsMap)
   }
 
+  it should "process file options if there are none" in {
+    val args = List("larry", "curly", "moe", "--funny", "true")
+
+    val processedArgs = processFileOptionsSuccess(args)
+    processedArgs should be(args)
+  }
+
   it should "add the content of parameter files to command line options" in {
     val OptionName1 = "foo"
     val OptionName2 = "test"
@@ -473,12 +507,12 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val uri2 = "testUri2"
     val args = appendFileParameter(createParameterFile("--" + OptionName1, Opt1Val1, uri1),
       appendFileParameter(createParameterFile("--" + OptionName2, Opt2Val),
-        "--" + OptionName1 :: Opt1Val2 :: uri2 :: Nil))
+        "--" + OptionName1 :: Opt1Val2 :: uri2 :: Nil, shortAlias = true))
+    val expResult = List("--" + OptionName1, Opt1Val1, uri1, "--" + OptionName2, Opt2Val, "--" + OptionName1,
+      Opt1Val2, uri2)
 
-    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
-    argsMap(pk(OptionName1)) should contain only(Opt1Val1, Opt1Val2)
-    argsMap(pk(OptionName2)) should contain only Opt2Val
-    argsMap.keys should not contain FileOption
+    val processedArgs = processFileOptionsSuccess(args)
+    processedArgs should contain theSameElementsInOrderAs expResult
   }
 
   it should "parse parameter files defined in another parameter file" in {
@@ -489,51 +523,47 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val OptionName3 = "deep"
     val Option3Value = "inNestedFile"
     val nestedFile = createParameterFile("--" + OptionName3, Option3Value)
-    val args = appendFileParameter(
-      createParameterFile("--" + FileOption, nestedFile.toString,
-        "--" + OptionName2, Option2Value), "--" + OptionName1 :: Option1Value :: Nil)
-    val expArgs = Map(pk(OptionName1) -> List(Option1Value),
-      pk(OptionName2) -> List(Option2Value),
-      pk(OptionName3) -> List(Option3Value))
+    val args = appendFileParameter(createParameterFile("--" + OptionName2, Option2Value,
+      "--" + FileOption, nestedFile.toString), "--" + OptionName1 :: Option1Value :: Nil)
+    val expArgs = List("--" + OptionName2, Option2Value, "--" + OptionName3, Option3Value,
+      "--" + OptionName1, Option1Value)
 
-    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
-    argsMap should be(expArgs)
+    val processedArgs = processFileOptionsSuccess(args)
+    processedArgs should contain theSameElementsInOrderAs expArgs
   }
 
   it should "deal with cyclic references in parameter files" in {
     val file1 = createFileReference()
     val file3 = createParameterFile("--" + FileOption, file1.toString, "--op3", "v3")
-    val file2 = createParameterFile("--" + FileOption, file3.toString, "--op2", "v2")
+    val file2 = createParameterFile("-" + ShortFileOption, file3.toString, "--op2", "v2")
     writeFileContent(file1, parameterFileContent("--" + FileOption, file2.toString,
       "--op1", "v1", "--" + FileOption, file2.toString))
     val args = appendFileParameter(file1, Nil)
-    val expArgs = Map(pk("op1") -> List("v1"), pk("op2") -> List("v2"), pk("op3") -> List("v3"))
+    val expArgs = List("--op1", "v1", "--op3", "v3", "--op2", "v2")
 
-    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
-    argsMap should be(expArgs)
+    val processedArgs = processFileOptionsSuccess(args)
+    processedArgs should contain theSameElementsInOrderAs expArgs
   }
 
   it should "ignore empty lines in parameter files" in {
     val args = appendFileParameter(createParameterFile("--foo", "bar", "", "--foo", "baz"),
       "--test" :: "true" :: Nil)
+    val expArgs = List("--foo", "bar", "--foo", "baz", "--test", "true")
 
-    val argsMap = parseParametersSuccess(args)(basicClassifierFunc)
-    argsMap.keys should contain only(pk("foo"), pk("test"))
+    val processedArgs = processFileOptionsSuccess(args)
+    processedArgs should contain theSameElementsInOrderAs expArgs
   }
 
   it should "handle an exception when reading a parameter file" in {
     val FileName = "non_existing_file.txt"
     val args = List("--op1", "don't care", "--" + FileOption, FileName)
-    val expArgs = Map(pk("op1") -> List("don't care"))
 
-    val exception = parseParametersFailure(args)(basicClassifierFunc)
-    exception match {
-      case e: ParameterParseException =>
+    processFileOptions(args) match {
+      case Failure(e: ParameterParseException) =>
         e.getMessage should include(FileName)
         e.getCause shouldBe a[IOException]
-        e.fileOption should be(FileOption)
-        e.currentParameters should be(expArgs)
-      case e => fail("Unexpected exception: " + e)
+        e.fileOption should be(pk(FileOption))
+      case r => fail("Unexpected result: " + r)
     }
   }
 

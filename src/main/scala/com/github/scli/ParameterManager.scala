@@ -223,9 +223,8 @@ object ParameterManager {
   private def parse(args: Seq[String], extractor: CliExtractor[_], parseFunc: ParsingFunc): Try[ParametersMap] =
     parseFunc(args) recoverWith {
       case e: ParameterParseException =>
-        val context = gatherMetaData(extractor, parameters = e.currentParameters)
-        //TODO use correct ParameterKey for file option
-        val failure = ExtractionFailure(ParameterKey(e.fileOption, shortAlias = false), e.getMessage, context)
+        val context = gatherMetaData(extractor)
+        val failure = ExtractionFailure(e.fileOption, e.getMessage, context)
         Failure(updateModelContextWithFailures(List(failure), context))
     }
 

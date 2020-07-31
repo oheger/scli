@@ -204,29 +204,6 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     res should be(TestOptionValue)
   }
 
-  it should "support loading parameter files and handle corresponding exceptions" in {
-    val FileOption = pk("file")
-    val FileName = "someFile.txt"
-    val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption.key, FileName)
-    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey, help = Some(HelpTestOption))
-    val extractorCtx = ExtractorContext(extractor)
-
-    val parseFunc = ParameterManager.parsingFunc(extractorCtx, optFileOption = Some(FileOption.key))
-    val exception = failedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parseFunc,
-      checkUnconsumedParameters = false))
-    exception.failures should have size 1
-    val failure = exception.failures.head
-    failure.key should be(FileOption)
-    failure.message should include(FileName)
-    val context = exception.parameterContext
-    context.parameters.parametersMap.keys should contain(TestOptionPk)
-    val modelContext = context.modelContext
-    val testOptionAttrs = modelContext.options(TestOptionPk)
-    testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
-    val fileOptionAttrs = modelContext.options(FileOption)
-    fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
-  }
-
   it should "not construct a model context if this is not needed" in {
     val extractor = ParameterExtractor.inputValue(0, last = true)
     val args = List("input")
