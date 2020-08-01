@@ -20,6 +20,7 @@ import java.nio.file.Path
 import java.util.Locale
 
 import com.github.scli.ParameterExtractor._
+import com.github.scli.ParameterManager
 
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Try}
@@ -197,6 +198,23 @@ object TransferParameterManager {
                                    cryptConfig: CryptConfig,
                                    transferConfig: TransferConfig)
 
+  /** The top-level extractor for the ''TransferCommandConfig''. */
+  private val transferCommandConfigExtractor: CliExtractor[Try[TransferCommandConfig]] =
+    createTransferCommandConfigExtractor()
+
+  /**
+   * Processes the given sequence of command line arguments and returns a
+   * ''Try'' with the results. This function has to be called with the
+   * arguments passed to the application. If successful, from the result the
+   * ''TransferCommandConfig'' with all settings provided by the user can be
+   * extracted.
+   *
+   * @param args the sequence with command line arguments
+   * @return a ''Try'' with the results of command line processing
+   */
+  def processCommandLine(args: Seq[String]): Try[(TransferCommandConfig, ParameterContext)] =
+    ParameterManager.processCommandLine(args, transferCommandConfigExtractor)
+
   /**
    * Returns an extractor for the configuration for encryption. Whether
    * encryption is enabled (and additional properties must be provided),
@@ -204,7 +222,7 @@ object TransferParameterManager {
    *
    * @return the extractor for the ''CryptConfig''
    */
-  def cryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
+  private[transfer] def cryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
     val extCryptEnabled = cryptModeExtractor
       .map(triedMode => triedMode.map(_ != CryptMode.None))
     conditionalValue(extCryptEnabled, ifExt = definedCryptConfigExtractor,
@@ -218,7 +236,7 @@ object TransferParameterManager {
    *
    * @return the extractor for the ''HttpServerConfig''
    */
-  def httpServerConfigExtractor: CliExtractor[Try[ServerConfig]] = {
+  private[transfer] def httpServerConfigExtractor: CliExtractor[Try[ServerConfig]] = {
     val extUsr = optionValue("user")
       .mandatory
     val extPwd = passwordExtractor("password", "HTTP server password")
@@ -229,11 +247,27 @@ object TransferParameterManager {
   }
 
   /**
+   * Returns an extractor for the ''TransferCommandConfig''. This is the
+   * top-level extractor which combines all other extractors to process the
+   * full command line.
+   *
+   * @return the extractor for the ''TransferCommandConfig''
+   */
+  private def createTransferCommandConfigExtractor(): CliExtractor[Try[TransferCommandConfig]] = {
+    for {
+      cmd <- commandConfigExtractor
+      svr <- serverConfigExtractor
+      crypt <- cryptConfigExtractor
+      trans <- transferConfigExtractor
+    } yield createRepresentation(cmd, svr, crypt, trans)(TransferCommandConfig)
+  }
+
+  /**
    * Returns an extractor for the ''TransferConfig''.
    *
    * @return the extractor for the ''TransferConfig''
    */
-  def transferConfigExtractor: CliExtractor[Try[TransferConfig]] = {
+  private def transferConfigExtractor: CliExtractor[Try[TransferConfig]] = {
     val extSrcFiles = inputValues(fromIdx = 1, toIdx = -2, optKey = Some("transferFiles"))
       .multiplicity(atLeast = 1)
       .toPath
@@ -256,22 +290,6 @@ object TransferParameterManager {
     } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, logs, tag) {
       TransferConfig(_, _, _, _, false, _, _)
     }
-  }
-
-  /**
-   * Returns an extractor for the ''TransferCommandConfig''. This is the
-   * top-level extractor which combines all other extractors to process the
-   * full command line.
-   *
-   * @return the extractor for the ''TransferCommandConfig''
-   */
-  def transferCommandConfigExtractor: CliExtractor[Try[TransferCommandConfig]] = {
-    for {
-      cmd <- commandConfigExtractor
-      svr <- serverConfigExtractor
-      crypt <- cryptConfigExtractor
-      trans <- transferConfigExtractor
-    } yield createRepresentation(cmd, svr, crypt, trans)(TransferCommandConfig)
   }
 
   /**
@@ -305,24 +323,20 @@ object TransferParameterManager {
   }
 
   /**
-   * Returns an extractor to determine the server type based on its URI. This
-   * type determines, which additional options are supported to configure the
+   * An extractor to determine the server type based on its URI. This type
+   * determines, which additional options are supported to configure the
    * server.
-   *
-   * @return the extractor for the server type
    */
-  private def serverTypeExtractor: CliExtractor[Try[String]] =
+  private lazy val serverTypeExtractor: CliExtractor[Try[String]] =
     serverUriExtractor.mapTo { uri =>
       if (uri.startsWith("http://") || uri.startsWith("https://")) ServerTypeHttp else ServerTypeFile
     }.mandatory
 
   /**
-   * Returns the extractor for the URI of the target server. The URI is read
-   * from the last input parameter.
-   *
-   * @return the extractor for the URI of the server
+   * The extractor for the URI of the target server. The URI is read from the
+   * last input parameter.
    */
-  private def serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
+  private lazy val serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
     inputValue(optKey = Some("serverUri"), index = -1)
 
   /**
@@ -340,12 +354,9 @@ object TransferParameterManager {
       .mandatory
 
   /**
-   * Returns an extractor that extracts a crypt mode value from a command line
-   * option.
-   *
-   * @return the extractor to extract the crypt mode
+   * An extractor that extracts a crypt mode value from a command line option.
    */
-  private def cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
+  private lazy val cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
     optionValue("crypt-mode")
       .toUpper
       .toEnum(CryptMode.Literals.get)

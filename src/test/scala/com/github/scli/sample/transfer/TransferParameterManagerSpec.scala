@@ -18,34 +18,42 @@ package com.github.scli.sample.transfer
 
 import java.nio.file.Paths
 
-import com.github.scli.ParameterExtractor.{CliExtractor, ParameterContext, ParameterExtractionException}
-import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterManager}
+import com.github.scli.ParameterExtractor.{ParameterContext, ParameterExtractionException}
 import com.github.scli.ParametersTestHelper._
-import com.github.scli.sample.transfer.TransferParameterManager.{CryptConfig, CryptMode, DownloadCommandConfig, FileServerConfig, HttpServerConfig, UploadCommandConfig}
+import com.github.scli.sample.transfer.TransferParameterManager._
+import com.github.scli.{ConsoleReader, ParameterExtractor}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 
-import scala.util.{Failure, Success, Try}
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 /**
  * Test class for ''TransferParameterManager''.
  */
 class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with MockitoSugar {
   /**
+   * Returns a list with default input parameters. These parameters are needed
+   * by many tests to have a valid command line.
+   *
+   * @param http flag whether an HTTP server URI should be used
+   * @return the default input parameters
+   */
+  private def inputParameters(http: Boolean): List[String] =
+    List("upload", "file", if (http) "https://server.org" else "/file/server")
+
+  /**
    * Parses the given command line arguments and invokes the extractor
    * specified on the result. The function expects that the extraction is
    * successful. The result is returned.
    *
-   * @param args      the command line arguments
-   * @param extractor the extractor to be invoked
-   * @tparam T the result type of the extract
+   * @param args the command line arguments
    * @return a tuple with the extraction result and the updated context
    */
-  private def extract[T](args: Seq[String], extractor: CliExtractor[Try[T]]): (T, ParameterContext) = {
-    val triedResult = ParameterManager.processCommandLine(args, extractor)
+  private def extract(args: Seq[String]): (TransferParameterManager.TransferCommandConfig, ParameterContext) = {
+    val triedResult = TransferParameterManager.processCommandLine(args)
     triedResult match {
       case Success(tuple) => tuple
       case r => fail("Unexpected result: " + r)
@@ -57,25 +65,22 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
    * on the result, and returns the result produced by the extractor. The
    * extraction is supposed to be successful.
    *
-   * @param args      the command line arguments
-   * @param extractor the extractor to be invoked
-   * @tparam T the result type of the extract
+   * @param args the command line arguments
    * @return the result produced by the extractor
    */
-  private def extractResult[T](args: Seq[String], extractor: CliExtractor[Try[T]]): T =
-    extract(args, extractor)._1
+  private def extractResult(args: Seq[String]): TransferParameterManager.TransferCommandConfig =
+    extract(args)._1
 
   /**
    * Processes the given command line arguments with the extractor specified
    * and expects the operation to fail. The exception describing the failure is
    * returned.
    *
-   * @param args      the command line arguments
-   * @param extractor the extractor to be invoked
+   * @param args the command line arguments
    * @return the exception causing the operation to fail
    */
-  private def expectFailure[T](args: Seq[String], extractor: CliExtractor[Try[T]]): ParameterExtractionException =
-    ParameterManager.processCommandLine(args, extractor) match {
+  private def expectFailure(args: Seq[String]): ParameterExtractionException =
+    TransferParameterManager.processCommandLine(args) match {
       case Failure(e: ParameterExtractionException) => e
       case r => fail("Unexpected result: " + r)
     }
@@ -86,13 +91,11 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
    * The exception describing the failure is returned.
    *
    * @param args          the command line arguments
-   * @param extractor     the extractor to be invoked
    * @param failedOptions the keys of the options expected to fail
    * @return the exception causing the operation to fail
    */
-  private def expectFailureInOptions[T](args: Seq[String], extractor: CliExtractor[Try[T]], failedOptions: String*):
-  ParameterExtractionException = {
-    val exception = expectFailure(args, extractor)
+  private def expectFailureInOptions[T](args: Seq[String], failedOptions: String*): ParameterExtractionException = {
+    val exception = expectFailure(args)
     exception.failures.map(_.key.key) should contain allElementsOf failedOptions
     exception
   }
@@ -102,7 +105,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
       "--log", "log2", "--chunk-size", "16384", "--timeout", "30")
     val ExpPaths = List(Paths.get("file1"), Paths.get("file2"), Paths.get("file3"))
 
-    val config = extractResult(args, TransferParameterManager.transferConfigExtractor)
+    val config = extractResult(args).transferConfig
     config.sourceFiles should be(ExpPaths)
     config.serverUrl should be("serverUri")
     config.logs should be(List("log1", "log2"))
@@ -114,57 +117,58 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "set a default chunk size" in {
     val args = List("upload", "file", "serverUri")
 
-    val config = extractResult(args, TransferParameterManager.transferConfigExtractor)
+    val config = extractResult(args).transferConfig
     config.chunkSize should be(TransferParameterManager.DefaultChunkSize)
   }
 
   it should "detect missing files to transfer in the transfer config" in {
     val args = List("upload", "serverUri")
 
-    expectFailureInOptions(args, TransferParameterManager.transferConfigExtractor, "transferFiles")
+    expectFailureInOptions(args, "transferFiles")
   }
 
   it should "fail for an unexpected parameter" in {
     val UnexpectedParam = "unsupported"
     val args = List("upload", "file1", "serverUri", "--tag", "test", "--" + UnexpectedParam, "strange")
 
-    expectFailureInOptions(args, TransferParameterManager.transferConfigExtractor, UnexpectedParam)
+    expectFailureInOptions(args, UnexpectedParam)
   }
 
   it should "extract a CryptConfig" in {
-    val args = List("--crypt-mode", "files", "--crypt-password", "secret", "--crypt-alg", "AES")
+    val args = inputParameters(false) ::: List("--crypt-mode", "files", "--crypt-password", "secret",
+      "--crypt-alg", "AES")
 
-    val config = extractResult(args, TransferParameterManager.cryptConfigExtractor)
+    val config = extractResult(args).cryptConfig
     config.cryptMode should be(CryptMode.Files)
     config.password should be("secret")
     config.algorithm should be("AES")
   }
 
   it should "set a default encryption algorithm" in {
-    val args = List("--crypt-mode", "filesANDNames", "--crypt-password", "secret")
+    val args = inputParameters(false) ::: List("--crypt-mode", "filesANDNames", "--crypt-password", "secret")
 
-    val config = extractResult(args, TransferParameterManager.cryptConfigExtractor)
+    val config = extractResult(args).cryptConfig
     config.cryptMode should be(CryptMode.FilesAndNames)
     config.algorithm should be(TransferParameterManager.DefaultCryptAlgorithm)
   }
 
   it should "return a dummy CryptConfig if the crypt mode is set to None" in {
-    val args = List("--crypt-mode", "none")
+    val args = inputParameters(false) ::: List("--crypt-mode", "none")
 
-    val config = extractResult(args, TransferParameterManager.cryptConfigExtractor)
-    config should be(TransferParameterManager.DisabledCryptConfig)
+    val config = extractResult(args)
+    config.cryptConfig should be(TransferParameterManager.DisabledCryptConfig)
   }
 
   it should "report a failure for an unsupported crypt mode" in {
-    val args = List("--crypt-mode", "unknownCryptMode")
+    val args = inputParameters(false) ::: List("--crypt-mode", "unknownCryptMode")
 
-    expectFailureInOptions(args, TransferParameterManager.cryptConfigExtractor, "crypt-mode")
+    expectFailureInOptions(args, "crypt-mode")
   }
 
   it should "set CryptMode None as default" in {
-    val config = extractResult(List.empty, TransferParameterManager.cryptConfigExtractor)
+    val config = extractResult(inputParameters(false))
 
-    config should be(TransferParameterManager.DisabledCryptConfig)
+    config.cryptConfig should be(TransferParameterManager.DisabledCryptConfig)
   }
 
   it should "read the encryption password from the console if it is not specified" in {
@@ -179,10 +183,10 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   }
 
   it should "extract an HttpServerConfig" in {
-    val args = List("--user", "scott", "--password", "tiger")
+    val args = inputParameters(http = true) ::: List("--user", "scott", "--password", "tiger")
 
-    val config = extractResult(args, TransferParameterManager.httpServerConfigExtractor)
-    config should be(HttpServerConfig("scott", "tiger"))
+    val config = extractResult(args)
+    config.serverConfig should be(HttpServerConfig("scott", "tiger"))
   }
 
   it should "read the HTTP server password from the console if it is not specified" in {
@@ -204,7 +208,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
       "--remove-uploaded-files", "--root-path", "/data", "--umask", "660",
       "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.cryptConfig should be(CryptConfig(CryptMode.FilesAndNames, "secret",
       TransferParameterManager.DefaultCryptAlgorithm))
     config.transferConfig.serverUrl should be("/file/server")
@@ -216,14 +220,14 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "set default values for the upload config" in {
     val args = List("upload", "file1", "file2", "/file/server", "--root-path", "/data", "--umask", "660")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.commandConfig should be(UploadCommandConfig(uploadHashes = false, removeUploadedFiles = false))
   }
 
   it should "set default values for the file server config" in {
     val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.serverConfig should be(FileServerConfig(rootPath = None, umask = TransferParameterManager.DefaultUmask))
   }
 
@@ -232,7 +236,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
       "--skip-existing", "--root-path", "/data", "--umask", "660",
       "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.cryptConfig should be(CryptConfig(CryptMode.FilesAndNames, "secret",
       TransferParameterManager.DefaultCryptAlgorithm))
     config.transferConfig.serverUrl should be("/file/server")
@@ -244,7 +248,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "set default values for the download config" in {
     val args = List("download", "file1", "file2", "/file/server", "--target-folder", "target")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.cryptConfig should be(TransferParameterManager.DisabledCryptConfig)
     config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
   }
@@ -252,14 +256,13 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "detect an unsupported transfer command" in {
     val args = List("unknownCmd", "file1", "file2", "/file/server", "--target-folder", "target")
 
-    expectFailureInOptions(args, TransferParameterManager.transferCommandConfigExtractor,
-      "transfer-command")
+    expectFailureInOptions(args, "transfer-command")
   }
 
   it should "detect transfer commands in a case-insensitive manner" in {
     val args = List("DownLoad", "file1", "file2", "/file/server", "--target-folder", "target")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
   }
 
@@ -268,7 +271,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val args = List("download", "file1", "file2", ServerUri, "--user", "scott", "--password", "tiger",
       "--target-folder", "target")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.serverConfig should be(HttpServerConfig("scott", "tiger"))
     config.commandConfig should be(DownloadCommandConfig(targetFolder = Paths get "target", overrideLocalFiles = true))
   }
@@ -278,7 +281,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val args = List("upload", "file1", "file2", ServerUri, "--user", "scott", "--password", "tiger",
       "--upload-hashes")
 
-    val config = extractResult(args, TransferParameterManager.transferCommandConfigExtractor)
+    val config = extractResult(args)
     config.serverConfig should be(HttpServerConfig("scott", "tiger"))
     config.commandConfig should be(UploadCommandConfig(uploadHashes = true, removeUploadedFiles = false))
   }
@@ -286,7 +289,6 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "detect unexpected parameters from a different server type" in {
     val args = List("upload", "file1", "file2", "/file/server", "--user", "scott", "--password", "tiger")
 
-    expectFailureInOptions(args, TransferParameterManager.transferCommandConfigExtractor,
-      "user", "password")
+    expectFailureInOptions(args, "user", "password")
   }
 }
