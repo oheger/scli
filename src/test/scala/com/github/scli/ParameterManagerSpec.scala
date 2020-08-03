@@ -207,8 +207,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val extractorCtx = ExtractorContext(extractor)
     val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
       opt.map(key => key.copy(key = key.key.toLowerCase(Locale.ROOT))))
-    val classifierFunc =
-      ParameterParser.classifierOf(ParameterManager.defaultExtractedKeyClassifiers(extractorCtx))(keyExtractor)
+    val classifierFunc = ParameterManager.classifierFunc(extractorCtx, keyExtractor = keyExtractor)
 
     val parseFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
     val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parser = parseFunc))

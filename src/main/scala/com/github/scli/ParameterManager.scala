@@ -118,13 +118,15 @@ object ParameterManager {
    * @param prefixes                the object defining prefixes for options
    * @param supportCombinedSwitches flag whether combined switches are
    *                                supported
+   * @param keyExtractor            optional function to extract keys
    * @return the default ''CliClassifierFunc'' for this extractor
    */
   def classifierFunc(extractorCtx: ExtractorContext[_],
                      prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes,
-                     supportCombinedSwitches: Boolean = false): CliClassifierFunc =
+                     supportCombinedSwitches: Boolean = false,
+                     keyExtractor: KeyExtractorFunc = null): CliClassifierFunc =
     ParameterParser.classifierOf(defaultExtractedKeyClassifiers(extractorCtx,
-      supportCombinedSwitches))(defaultKeyExtractor(prefixes))
+      supportCombinedSwitches))(getOrDefault(keyExtractor, defaultKeyExtractor(prefixes)))
 
   /**
    * Returns a ''ParsingFunc'' that is configured with the parameters provided.
