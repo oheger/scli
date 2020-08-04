@@ -21,10 +21,11 @@ import java.util.Locale
 
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterManager
+import com.github.scli.ParameterManager.ExtractorContext
+import com.github.scli.ParameterModel.ParameterKey
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, _}
 import scala.util.{Success, Try}
-import scala.concurrent.duration._
 
 /**
  * An example module that provides functionality to extract command line
@@ -212,8 +213,20 @@ object TransferParameterManager {
    * @param args the sequence with command line arguments
    * @return a ''Try'' with the results of command line processing
    */
-  def processCommandLine(args: Seq[String]): Try[(TransferCommandConfig, ParameterContext)] =
-    ParameterManager.processCommandLine(args, transferCommandConfigExtractor)
+  def processCommandLine(args: Seq[String]): Try[(TransferCommandConfig, ParameterContext)] = {
+    val extractorCtx = ExtractorContext(transferCommandConfigExtractor)
+    val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
+      opt.map(key => if (key.shortAlias) key else key.copy(key = key.key.toLowerCase(Locale.ROOT))))
+    val classifierFunc = ParameterManager.classifierFunc(extractorCtx, keyExtractor = keyExtractor,
+      supportCombinedSwitches = true)
+    val parseFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
+
+    for {
+      processedArgs <- ParameterManager.processParameterFilesWithOptions(args, extractorCtx,
+        ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true))(classifierFunc)
+      result <- ParameterManager.processCommandLineCtx(processedArgs, extractorCtx, parser = parseFunc)
+    } yield result
+  }
 
   /**
    * Returns an extractor for the configuration for encryption. Whether
@@ -277,18 +290,28 @@ object TransferParameterManager {
       .toInt
       .fallbackValue(DefaultChunkSize)
       .mandatory
+      .alias("s")
     val extTimeout = optionValue("timeout")
+      .alias("t")
       .toInt
       .mapTo(t => t.seconds)
+    val extLogs = multiOptionValue("log")
+      .alias("l")
+    val extTag = optionValue("tag")
+      .alias("T")
+    val extDryRun = switchValue("dry-run")
+      .alias("d")
+
     for {
       srcFiles <- extSrcFiles
       serverUri <- extServerUri
-      logs <- multiOptionValue("log")
-      tag <- optionValue("tag")
+      logs <- extLogs
+      tag <- extTag
       chunkSize <- extChunkSize
       timeout <- extTimeout
-    } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, logs, tag) {
-      TransferConfig(_, _, _, _, false, _, _)
+      dryRun <- extDryRun
+    } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, dryRun, logs, tag) {
+      TransferConfig(_, _, _, _, _, _, _)
     }
   }
 
@@ -358,6 +381,7 @@ object TransferParameterManager {
    */
   private lazy val cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
     optionValue("crypt-mode")
+      .alias("c")
       .toUpper
       .toEnum(CryptMode.Literals.get)
       .fallbackValue(CryptMode.None)
@@ -389,7 +413,9 @@ object TransferParameterManager {
    */
   private def uploadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
     val extUploadHashes = switchValue("upload-hashes")
+      .alias("H")
     val extRemoveUploaded = switchValue("remove-uploaded-files")
+      .alias("C")
     for {
       uploadHashes <- extUploadHashes
       removeUploaded <- extRemoveUploaded

@@ -16,11 +16,11 @@
 
 package com.github.scli.sample.transfer
 
-import java.nio.file.Paths
+import java.nio.file.{Files, Paths}
 
 import com.github.scli.ParameterExtractor.{ParameterContext, ParameterExtractionException}
 import com.github.scli.ParametersTestHelper._
-import com.github.scli.sample.transfer.TransferParameterManager._
+import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, _}
 import com.github.scli.{ConsoleReader, ParameterExtractor}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -102,7 +102,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
 
   "TransferParameterManager" should "extract a TransferConfig" in {
     val args = List("upload", "--log", "log1", "file1", "--tag", "tag", "file2", "file3", "serverUri",
-      "--log", "log2", "--chunk-size", "16384", "--timeout", "30")
+      "--log", "log2", "--chunk-size", "16384", "--timeout", "30", "--dry-run")
     val ExpPaths = List(Paths.get("file1"), Paths.get("file2"), Paths.get("file3"))
 
     val config = extractResult(args).transferConfig
@@ -112,13 +112,27 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     config.tag should be(Some("tag"))
     config.chunkSize should be(16384)
     config.timeout should be(Some(30.seconds))
+    config.dryRun shouldBe true
   }
 
-  it should "set a default chunk size" in {
+  it should "set a default chunk size and dry-run flag" in {
     val args = List("upload", "file", "serverUri")
 
     val config = extractResult(args).transferConfig
     config.chunkSize should be(TransferParameterManager.DefaultChunkSize)
+    config.dryRun shouldBe false
+  }
+
+  it should "define aliases for some parameters of the TransferConfig" in {
+    val args = inputParameters(http = false) ::: List("-l", "log1", "-T", "tag",
+      "--log", "log2", "-s", "16384", "-t", "30", "-d")
+
+    val config = extractResult(args).transferConfig
+    config.logs should be(List("log1", "log2"))
+    config.tag should be(Some("tag"))
+    config.chunkSize should be(16384)
+    config.timeout should be(Some(30.seconds))
+    config.dryRun shouldBe true
   }
 
   it should "detect missing files to transfer in the transfer config" in {
@@ -145,7 +159,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   }
 
   it should "set a default encryption algorithm" in {
-    val args = inputParameters(false) ::: List("--crypt-mode", "filesANDNames", "--crypt-password", "secret")
+    val args = inputParameters(false) ::: List("-c", "filesANDNames", "--crypt-password", "secret")
 
     val config = extractResult(args).cryptConfig
     config.cryptMode should be(CryptMode.FilesAndNames)
@@ -290,5 +304,59 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val args = List("upload", "file1", "file2", "/file/server", "--user", "scott", "--password", "tiger")
 
     expectFailureInOptions(args, "user", "password")
+  }
+
+  it should "treat long options in a case-insensitive way" in {
+    val args = inputParameters(http = false) ::: List("--Log", "log1", "--TAG", "tag",
+      "--Chunk-Size", "16384", "--TIMEOUT", "30", "--Dry-RUN")
+
+    val config = extractResult(args).transferConfig
+    config.logs should be(List("log1"))
+    config.tag should be(Some("tag"))
+    config.chunkSize should be(16384)
+    config.timeout should be(Some(30.seconds))
+    config.dryRun shouldBe true
+  }
+
+  /**
+   * Processes a command line that references a file and checks whether this
+   * file is correctly evaluated.
+   *
+   * @param key the key of the option referencing the file
+   */
+  private def checkSupportForParameterFiles(key: String): Unit = {
+    val serverConfig = HttpServerConfig("scott", "tiger")
+    val fileContent = List("--timeout", "15", "--chunk-size", "8192", "--user", serverConfig.user,
+      "--password", serverConfig.password)
+    import scala.jdk.CollectionConverters._
+    val path = Files.createTempFile("scliTest", ".tmp")
+    val paramFile = Files.write(path, fileContent.asJava)
+    try {
+      val args = inputParameters(http = true) ::: List(key, paramFile.toAbsolutePath.toString)
+      val config = extractResult(args)
+      config.transferConfig.chunkSize should be(8192)
+      config.transferConfig.timeout should be(Some(15.seconds))
+      config.serverConfig should be(serverConfig)
+    } finally {
+      Files.delete(paramFile)
+    }
+  }
+
+  it should "support parameter files" in {
+    checkSupportForParameterFiles("--param-file")
+  }
+
+  //TODO This test fails currently as the -f option is incorrectly classified as switch
+  ignore should "support parameter files with a short alias" in {
+    checkSupportForParameterFiles("-f")
+  }
+
+  it should "support combining switches in a single parameter" in {
+    val args = inputParameters(http = false) ::: List("--chunk-size", "8192", "-dHC")
+    val expUploadConfig = UploadCommandConfig(uploadHashes = true, removeUploadedFiles = true)
+
+    val config = extractResult(args)
+    config.transferConfig.dryRun shouldBe true
+    config.commandConfig should be(expUploadConfig)
   }
 }
