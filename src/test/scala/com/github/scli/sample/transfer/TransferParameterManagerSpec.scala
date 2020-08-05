@@ -346,8 +346,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     checkSupportForParameterFiles("--param-file")
   }
 
-  //TODO This test fails currently as the -f option is incorrectly classified as switch
-  ignore should "support parameter files with a short alias" in {
+  it should "support parameter files with a short alias" in {
     checkSupportForParameterFiles("-f")
   }
 

@@ -20,7 +20,7 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ParameterExtractionException}
-import com.github.scli.ParameterManager.ExtractorContext
+import com.github.scli.ParameterManager.ExtractionSpec
 import com.github.scli.ParameterModel.ParameterKey
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -191,12 +191,12 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
   it should "support different option prefixes" in {
     val args = List("/" + TestOptionKey, TestOptionValue)
     val extractor = ParameterExtractor.optionValue(TestOptionKey).mandatory
-    val extractorCtx = ExtractorContext(extractor)
     val prefixes = ParameterParser.OptionPrefixes(pk("/"))
+    val spec = ExtractionSpec(extractor, prefixes = prefixes)
 
-    val classifierFunc = ParameterManager.classifierFunc(extractorCtx, prefixes = prefixes)
-    val parserFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parser = parserFunc))
+    val classifierFunc = ParameterManager.classifierFunc(spec)
+    val parserFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
+    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec, parser = parserFunc))
     res should be(TestOptionValue)
   }
 
@@ -204,13 +204,13 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val args = List("--" + TestOptionKey, TestOptionValue)
     val key = TestOptionKey.toLowerCase(Locale.ROOT)
     val extractor = ParameterExtractor.optionValue(key).mandatory
-    val extractorCtx = ExtractorContext(extractor)
     val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
       opt.map(key => key.copy(key = key.key.toLowerCase(Locale.ROOT))))
-    val classifierFunc = ParameterManager.classifierFunc(extractorCtx, keyExtractor = keyExtractor)
+    val spec = ExtractionSpec(extractor, keyExtractor = keyExtractor)
+    val classifierFunc = ParameterManager.classifierFunc(spec)
 
-    val parseFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extractorCtx, parser = parseFunc))
+    val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
+    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec, parser = parseFunc))
     res should be(TestOptionValue)
   }
 
@@ -270,11 +270,11 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       verbose <- extVerbose
       debug <- extDebug
     } yield (verbose, debug)
-    val extCtx = ExtractorContext(ParameterManager.wrapTryExtractor(extractor))
+    val spec = ExtractionSpec(ParameterManager.wrapTryExtractor(extractor), supportCombinedSwitches = true)
 
-    val classifierFunc = ParameterManager.classifierFunc(extCtx, supportCombinedSwitches = true)
-    val parser = ParameterManager.parsingFuncForClassifier(extCtx)(classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLineCtx(args, extCtx, parser = parser))
+    val classifierFunc = ParameterManager.classifierFunc(spec)
+    val parser = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
+    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec, parser = parser))
     res should be((Success(true), Success(true)))
   }
 
@@ -286,9 +286,9 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       verbose <- extVerbose
       debug <- extDebug
     } yield (verbose, debug)
-    val extCtx = ExtractorContext(ParameterManager.wrapTryExtractor(extractor))
+    val extCtx = ExtractionSpec(ParameterManager.wrapTryExtractor(extractor))
 
-    val exception = failedResult(ParameterManager.processCommandLineCtx(args, extCtx))
+    val exception = failedResult(ParameterManager.processCommandLineSpec(args, extCtx))
     exception.failures should have size 1
     exception.failures.head.key should be(ParameterKey("dv", shortAlias = true))
   }
@@ -298,11 +298,10 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val FileName = "someFile.txt"
     val args = List("--" + TestOptionKey, TestOptionValue, "--" + FileOption.key, FileName)
     val extractor = ParameterExtractor.optionValue(TestOptionKey, help = Some(HelpTestOption))
-    val extractorCtx = ExtractorContext(extractor)
+    val spec = ExtractionSpec(extractor, fileOptions = List(FileOption))
 
-    val classifierFunc = ParameterManager.classifierFunc(extractorCtx)
-    val exception = failedResult(ParameterManager.processParameterFilesWithOptions(args, extractorCtx,
-      FileOption)(classifierFunc))
+    val classifierFunc = ParameterManager.classifierFunc(spec)
+    val exception = failedResult(ParameterManager.processParameterFiles(args, spec)(classifierFunc))
     exception.failures should have size 1
     val failure = exception.failures.head
     failure.key should be(FileOption)
@@ -313,5 +312,18 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
     val fileOptionAttrs = modelContext.options(FileOption)
     fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
+  }
+
+  it should "detect a file option with a short alias if combined switches are enabled" in {
+    val FileOption = ParameterKey("f", shortAlias = true)
+    val args = List("--" + TestOptionKey, TestOptionValue, "-" + FileOption.key, "nonExisting.txt")
+    val extractor = ParameterExtractor.optionValue(TestOptionKey, help = Some(HelpTestOption))
+    val spec = ExtractionSpec(extractor, fileOptions = List(FileOption), supportCombinedSwitches = true)
+
+    val classifierFunc = ParameterManager.classifierFunc(spec)
+    val exception = failedResult(ParameterManager.processParameterFiles(args, spec)(classifierFunc))
+    exception.failures should have size 1
+    val failure = exception.failures.head
+    failure.key should be(FileOption)
   }
 }

@@ -21,7 +21,7 @@ import java.util.Locale
 
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterManager
-import com.github.scli.ParameterManager.ExtractorContext
+import com.github.scli.ParameterManager.ExtractionSpec
 import com.github.scli.ParameterModel.ParameterKey
 
 import scala.concurrent.duration.{Duration, _}
@@ -214,17 +214,17 @@ object TransferParameterManager {
    * @return a ''Try'' with the results of command line processing
    */
   def processCommandLine(args: Seq[String]): Try[(TransferCommandConfig, ParameterContext)] = {
-    val extractorCtx = ExtractorContext(transferCommandConfigExtractor)
     val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
       opt.map(key => if (key.shortAlias) key else key.copy(key = key.key.toLowerCase(Locale.ROOT))))
-    val classifierFunc = ParameterManager.classifierFunc(extractorCtx, keyExtractor = keyExtractor,
-      supportCombinedSwitches = true)
-    val parseFunc = ParameterManager.parsingFuncForClassifier(extractorCtx)(classifierFunc)
+    val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
+      supportCombinedSwitches = true,
+      fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)))
+    val classifierFunc = ParameterManager.classifierFunc(spec)
+    val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
 
     for {
-      processedArgs <- ParameterManager.processParameterFilesWithOptions(args, extractorCtx,
-        ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true))(classifierFunc)
-      result <- ParameterManager.processCommandLineCtx(processedArgs, extractorCtx, parser = parseFunc)
+      processedArgs <- ParameterManager.processParameterFiles(args, spec)(classifierFunc)
+      result <- ParameterManager.processCommandLineSpec(processedArgs, spec, parser = parseFunc)
     } yield result
   }
 
