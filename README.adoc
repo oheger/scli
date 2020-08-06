@@ -87,6 +87,39 @@ deliberately simple and are based on standard collection types. This section
 describes the most important types a user will deal with when processing
 command line arguments.
 
+==== ParameterKey - identifiers for parameters
+
+In order to access the values of parameters and some other metadata, they have
+unique keys. For options and switches, the key also determines how the
+parameter needs to be specified on the command line: it consists of a string
+part that corresponds to the parameter name on the command line. In addition,
+there is a flag whether the string is a long parameter name or a short alias.
+Applications often distinguish between these types of keys, and they also use
+different prefixes to specify them. For instance, an application supporting
+user credentials may define the following long option names:
+
+ login --user scott --password tiger
+
+Alternatively, option names can be replaced by short aliases; to make clear
+that the keys in use are aliases, the standard prefix `--` is replaced by
+`-` (this is actually a standard convention):
+
+ login -u scott -p tiger
+
+The information whether a key refers to a long parameter name or a short alias
+is important, as it is typically not allowed to mix the different prefixes. So
+the following command line would be invalid:
+
+ login -user scott --p tiger
+
+_SCLI_ defines the `ParameterKey` case class to store the information - the
+string key plus the alias flag - to fully describe a parameter key. While the
+developer typically need not create instances of this class, it is pretty
+present in various parts of the API.
+
+NOTE: For input parameters, there is a special key defined as a constant. This
+key is not visible on the command line.
+
 ==== ParametersMap - a parsed command line
 
 In the parsing phase (refer to <<Processing phases>>), the sequence of strings
@@ -96,16 +129,14 @@ _Map_ of the following type:
 
 [source,scala]
 ----
-type ParametersMap = Map[String, Iterable[String]]
+type ParametersMap = Map[ParameterKey, Iterable[String]]
 ----
 
 The meaning of this type is as follows:
 
-* Command line arguments have a key by which they can be accessed. This is
-  typically the name of the option or the switch. In case of an input
-  parameter, a special constant serves as key. To support direct access to a
-  specific command line element, the _ParametersMap_ type uses the key of the
-  element.
+* Command line arguments have a key by which they can be accessed, as discussed
+  in the previous section. To support direct access to a specific command line
+  element, the _ParametersMap_ type uses the key of the element.
 * The values of command line options are strings initially - after all, this is
   how the command line is passed to the application. In later transformation
   steps, the value types can be changed.
@@ -239,16 +270,25 @@ val combinedExtractor = for {
 ----
 
 If all the extractors that are to be combined return a `Try[XXX]` (which is
-typically the case when using the standard types), SCLI provides special
+typically the case when using the standard types), _SCLI_ provides special
 support for creating a result object out of the single argument values
 including error handling: As long as all tried values are successful, a result
 object is created; otherwise, result is an exception that contains the messages
 of all failed extractions.
 
-This concludes the discussion of the fundamental concepts of the SCLI library.
+In the recommended usage scenario of _SCLI_, there is a top-level extractor
+that processes the whole command line and transforms it into a data object, so
+that it can be evaluated by the application. Command line processing is then a
+matter of executing this extractor.
+
+There is one related class named `ExtractionSpec`. It is a specification how to
+process the command line. It wraps the top-level extractor and contains some
+settings to customize the parsing and extraction processes.
+
+This concludes the discussion of the fundamental concepts of the _SCLI_ library.
 Now it is a good time to checkout the link:Tutorial.adoc[tutorial] to see
 practical usage examples.
 
 == License
 
-SCLI is available under the http://www.apache.org/licenses/LICENSE-2.0.html[Apache 2.0 License].
+_SCLI_ is available under the http://www.apache.org/licenses/LICENSE-2.0.html[Apache 2.0 License].
