@@ -242,6 +242,76 @@ parameter looks as follows:
 val extOverride = switchValue("skip-existing", presentValue = false)
 ----
 
+==== (Short) Alias names
+
+User-friendly command line applications often support abbreviations for their
+switches and option names. Per default, parameters have a descriptive name,
+which can be used for instance in shell scripts to make their meaning explicit;
+but for the user typing in commands in a terminal, it is easier to use short
+names to reduce the amount of typing. Convention is that long parameter names
+use the prefix `--` while short aliases are prefixed only with a single `-`.
+The _transfer_ demo application wants to support its users in this way and
+therefore defines a number of aliases for its options and switches. For
+instance, the following command lines are equivalent:
+
+ transfer upload --log "Updated file" file.txt --tag "v10" /shared/data \
+   --chunk-size 16384 --timeout 30 --dry-run
+
+and
+
+ transfer upload -l "Updated file" file.txt -T "v10" /shared/data -s 16384 -t 30 -d
+
+Defining a short alias name for an option or switch is straight-forward: just
+use the `alias()` function on a `CliExtractor`. Below are some examples taken
+from the code of the demo application:
+
+[source,scala]
+----
+val extChunkSize = optionValue("chunk-size")
+  .toInt
+  .fallbackValue(DefaultChunkSize)
+  .mandatory
+  .alias("s")
+val extTimeout = optionValue("timeout")
+  .alias("t")
+  .toInt
+  .mapTo(t => t.seconds)
+val extLogs = multiOptionValue("log")
+  .alias("l")
+val extTag = optionValue("tag")
+  .alias("T")
+val extDryRun = switchValue("dry-run")
+  .alias("d")
+----
+
+Note that it does not matter where in the chain of modifiers the `alias`
+function appears; it is available on all extractors independent on their data
+type. (This includes extractors for input parameters, although the alias has no
+effect in this case.)
+
+Per default, the key passed to the `optionValue()` and `switchValue()`
+functions is considered the long parameter name, while the `alias()` function
+sets a short key. This is not enforced though; the functions accepting a
+string-based key also support a boolean parameter named _shortAlias_; passing
+in *true* or *false* here gives full control over the interpretation of the
+key.
+
+There is no restriction in the number of aliases that can be set for a
+parameter. The typical use case is to have at most one long key and one short
+alias, but the developer is free to define multiple alias, which can be both
+short or long keys. One use case could be a new version of an application that
+has renamed a parameter because the old name may have been misleading. To
+remain backwards compatibility, the old deprecated name could be used as an
+alias for the new name:
+
+ val extractor = optionValue("new-key")
+   .alias("n")
+   .alias("old-key", shortAlias = false)
+
+NOTE: Parameter aliases are processed already in the parsing phase. That means
+that the map with parameters passed to extractors contains only the standard
+parameter keys.
+
 === Input parameters
 
 Input values are elements on the command line that cannot be assigned to
