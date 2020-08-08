@@ -1105,7 +1105,91 @@ to a map of parameters, which can serve as input for the extraction step.
 an `ExtractionSpec`, and with a custom classifier function, too. The parsing
 function obtained that way can then be passed to `processCommandLineSpec()`. An
 example making use of these features is available in the section about
-parameter files.
+<<Reading parameter files,parameter files>>.
+
+==== Reading parameter files
+
+If an application supports complex command line parameters and requires a
+larger number of them to be present on each invocation, it is beneficial for
+the users if sets of parameters could be stored in files and then simply be
+referenced from the command line. For the _transfer_ sample application for
+instance, it makes sense to have parameter files defining default upload or
+download options.
+
+_SCLI_ supports this use case; it can read parameters from files. A parameter
+file is a plain text file where each line corresponds to an element of the
+command line; empty lines are ignored. So a parameter file for the _transfer_
+application defining default upload settings could look as follows:
+
+ --time-out
+ 15
+ --chunk-size
+ 16384
+ --user
+ uploader@transfer.org
+ --upload-hashes
+
+Provided that the file is available in the current directory under the name
+`upload-settings.txt`, it can then be referenced from the command line using
+the `--param-file` option or its short alias `-f` (of course, relative or
+absolute paths to the parameter file are possible as well):
+
+ transfer upload file1.txt file2.txt https://target.upload.com/data -f upload-settings.txt
+
+The reading of parameter files is an optional step, which needs to be invoked
+manually before the actual processing of the command line. `ParameterManager`
+offers the function `processParameterFiles()` for this purpose. The function
+basically takes the original command line - as a sequence of strings - and
+replaces all references to parameter files by the content of the files. Result
+is a modified sequence, which can then become the input for the parsing phase.
+As the processing of parameter files can fail - users may provide wrong file
+names, or there may be I/O errors -, the function actually returns a `Try` with
+the modified sequence of arguments.
+
+In addition to the original command line, `processParameterFiles()` needs an
+`ExtractionSpec` and a _classifier function_ (refer to
+<<Advanced customizations>>). This is because it needs to do a partial parsing
+of the command line to detect the options referencing parameter files. The keys
+of the options to look for need to be specified in the `fileOptions` property
+of the `ExtractionSpec`, which accepts a sequence of `ParameterKey` objects.
+The mandatory classifier function can be queried from `ParameterManager`. Here
+the same function should be used as for the following command line processing;
+therefore, the function should be obtained once and re-used in both steps. For
+the processing step this is done by creating a custom _parsing function_ based
+on the classifier function. How this looks like in practice can be seen in the
+code fragment below, which shows the main function to process the command line
+of the _transfer_ sample application:
+
+[source,scala]
+----
+def processCommandLine(args: Seq[String]): Try[(TransferCommandConfig, ParameterContext)] = {
+  val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
+    opt.map(key => if (key.shortAlias) key else key.copy(key = key.key.toLowerCase(Locale.ROOT))))
+  val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
+    supportCombinedSwitches = true,
+    fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)))
+  val classifierFunc = ParameterManager.classifierFunc(spec)
+  val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
+
+  for {
+    processedArgs <- ParameterManager.processParameterFiles(args, spec)(classifierFunc)
+    result <- ParameterManager.processCommandLineSpec(processedArgs, spec, parser = parseFunc)
+  } yield result
+}
+----
+
+The function sets up an `ExtractionSpec` object, filling in the settings
+already discussed under <<Running an extractor with custom settings>>. In
+addition, it provides a list of two parameter keys to define the options
+referencing parameter files - here the keys `--param-file`, and `-f` are
+defined.
+
+Based on this specification, the function can now obtain a classifier function
+and a parsing function for this classifier function. The *for* comprehension at
+the end of the function invokes `ParameterManager` with the settings prepared
+so far. The first line triggers the processing of parameter files resulting in
+a possibly extended sequence of arguments. This sequence goes as input into the
+second line, which does the actual command line processing.
 
 === Conditional extractors
 
