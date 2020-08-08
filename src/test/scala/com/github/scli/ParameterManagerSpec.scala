@@ -194,9 +194,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val prefixes = ParameterParser.OptionPrefixes(pk("/"))
     val spec = ExtractionSpec(extractor, prefixes = prefixes)
 
-    val classifierFunc = ParameterManager.classifierFunc(spec)
-    val parserFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec, parser = parserFunc))
+    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec))
     res should be(TestOptionValue)
   }
 
@@ -207,10 +205,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
       opt.map(key => key.copy(key = key.key.toLowerCase(Locale.ROOT))))
     val spec = ExtractionSpec(extractor, keyExtractor = keyExtractor)
-    val classifierFunc = ParameterManager.classifierFunc(spec)
 
-    val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec, parser = parseFunc))
+    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec))
     res should be(TestOptionValue)
   }
 
@@ -272,9 +268,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     } yield (verbose, debug)
     val spec = ExtractionSpec(ParameterManager.wrapTryExtractor(extractor), supportCombinedSwitches = true)
 
-    val classifierFunc = ParameterManager.classifierFunc(spec)
-    val parser = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
-    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec, parser = parser))
+    val (res, _) = triedResult(ParameterManager.processCommandLineSpec(args, spec))
     res should be((Success(true), Success(true)))
   }
 

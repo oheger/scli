@@ -947,7 +947,165 @@ not been accessed by any extractor.
 
 ==== Running an extractor with custom settings
 
-TODO
+_SCLI_ supports a number of ways to customize command line processing. For
+instance, you can change the prefixes used to identify options or switches on
+the command line, or you can modify the treatment of switches.
+
+The entry point into customized command line processing is the
+`processCommandLineSpec()` function of `ParameterManager`. This function
+differs from the function used by the previous examples in that it does not
+expect a `CliExtractor` as argument, but an `ExtractionSpec` object.
+`ExtractionSpec` is a data class that holds the `CliExtractor` to execute; in
+addition, it supports a couple of settings to configure the parsing and
+extraction steps. When creating an instance of `ExtractionSpec` only the
+`CliExtractor` is a mandatory parameter; for all other settings, the class sets
+meaningful default values. By selectively setting specific properties, command
+line processing can be tweaked to a certain degree. In the following, we give
+some examples of possible adjustments.
+
+One use case could be changing the prefixes for option and switch parameters.
+For instance, on Windows the prefix `/` used to be quite popular, as in:
+
+ copy /b test.txt target
+
+In order to change the prefixes, you have to pass an object of the
+`ParameterParser.OptionPrefixes` class to the _prefixes_ parameter of the
+`ExtractionSpec` class. `OptionPrefixes` is a data class that holds an
+arbitrary number of prefixes that are used by the parser to detect option or
+switch parameters. Each prefix is represented by a `ParameterKey` object, so it
+is clear whether it marks long or short parameter names.
+
+To demonstrate this feature, we might want to support the Windows option prefix
+in addition to the default one. This is achieved as follows:
+
+[source,scala]
+----
+val extractor = ParameterExtractor.optionValue("flag")
+  .alias("f")
+  .mandatory
+val prefixes = ParameterParser.OptionPrefixes(ParameterKey("/", shortAlias = false),
+  ParameterKey("--", shortAlias = false), ParameterKey("-", shortAlias = true))
+val spec = ExtractionSpec(extractor, prefixes = prefixes)
+
+val triedResult = ParameterManager.processCommandLineSpec(args, spec)
+----
+
+Given this declaration, all the following command lines would be valid:
+
+ my-app --flag value
+ my-app /flag value
+ my-app -f value
+
+Another customization option supported by `ExtractionSpec` affects the handling
+of switches: Some applications allow combining multiple single-letter switches
+in a single parameter. A popular example is the _tar_ utility; it supports
+command lines as the following:
+
+ tar -zvxf data.tar.gz
+
+The command line element `-zvfx` actually consists of four switches: `z` to
+enable support for _gz_ files; `v` for verbose output; `f` to specify a source
+file; and `x` to set the extract mode. Having these switches combined in a
+single argument is a shorter form of specifying four switch arguments as in:
+
+ tar -z -v -x -f data.tar.gz
+
+Enabling this mode in _SCLI_ is just a matter of setting the
+`supportCombinedSwitches` setting of `ExtractionSpec` to *true*. The _transfer_
+sample application makes use of this feature; therefore, the following command
+line will be accepted:
+
+ transfer upload file.txt /shared/content/ --chunk-size 8182 -dHC
+
+Here, in the last parameter, the following switches are set:
+
+* the _dry-run_ mode is enabled
+* hashes for uploaded files are generated
+* files are removed after upload
+
+Such parameters with multiple combined switches can appear everywhere on the
+command line; there can be multiple of them, and it is possible to mix the
+different styles to define switches. A current limitation is that for all the
+switches that can be combined single-letter short alias keys are defined.
+
+Applications that need to modify the way option and switch parameters are
+recognized can make use of a further customization option: Per default, the
+parameter parser checks whether a parameter on the command line starts with one
+of the prefixes configured. If so, the prefix is removed, and the resulting
+string becomes the key of the switch or option. Under the hood, these checks
+and manipulations are done by a so-called _key extractor function_, which is
+defined as follows:
+
+[source,scala]
+----
+type KeyExtractorFunc = String => Option[ParameterKey]
+----
+
+So the function expects a string for the command line element as input and
+returns an `Option` with a key if one could be extracted. `ExtractionSpec`
+allows defining a custom key extractor function. This gives an application a
+lot of control over the processing of option and switch parameters; it would be
+possible to use a completely different algorithm to detect options and
+switches. But even if you do not want to go that far, this mechanism gives an
+application a hook to do some manipulations on parameter keys.
+
+The _transfer_ sample application uses a custom key extractor function to
+recognize long parameter keys independent of their case. So the parameter keys
+`--chunk-size`, `--Chunk-Size`, and `--CHUNK-SIZE` should all mean the same. To
+achieve this, it uses a custom extractor function that is based on the default
+algorithm and checks whether a key could be extracted with the _shortAlias_
+flag set to *false* (so short aliases remain case-sensitive). If this is the
+case, the key is converted to lowercase. Here is the code that configures this
+custom key extractor function in `TransferParameterManager`:
+
+[source,scala]
+----
+val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
+  opt.map(key => if (key.shortAlias) key else key.copy(key = key.key.toLowerCase(Locale.ROOT))))
+val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
+  supportCombinedSwitches = true)
+----
+
+The default key extractor function is available via the
+`ParameterManager.defaultKeyExtractor()` function. It is then extended by the
+conditional conversion of the resulting key to lowercase.
+
+==== Advanced customizations
+
+The customization options described so far have all been related to the
+`ExtractionSpec` class. These options are interpreted by the `ParameterManager`
+class, which then interacts with the `ParameterParser` module responsible for
+the actual parameter parsing. Applications needing even more control over the
+parsing of parameters could use functionality provided by `ParameterParser`
+directly.
+
+One feature provided by `ParameterParser`, which may be of interest for
+applications, is the _classifier function_. When the parser processes a command
+line it iterates over the single strings and invokes the classifier function on
+each. The function then returns a result indicating whether this element is an
+option, a switch, or an input parameter.
+
+`ParameterManager` generates a default classifier function, but applications
+could extend this function or replace it by a completely different
+implementation.
+
+It is even possible to replace the whole parameter parsing step. The functions
+to process the command line discussed so far support an additional optional
+parameter for the _parsing function_ to use. The parsing function is declared
+as:
+
+[source,scala]
+----
+type ParsingFunc = Seq[String] => ParametersMap
+----
+
+So, it basically converts a sequence of strings (representing the command line)
+to a map of parameters, which can serve as input for the extraction step.
+`ParameterManager` has functions to create a default parsing function based on
+an `ExtractionSpec`, and with a custom classifier function, too. The parsing
+function obtained that way can then be passed to `processCommandLineSpec()`. An
+example making use of these features is available in the section about
+parameter files.
 
 === Conditional extractors
 
