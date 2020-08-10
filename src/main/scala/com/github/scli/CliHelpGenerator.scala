@@ -398,6 +398,40 @@ object CliHelpGenerator {
     data => generators.flatMap(g => g(data)).toList
 
   /**
+   * Returns a ''ColumnGenerator'' function that composes the results of two
+   * single-line generators. This function is similar to
+   * ''composeColumnGenerator()'', but it only combines the results of a
+   * single line of two generators. It checks whether both generators produce
+   * at least one line. If so, result is a single line containing the text from
+   * both separators separated by the separator provided. If only one of the
+   * generators produces a result line, this line is returned. If a generator
+   * produces multiple lines, all lines except for the first one are ignored.
+   * This function is useful if a table cell should contain the values of
+   * multiple attributes.
+   *
+   * @param generator1 the first generator
+   * @param generator2 the second generator
+   * @param separator  the separator string
+   * @return the ''ColumnGenerator'' producing a combined result line
+   */
+  def composeSingleLineColumnGenerator(generator1: ColumnGenerator, generator2: ColumnGenerator,
+                                       separator: String): ColumnGenerator =
+    data => {
+      val optValue1 = generator1(data).headOption
+      val optValue2 = generator2(data).headOption
+      (optValue1, optValue2) match {
+        case (Some(value1), Some(value2)) =>
+          List(value1 + separator + value2)
+        case (Some(value), None) =>
+          List(value)
+        case (None, Some(value)) =>
+          List(value)
+        case (None, None) =>
+          Nil
+      }
+    }
+
+  /**
    * Generates an overview over the input parameters of an application. The
    * function generates a list where each element represents an input
    * parameter. The information about a single parameter is a visual

@@ -741,6 +741,49 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     result should be(List("v1", "v2", "v3"))
   }
 
+  it should "provide a ColumnGenerator that composes a line from two generators" in {
+    val attributes = Map("a1" -> "v1", "a2" -> "v2")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
+    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+
+    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
+    val result = generator(data)
+    result should be(List("v1, v2"))
+  }
+
+  it should "provide a ColumnGenerator that composes a line if generator 2 does not produce a result" in {
+    val attributes = Map("a1" -> "v1")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
+    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+
+    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
+    val result = generator(data)
+    result should be(List("v1"))
+  }
+
+  it should "provide a ColumnGenerator that composes a line if generator 1 does not produce a result" in {
+    val attributes = Map("a1" -> "v1")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
+    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+
+    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g2, g1, ", ")
+    val result = generator(data)
+    result should be(List("v1"))
+  }
+
+  it should "provide a ColumnGenerator that composes a line if both generators do not produce a result" in {
+    val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
+    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
+    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+
+    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g2, g1, "*")
+    val result = generator(data)
+    result should have size 0
+  }
+
   it should "provide a ColumnGenerator that does line wrapping" in {
     val text =
       """|Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy
