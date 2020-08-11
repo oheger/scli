@@ -787,6 +787,66 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     result should have size 0
   }
 
+  it should "provide a ColumnGenerator that appends a separator and handles an empty result" in {
+    val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
+    val gen = CliHelpGenerator.attributeColumnGenerator("someKey")
+
+    val generator = CliHelpGenerator.separatorColumnGenerator(gen, "---")
+    val result = generator(data)
+    result should have size 0
+  }
+
+  it should "provide a ColumnGenerator that appends a separator to a single-line result" in {
+    val Attr = "testAttr"
+    val Value = "aValue"
+    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> Value)))
+    val gen = CliHelpGenerator.attributeColumnGenerator(Attr)
+
+    val generator = CliHelpGenerator.separatorColumnGenerator(gen, "***")
+    val result = generator(data)
+    result should contain only Value
+  }
+
+  it should "provide a ColumnGenerator that appends a separator to a multi-line result" in {
+    val Attr = "multiLineAttr"
+    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> "v1,v2,v3")))
+    val gen: ColumnGenerator = data => data.attributes.attributes(Attr).split(",").toList
+
+    val generator = CliHelpGenerator.separatorColumnGenerator(gen, ";")
+    val result = generator(data)
+    result should be(List("v1;", "v2;", "v3"))
+  }
+
+  it should "provide a ColumnGenerator that converts a result to a single line" in {
+    val Attr = "multiLineAttr"
+    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> "v1,v2,v3")))
+    val gen: ColumnGenerator = data => data.attributes.attributes(Attr).split(",").toList
+
+    val generator = CliHelpGenerator.singleLineColumnGenerator(gen, "; ")
+    val result = generator(data)
+    result should contain only "v1; v2; v3"
+  }
+
+  it should "provide a ColumnGenerator that converts a result to a single line and handles an empty result" in {
+    val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
+    val gen = CliHelpGenerator.attributeColumnGenerator("undefined")
+
+    val generator = CliHelpGenerator.singleLineColumnGenerator(gen, "~~~")
+    val result = generator(data)
+    result should have size 0
+  }
+
+  it should "provide a ColumnGenerator that converts a result to a single line and handles a single line" in {
+    val Attr = "singleLineAttr"
+    val Value = "foo"
+    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> Value)))
+    val gen = CliHelpGenerator.attributeColumnGenerator(Attr)
+
+    val generator = CliHelpGenerator.singleLineColumnGenerator(gen, "===")
+    val result = generator(data)
+    result should contain only Value
+  }
+
   it should "provide a ColumnGenerator that does line wrapping" in {
     val text =
       """|Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy

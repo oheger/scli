@@ -446,6 +446,40 @@ object CliHelpGenerator {
     }
 
   /**
+   * Returns a ''ColumnGenerator'' that adds a separator between the lines
+   * produced by the given generator. On each line except for the last one the
+   * given separator string is appended. This is useful if the wrapped
+   * generator yields a list of items; with this function, these items can then
+   * be combined, e.g. by adding a comma as separator.
+   *
+   * @param generator the generator to be modified
+   * @param separator the separator string
+   * @return the ''ColumnGenerator'' appending this separator string
+   */
+  def separatorColumnGenerator(generator: ColumnGenerator, separator: String): ColumnGenerator =
+    data => generator(data).foldRight(List.empty[String]) { (line, list) =>
+      val modifiedLine = if (list.isEmpty) line else line + separator
+      modifiedLine :: list
+    }
+
+  /**
+   * Returns a ''ColumnGenerator'' that transforms the result of the given
+   * generator to a single line, using the separator provided as delimiter
+   * between the single elements. If the wrapped generator returns an empty
+   * result, the result of this generator is empty, too. With this function a
+   * list of items can be transformed to fit into a single line in a cell.
+   *
+   * @param generator the generator to be modified
+   * @param separator the separator string
+   * @return the ''ColumnGenerator'' producing a single line result
+   */
+  def singleLineColumnGenerator(generator: ColumnGenerator, separator: String): ColumnGenerator =
+    data => generator(data) match {
+      case l@_ :: _ => List(l.mkString(separator))
+      case _ => Nil
+    }
+
+  /**
    * Generates an overview over the input parameters of an application. The
    * function generates a list where each element represents an input
    * parameter. The information about a single parameter is a visual
