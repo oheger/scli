@@ -32,8 +32,17 @@ import scala.collection.mutable.ListBuffer
  */
 object CliHelpGenerator {
 
-  /** The prefix indicating a command line option. */
-  final val DefaultOptionPrefix = "--"
+  /**
+   * The default prefix indicating a long key for a command line option or
+   * switch.
+   */
+  final val DefaultLongOptionPrefix = "--"
+
+  /**
+   * The default prefix indicating a short key for a command line option or
+   * switch.
+   */
+  final val DefaultShortOptionPrefix = "-"
 
   /**
    * A standard sort function for parameters that implements an alphabetic
@@ -312,11 +321,16 @@ object CliHelpGenerator {
    * current command line parameter. This can be used for instance in the first
    * column to display the key the following information is about.
    *
-   * @param optionPrefix a prefix added to the parameter name
+   * @param longOptionPrefix  a prefix added to long parameter names
+   * @param shortOptionPrefix a prefix added to short parameter names
    * @return the ''ColumnGenerator'' generating the parameter name
    */
-  def parameterNameColumnGenerator(optionPrefix: String = DefaultOptionPrefix): ColumnGenerator =
-    data => List(optionPrefix + data.key)
+  def parameterNameColumnGenerator(longOptionPrefix: String = DefaultLongOptionPrefix,
+                                   shortOptionPrefix: String = DefaultShortOptionPrefix): ColumnGenerator =
+    data => {
+      val prefix = if (data.key.shortAlias) shortOptionPrefix else longOptionPrefix
+      List(prefix + data.key.key)
+    }
 
   /**
    * Returns a ''ColumnGenerator'' that renders the multiplicity attribute.

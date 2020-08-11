@@ -33,6 +33,9 @@ object CliExtractorHelpSpec {
   /** Key for a test option. */
   private val Key = ParameterKey("testOption", shortAlias = false)
 
+  /** A key representing the short alias of a test option. */
+  private val ShortKey = ParameterKey("o", shortAlias = true)
+
   /** A test help text. */
   private val HelpText = "Test help text for the test help option."
 
@@ -837,15 +840,30 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val data = testOptionMetaData(Key, HelpText)
 
     val generator = CliHelpGenerator.parameterNameColumnGenerator()
-    generator(data) should contain only (CliHelpGenerator.DefaultOptionPrefix + Key)
+    generator(data) should contain only (CliHelpGenerator.DefaultLongOptionPrefix + Key.key)
   }
 
-  it should "support customizing the prefixes for the parameter name column generator" in {
+  it should "provide a ColumnGenerator that outputs the correct prefix for the parameter name" in {
+    val data = testOptionMetaData(ShortKey, HelpText)
+
+    val generator = CliHelpGenerator.parameterNameColumnGenerator()
+    generator(data) should contain only (CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key)
+  }
+
+  it should "support customizing the long prefix for the parameter name column generator" in {
     val Prefix = "/"
     val data = testOptionMetaData(Key, HelpText)
 
     val generator = CliHelpGenerator.parameterNameColumnGenerator(Prefix)
-    generator(data) should contain only (Prefix + Key)
+    generator(data) should contain only (Prefix + Key.key)
+  }
+
+  it should "support customizing the short prefix for the parameter name column generator" in {
+    val Prefix = "#"
+    val data = testOptionMetaData(ShortKey, HelpText)
+
+    val generator = CliHelpGenerator.parameterNameColumnGenerator(shortOptionPrefix = Prefix)
+    generator(data) should contain only (Prefix + ShortKey.key)
   }
 
   it should "provide a ColumnGenerator for the multiplicity of command line parameters" in {
