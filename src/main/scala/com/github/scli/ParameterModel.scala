@@ -187,8 +187,11 @@ object ParameterModel {
    *
    * @param key        the key of the parameter
    * @param attributes a data object with the attributes of this option
+   * @param aliases    a list with aliases defined for this parameter
    */
-  case class ParameterMetaData(key: ParameterKey, attributes: ParameterAttributes)
+  case class ParameterMetaData(key: ParameterKey,
+                               attributes: ParameterAttributes,
+                               aliases: List[ParameterKey] = Nil)
 
   /**
    * A class for storing and updating meta information about command line
@@ -333,7 +336,9 @@ object ParameterModel {
      *
      * @return an iterable with meta data about all options in this context
      */
-    def optionMetaData: Iterable[ParameterMetaData] = options.map(e => ParameterMetaData(e._1, e._2))
+    def optionMetaData: Iterable[ParameterMetaData] =
+      options.map(e => ParameterMetaData(e._1, e._2,
+        aliases = aliasMapping.aliasesForKey.getOrElse(e._1, Nil)))
 
     /**
      * Creates a new ''ModelContext'' with an additional parameter as defined

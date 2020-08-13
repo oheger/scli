@@ -327,10 +327,23 @@ object CliHelpGenerator {
    */
   def parameterNameColumnGenerator(longOptionPrefix: String = DefaultLongOptionPrefix,
                                    shortOptionPrefix: String = DefaultShortOptionPrefix): ColumnGenerator =
-    data => {
-      val prefix = if (data.key.shortAlias) shortOptionPrefix else longOptionPrefix
-      List(prefix + data.key.key)
-    }
+    data =>
+      List(prefixedKey(data.key, longOptionPrefix, shortOptionPrefix))
+
+  /**
+   * Returns a ''ColumnGenerator'' function that generates a list with the
+   * aliases assigned to a parameter. If aliases are present, each alias is
+   * generated on a single line using the correct prefix. To format this
+   * output, other functions can be used, e.g. ''singleLineColumnGenerator()'',
+   * or ''separatorColumnGenerator()''.
+   *
+   * @param longOptionPrefix  a prefix added to long parameter names
+   * @param shortOptionPrefix a prefix added to short parameter names
+   * @return the ''ColumnGenerator'' generating the parameter aliases
+   */
+  def parameterAliasColumnGenerator(longOptionPrefix: String = DefaultLongOptionPrefix,
+                                    shortOptionPrefix: String = DefaultShortOptionPrefix): ColumnGenerator =
+    data => data.aliases map (prefixedKey(_, longOptionPrefix, shortOptionPrefix))
 
   /**
    * Returns a ''ColumnGenerator'' that renders the multiplicity attribute.
@@ -680,5 +693,18 @@ object CliHelpGenerator {
     val upperPart = inputParameterOverviewUpperPart(key.key, multiplicity, symbols)
     val result = if (upperPart.nonEmpty) lowerPart + " " + upperPart else lowerPart
     symbols.markAsOptional(result, multiplicity.optional)
+  }
+
+  /**
+   * Generates a string for the given parameter key with the correct prefix.
+   *
+   * @param key               the key in question
+   * @param longOptionPrefix  the prefix for long keys
+   * @param shortOptionPrefix the prefix for short keys
+   * @return the key with the correct prefix
+   */
+  private def prefixedKey(key: ParameterKey, longOptionPrefix: String, shortOptionPrefix: String): String = {
+    val prefix = if (key.shortAlias) shortOptionPrefix else longOptionPrefix
+    prefix + key.key
   }
 }

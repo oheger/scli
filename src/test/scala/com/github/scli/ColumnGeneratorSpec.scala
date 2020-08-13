@@ -17,7 +17,7 @@
 package com.github.scli
 
 import com.github.scli.CliHelpGenerator.ColumnGenerator
-import com.github.scli.ParameterModel.{ParameterAttributes, ParameterMetaData}
+import com.github.scli.ParameterModel.{ParameterAttributes, ParameterKey, ParameterMetaData}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -26,6 +26,7 @@ import org.scalatest.matchers.should.Matchers
  * module.
  */
 class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
+
   import HelpGeneratorTestHelper._
 
   "CliHelpGenerator" should "provide an attribute ColumnGenerator that handles undefined attributes" in {
@@ -280,6 +281,30 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
     val generator = CliHelpGenerator.parameterNameColumnGenerator(shortOptionPrefix = Prefix)
     generator(data) should contain only (Prefix + ShortKey.key)
+  }
+
+  it should "provide a ColumnGenerator that renders the aliases of a parameter" in {
+    val LongAlias = ParameterKey("alternative", shortAlias = false)
+    val aliases = List(ShortKey, LongAlias)
+    val expResult = List(CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key,
+      CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key)
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = CliHelpGenerator.parameterAliasColumnGenerator()
+    generator(data) should contain theSameElementsInOrderAs expResult
+  }
+
+  it should "support customizing the prefixes for the alias column generator" in {
+    val ShortPrefix = "\\"
+    val LongPrefix = "/"
+    val LongAlias = ParameterKey("alternative", shortAlias = false)
+    val aliases = List(ShortKey, LongAlias)
+    val expResult = List(ShortPrefix + ShortKey.key, LongPrefix + LongAlias.key)
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = CliHelpGenerator.parameterAliasColumnGenerator(shortOptionPrefix = ShortPrefix,
+      longOptionPrefix = LongPrefix)
+    generator(data) should contain theSameElementsInOrderAs expResult
   }
 
   it should "provide a ColumnGenerator for the multiplicity of command line parameters" in {

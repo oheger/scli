@@ -54,14 +54,15 @@ object HelpGeneratorTestHelper {
   /**
    * Generates test meta data based on the given parameters.
    *
-   * @param key  the parameter key
-   * @param help the help text
+   * @param key     the parameter key
+   * @param help    the help text
+   * @param aliases a list with aliases for the parameter
    * @return the resulting meta data
    */
-  def testOptionMetaData(key: ParameterKey, help: String): ParameterMetaData = {
+  def testOptionMetaData(key: ParameterKey, help: String, aliases: List[ParameterKey] = Nil): ParameterMetaData = {
     val attrs = Map(ParameterModel.AttrHelpText -> help,
       ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption)
-    ParameterMetaData(key, ParameterAttributes(attrs))
+    ParameterMetaData(key, ParameterAttributes(attrs), aliases)
   }
 
 }

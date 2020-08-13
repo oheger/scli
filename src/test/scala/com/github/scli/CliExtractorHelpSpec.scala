@@ -868,4 +868,19 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val result = CliHelpGenerator.generateInputParamsOverview(modelContext, symbols)
     result should contain only ExpResult
   }
+
+  it should "add parameter aliases to ParameterMetaData" in {
+    val alias1 = ParameterKey("anAlias", shortAlias = false)
+    val alias2 = ParameterKey("anotherAlias", shortAlias = true)
+    val aliasList = List(alias1, alias2)
+    val context = modelContextWithOptions(2)
+      .addOption(Key, None)
+      .addAlias(alias1)
+      .addAlias(alias2)
+
+    val result = context.optionMetaData.filter { data =>
+      data.key == Key && data.aliases == aliasList
+    }
+    result should have size 1
+  }
 }
