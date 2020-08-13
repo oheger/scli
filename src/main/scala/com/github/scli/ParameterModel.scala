@@ -331,12 +331,12 @@ object ParameterModel {
       }
 
     /**
-     * Returns an ''Iterable'' with ''OptionMetaData'' objects for the options
+     * Returns an ''Iterable'' with ''ParameterMetaData'' objects for the options
      * stored in this context.
      *
      * @return an iterable with meta data about all options in this context
      */
-    def optionMetaData: Iterable[ParameterMetaData] =
+    def parameterMetaData: Iterable[ParameterMetaData] =
       options.map(e => ParameterMetaData(e._1, e._2,
         aliases = aliasMapping.aliasesForKey.getOrElse(e._1, Nil)))
 

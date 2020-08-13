@@ -201,7 +201,7 @@ object CliHelpGenerator {
     def generateColumns(data: ParameterMetaData): Seq[List[String]] =
       columns.map(_.apply(data))
 
-    val metaData = context.optionMetaData
+    val metaData = context.parameterMetaData
       .filter(filterFunc)
       .toSeq
     if (metaData.isEmpty) ""

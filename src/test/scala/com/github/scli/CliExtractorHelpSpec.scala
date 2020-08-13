@@ -644,7 +644,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       ParameterMetaData(Key2, modelContext.options(Key2)),
       ParameterMetaData(Key3, modelContext.options(Key3)))
 
-    val result = CliHelpGenerator.inputParamSortFunc(modelContext)(modelContext.optionMetaData.toSeq)
+    val result = CliHelpGenerator.inputParamSortFunc(modelContext)(modelContext.parameterMetaData.toSeq)
     result should be(ExpResult)
   }
 
@@ -659,7 +659,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       ParameterMetaData(Key2, modelContext.options(Key2)),
       ParameterMetaData(Key, modelContext.options(Key)))
 
-    val result = CliHelpGenerator.inputParamSortFunc(modelContext)(modelContext.optionMetaData.toSeq)
+    val result = CliHelpGenerator.inputParamSortFunc(modelContext)(modelContext.parameterMetaData.toSeq)
     result should be(ExpResult)
   }
 
@@ -672,7 +672,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpResult = List(ParameterMetaData(Key2, modelContext.options(Key2)),
       ParameterMetaData(Key, modelContext.options(Key)))
 
-    val result = modelContext.optionMetaData.filter(CliHelpGenerator.OptionsFilterFunc)
+    val result = modelContext.parameterMetaData.filter(CliHelpGenerator.OptionsFilterFunc)
     result should contain theSameElementsAs ExpResult
   }
 
@@ -685,7 +685,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpResult = List(ParameterMetaData(Key2, modelContext.options(Key2)),
       ParameterMetaData(Key, modelContext.options(Key)))
 
-    val result = modelContext.optionMetaData.filter(CliHelpGenerator.InputParamsFilterFunc)
+    val result = modelContext.parameterMetaData.filter(CliHelpGenerator.InputParamsFilterFunc)
     result should contain theSameElementsAs ExpResult
   }
 
@@ -700,7 +700,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(ParameterKey("ignored2", shortAlias = false), None)
     val ExpResult = ParameterMetaData(Key, modelContext.options(Key))
 
-    val result = modelContext.optionMetaData.filter(CliHelpGenerator.groupFilterFunc(Group))
+    val result = modelContext.parameterMetaData.filter(CliHelpGenerator.groupFilterFunc(Group))
     result should contain only ExpResult
   }
 
@@ -715,7 +715,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, Some(HelpText))
     val ExpResult = ParameterMetaData(Key, modelContext.options(Key))
 
-    val result = modelContext.optionMetaData.filter(CliHelpGenerator.groupFilterFunc(Group1, Group2))
+    val result = modelContext.parameterMetaData.filter(CliHelpGenerator.groupFilterFunc(Group1, Group2))
     result should contain only ExpResult
   }
 
@@ -726,7 +726,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(ParameterKey("ignored", shortAlias = false), Some("test"))
     val ExpResult = ParameterMetaData(Key, modelContext.options(Key))
 
-    val result = modelContext.optionMetaData.filter(CliHelpGenerator.UnassignedGroupFilterFunc)
+    val result = modelContext.parameterMetaData.filter(CliHelpGenerator.UnassignedGroupFilterFunc)
     result should contain only ExpResult
   }
 
@@ -736,7 +736,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(ParameterKey("ignored", shortAlias = false), None)
     val ExpResult = ParameterMetaData(Key, modelContext.options(Key))
 
-    val result = modelContext.optionMetaData
+    val result = modelContext.parameterMetaData
       .filter(CliHelpGenerator.attributeFilterFunc(ParameterModel.AttrHelpText))
     result should contain only ExpResult
   }
@@ -751,7 +751,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
     val filter = CliHelpGenerator.andFilter(CliHelpGenerator.OptionsFilterFunc,
       CliHelpGenerator.UnassignedGroupFilterFunc)
-    val result = modelContext.optionMetaData.filter(filter)
+    val result = modelContext.parameterMetaData.filter(filter)
     result should contain only ExpResult
   }
 
@@ -768,7 +768,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
     val filter = CliHelpGenerator.orFilter(CliHelpGenerator.InputParamsFilterFunc,
       CliHelpGenerator.groupFilterFunc(Group))
-    val result = modelContext.optionMetaData.filter(filter)
+    val result = modelContext.parameterMetaData.filter(filter)
     result should contain theSameElementsAs ExpResult
   }
 
@@ -780,7 +780,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpResult = ParameterMetaData(Key, modelContext.options(Key))
     val filter = CliHelpGenerator.negate(CliHelpGenerator.UnassignedGroupFilterFunc)
 
-    val result = modelContext.optionMetaData.filter(filter)
+    val result = modelContext.parameterMetaData.filter(filter)
     result should contain only ExpResult
   }
 
@@ -878,7 +878,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addAlias(alias1)
       .addAlias(alias2)
 
-    val result = context.optionMetaData.filter { data =>
+    val result = context.parameterMetaData.filter { data =>
       data.key == Key && data.aliases == aliasList
     }
     result should have size 1
