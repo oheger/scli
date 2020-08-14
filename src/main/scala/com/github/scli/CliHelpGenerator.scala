@@ -346,6 +346,33 @@ object CliHelpGenerator {
     data => data.aliases map (prefixedKey(_, longOptionPrefix, shortOptionPrefix))
 
   /**
+   * Returns a ''ColumnGenerator'' function that generates a single line result
+   * containing the parameter key and all its aliases, separated by the given
+   * separator character. Optionally, the line can be wrapped at the maximum
+   * length specified. This is a convenience function that combines some of the
+   * other generator functions to produce the result described. The use case to
+   * print a key with all its aliases should be quite popular.
+   *
+   * @param longOptionPrefix  a prefix added to long parameter names
+   * @param shortOptionPrefix a prefix added to short parameter names
+   * @param separator         the separator character
+   * @param maxLength         the maximum length for line wrapping; 0 or negative to
+   *                          disable line wrapping
+   * @return the ''ColumnGenerator'' generating the key and its aliases
+   */
+  def parameterKeyWithAliasesColumnGenerator(longOptionPrefix: String = DefaultLongOptionPrefix,
+                                             shortOptionPrefix: String = DefaultShortOptionPrefix,
+                                             separator: String = ", ", maxLength: Int = 0): ColumnGenerator = {
+    val lineGenerator = composeSingleLineColumnGenerator(
+      parameterNameColumnGenerator(longOptionPrefix, shortOptionPrefix),
+      singleLineColumnGenerator(parameterAliasColumnGenerator(longOptionPrefix, shortOptionPrefix),
+        separator), separator)
+    if (maxLength > 0)
+      wrapColumnGenerator(lineGenerator, maxLength)
+    else lineGenerator
+  }
+
+  /**
    * Returns a ''ColumnGenerator'' that renders the multiplicity attribute.
    * This is a convenience function that correctly shows the default
    * multiplicity if none is provided.

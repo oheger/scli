@@ -322,4 +322,71 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val generator = CliHelpGenerator.multiplicityColumnGenerator
     generator(data) should contain only Multiplicity.UnspecifiedMultiplicityString
   }
+
+  it should "provide a ColumnGenerator for keys and aliases that handles missing aliases" in {
+    val data = testOptionMetaData(Key, HelpText)
+    val expResult = CliHelpGenerator.DefaultLongOptionPrefix + Key.key
+
+    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator()
+    generator(data) should contain only expResult
+  }
+
+  it should "provide a ColumnGenerator for keys and aliases that displays aliases" in {
+    val LongAlias = ParameterKey("anotherAlias", shortAlias = false)
+    val aliases = List(ShortKey, LongAlias)
+    val expResult = CliHelpGenerator.DefaultLongOptionPrefix + Key.key + ", " +
+      CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key + ", " +
+      CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator()
+    generator(data) should contain only expResult
+  }
+
+  it should "provide a ColumnGenerator for keys and aliases that supports customizing the separator" in {
+    val Separator = ";"
+    val LongAlias = ParameterKey("anotherAlias", shortAlias = false)
+    val aliases = List(ShortKey, LongAlias)
+    val expResult = CliHelpGenerator.DefaultLongOptionPrefix + Key.key + Separator +
+      CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key + Separator +
+      CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(separator = Separator)
+    generator(data) should contain only expResult
+  }
+
+  it should "provide a ColumnGenerator for keys and aliases that supports customizing prefixes for aliases" in {
+    val LongPrefix = "*"
+    val ShortPrefix = "/"
+    val LongAlias = ParameterKey("anotherLongAlias", shortAlias = false)
+    val aliases = List(ShortKey, LongAlias)
+    val expResult = LongPrefix + Key.key + ", " + ShortPrefix + ShortKey.key + ", " + LongPrefix + LongAlias.key
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(longOptionPrefix = LongPrefix,
+      shortOptionPrefix = ShortPrefix)
+    generator(data) should contain only expResult
+  }
+
+  it should "provide a ColumnGenerator for keys and aliases that supports customizing prefixes for keys" in {
+    val ShortPrefix = "_"
+    val data = testOptionMetaData(ShortKey, HelpText)
+    val expResult = ShortPrefix + ShortKey.key
+
+    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(shortOptionPrefix = ShortPrefix)
+    generator(data) should contain only expResult
+  }
+
+  it should "provide a ColumnGenerator for keys and alias that supports line wrapping" in {
+    val LongAlias = ParameterKey("foo", shortAlias = false)
+    val aliases = List(ShortKey, LongAlias)
+    val expResult = List(CliHelpGenerator.DefaultLongOptionPrefix + Key.key + ",",
+      CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key + ", " +
+        CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key)
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(maxLength = 13)
+    generator(data) should be(expResult)
+  }
 }
