@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.util.Locale
 
-import com.github.scli.CliHelpGenerator.{ColumnGenerator, InputParamOverviewSymbols, ParameterFilter, ParameterSortFunc}
+import com.github.scli.CliHelpGenerator.{ColumnGenerator, HelpTable, InputParamOverviewSymbols, ParameterFilter, ParameterSortFunc}
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterModel.{InputParameterRef, ModelContext, ParameterAttributes, ParameterKey, ParameterMetaData}
 import HelpGeneratorTestHelper._
@@ -517,7 +517,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpText = (1 to Count).map(testOptionMetaData).mkString(CR + CR)
     val modelContext = modelContextWithOptions(Count)
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext)(TestColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext)(TestColumnGenerator)
     text should be(ExpText)
   }
 
@@ -526,7 +526,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpText = (1 to Count).map(testOptionMetaData).mkString(CR)
     val modelContext = modelContextWithOptions(Count)
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext, optNewline = None)(TestColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext, optNewline = None)(TestColumnGenerator)
     text should be(ExpText)
   }
 
@@ -543,7 +543,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(KeyMin, Some(HelpText + KeyMin))
       .addOption(KeyMax, Some(HelpText + KeyMax))
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext)(TestColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext)(TestColumnGenerator)
     text should be(ExpText)
   }
 
@@ -553,7 +553,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val ExpText = (1 to Count).map(testOptionMetaData).reverse.mkString(CR + CR)
     val modelContext = modelContextWithOptions(Count)
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext, sortFunc = sortFunc)(TestColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext, sortFunc = sortFunc)(TestColumnGenerator)
     text should be(ExpText)
   }
 
@@ -564,7 +564,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val modelContext = modelContextWithOptions(CountAll)
     val filterFunc: ParameterFilter = _.key.key <= testKey(CountFiltered).key
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext, filterFunc = filterFunc)(TestColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext, filterFunc = filterFunc)(TestColumnGenerator)
     text should be(ExpText)
   }
 
@@ -573,7 +573,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, Some(HelpText))
     val ExpText = Key.key + CliHelpGenerator.DefaultPadding + HelpText
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext)(KeyColumnGenerator, HelpColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext)(KeyColumnGenerator, HelpColumnGenerator)
     text should be(ExpText)
   }
 
@@ -586,7 +586,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       CliHelpGenerator.DefaultPadding + testKey(1).key + CR + CR +
       HelpText + CliHelpGenerator.DefaultPadding + testKey(2).key
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext)(HelpColumnGenerator, KeyColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext)(HelpColumnGenerator, KeyColumnGenerator)
     text should be(ExpText)
   }
 
@@ -598,7 +598,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       spaceKey + CliHelpGenerator.DefaultPadding + "Line2" + CR +
       spaceKey + CliHelpGenerator.DefaultPadding + "Line3"
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext)(KeyColumnGenerator, HelpColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext)(KeyColumnGenerator, HelpColumnGenerator)
     text should be(ExpText)
   }
 
@@ -608,7 +608,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, None)
     val ExpText = Key.key + CliHelpGenerator.DefaultPadding
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext)(KeyColumnGenerator, EmptyColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext)(KeyColumnGenerator, EmptyColumnGenerator)
     text should be(ExpText)
   }
 
@@ -617,7 +617,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, Some(HelpText))
     val filter: ParameterFilter = _ => false
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext, filterFunc = filter)(KeyColumnGenerator)
+    val text = CliHelpGenerator.generateParametersHelp(modelContext, filterFunc = filter)(KeyColumnGenerator)
     text should be("")
   }
 
@@ -627,9 +627,53 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       .addOption(Key, Some(HelpText))
     val ExpText = Key.key + OtherPadding + HelpText
 
-    val text = CliHelpGenerator.generateOptionsHelp(modelContext, padding = OtherPadding)(KeyColumnGenerator,
+    val text = CliHelpGenerator.generateParametersHelp(modelContext, padding = OtherPadding)(KeyColumnGenerator,
       HelpColumnGenerator)
     text should be(ExpText)
+  }
+
+  it should "support rendering multiple help tables" in {
+    val cell11 = List("o")
+    val cell12 = List("Help text of o line 1", "Help text of o line 2")
+    val cell21 = List("someOption")
+    val cell22 = List("someOption help")
+    val cell31 = List("o2")
+    val cell32 = List("This is a very exciting option, which does blah", "and more.")
+    val table1: HelpTable = List(List(cell11, cell12), List(cell21, cell22))
+    val table2: HelpTable = List(List(cell31, cell32))
+    val Padding = "|"
+    val NewLine = "<<"
+
+    // Checks a single help table and returns the position of the Padding and the line length
+    def checkRenderedTable(result: String, expLineCount: Int, expNewLineAt: Int = -1): (Int, Int) = {
+      val lines = result.split(CliHelpGenerator.CR)
+      lines should have length expLineCount
+      val col1Length = lines.head.indexOf(Padding)
+      col1Length should be > 0
+      val lineLength = lines.head.length
+      lines forall { line =>
+        (line.indexOf(Padding) == col1Length && line.length == lineLength) || line == NewLine
+      } shouldBe true
+      if (expNewLineAt >= 0) {
+        lines(expNewLineAt) should be(NewLine)
+      }
+      (col1Length, lineLength)
+    }
+
+    val texts = CliHelpGenerator.renderHelpTables(List(table1, table2), Padding, Some(NewLine))
+    texts should have size 2
+    val (separatorPos1, length1) = checkRenderedTable(texts.head, 4, expNewLineAt = 2)
+    val (separatorPos2, length2) = checkRenderedTable(texts(1), 2)
+    separatorPos1 should be(separatorPos2)
+    length1 should be(length2)
+  }
+
+  it should "support rendering multiple help tables including empty ones" in {
+    val table1: HelpTable = List(List(List("foo"), List("bar")))
+    val table2: HelpTable = Nil
+
+    val texts = CliHelpGenerator.renderHelpTables(List(table2, table1))
+    texts.head should be("")
   }
 
   it should "provide a special sort function for input parameters" in {

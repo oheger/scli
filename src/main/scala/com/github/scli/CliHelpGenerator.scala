@@ -172,11 +172,92 @@ object CliHelpGenerator {
   type ColumnGenerator = ParameterMetaData => List[String]
 
   /**
-   * Generates a tabular help text for the command line options of an
-   * application. For each option, a number of columns is displayed that are
-   * defined by a sequence of ''ColumnGenerator'' functions. The table is
-   * converted to a string that can be directly printed to the console. By
-   * passing in additional parameters, the output can be customized.
+   * Type definition of a table with help information about parameters. The
+   * table consists of multiple rows (first ''Seq''). Each row has multiple
+   * columns (second ''Seq''). A cell in a column can have multiple text lines
+   * (the final ''List'' of strings).
+   */
+  type HelpTable = Seq[Seq[List[String]]]
+
+  /**
+   * Generates a tabular structure with help information based on the arguments
+   * provided. For each parameter in the ''ModelContext'' that is matched by
+   * the ''ParameterFilter'', a number of columns is generated that are
+   * defined by a sequence of ''ColumnGenerator'' functions. This table can
+   * then be rendered using other functions provided by this module.
+   *
+   * @param context    the ''ModelContext'' with all meta data about options
+   * @param sortFunc   a function to sort the list of options; per default,
+   *                   options are sorted alphabetically ignoring case
+   * @param filterFunc a function to filter the options to be displayed; per
+   *                   default, all options are shown
+   * @param columns    the functions to generate the single columns
+   * @return the resulting ''HelpTable''
+   */
+  def generateHelpTable(context: ModelContext,
+                        sortFunc: ParameterSortFunc = AlphabeticParameterSortFunc,
+                        filterFunc: ParameterFilter = AllFilterFunc)
+                       (columns: ColumnGenerator*): HelpTable = {
+    // generates the columns of an option by applying the column generators
+    def generateColumns(data: ParameterMetaData): Seq[List[String]] =
+      columns.map(_.apply(data))
+
+    val metaData = context.parameterMetaData
+      .filter(filterFunc)
+      .toSeq
+    sortFunc(metaData)
+      .map(generateColumns)
+  }
+
+  /**
+   * Renders the given ''HelpTable''. The table is converted to a single string
+   * that can be directly printed to the console. To achieve this, the single
+   * cells of the table are padded to the maximum length of each column. By
+   * passing in additional arguments, the output can be customized.
+   *
+   * @param table      the table to be rendered
+   * @param padding    a padding string inserted between columns
+   * @param optNewline an optional string added between the help texts of
+   *                   different options; by changing this string, one could
+   *                   add for instance empty lines or horizontal bars
+   * @return a string representation of the passed in ''HelpTable''
+   */
+  def renderHelpTable(table: HelpTable,
+                      padding: String = DefaultPadding,
+                      optNewline: Option[String] = Some("")): String = {
+    if (table.isEmpty) ""
+    else {
+      val widths = calcMaxColumnWidths(table)
+      renderTableWithWidths(table, padding, optNewline, widths)
+    }
+  }
+
+  /**
+   * Renders all the ''HelpTable'' objects in the sequence provided. This
+   * function applies the same steps as ''renderHelpTable()'' for all the
+   * tables passed in. However, when padding the cells the maximum column
+   * widths of all tables are taken into account, resulting in tables with
+   * equal column widths. All the tables must have the same number of columns.
+   *
+   * @param tables     the sequence with tables to be rendered
+   * @param padding    a padding string inserted between columns
+   * @param optNewline an optional string added between the help texts of
+   *                   different options; by changing this string, one could
+   *                   add for instance empty lines or horizontal bars
+   * @return a sequence with string representations of the passed in tables
+   */
+  def renderHelpTables(tables: Seq[HelpTable],
+                       padding: String = DefaultPadding,
+                       optNewline: Option[String] = Some("")): Seq[String] = {
+    val allLines = tables.flatten
+    val widths = calcMaxColumnWidths(allLines)
+    tables.map(table => renderTableWithWidths(table, padding, optNewline, widths))
+  }
+
+  /**
+   * Generates a tabular help text for the command line parameters of an
+   * application. This is a convenience function that combines the functions
+   * ''generateHelpTable()'' and ''renderHelpTable()''.
    *
    * @param context    the ''ModelContext'' with all meta data about options
    * @param sortFunc   a function to sort the list of options; per default,
@@ -190,53 +271,18 @@ object CliHelpGenerator {
    * @param columns    the functions to generate the single columns
    * @return a string with the help for command line options
    */
-  def generateOptionsHelp(context: ModelContext,
-                          sortFunc: ParameterSortFunc = AlphabeticParameterSortFunc,
-                          filterFunc: ParameterFilter = AllFilterFunc,
-                          padding: String = DefaultPadding,
-                          optNewline: Option[String] = Some(""))
-                         (columns: ColumnGenerator*): String = {
-
-    // generates the columns of an option by applying the column generators
-    def generateColumns(data: ParameterMetaData): Seq[List[String]] =
-      columns.map(_.apply(data))
-
-    val metaData = context.parameterMetaData
-      .filter(filterFunc)
-      .toSeq
-    if (metaData.isEmpty) ""
-    else {
-      val rows = sortFunc(metaData)
-        .map(generateColumns)
-      val widths = rows map columnWidths
-      val maxWidths = widths.transpose.map(_.max)
-      val spaces = paddingString(maxWidths)
-
-      // generates the row for an option that can consist of multiple lines;
-      // the lines have to be correctly aligned and padded
-      def generateRow(columns: Seq[List[String]]): Seq[String] = {
-        val maxLineCount = columns.map(_.size).max
-        val emptyList = List.fill(maxLineCount)("")
-        val filledColumns = columns.map(list => growList(list, maxLineCount, emptyList))
-
-        val lines = filledColumns.transpose.map(_.zip(maxWidths))
-          .map { line =>
-            line.map { t =>
-              val cell = t._1
-              cell + spaces.substring(0, t._2 - cell.length)
-            }.mkString(padding)
-          }
-        optNewline.fold(lines)(lines.toList :+ _)
-      }
-
-      val generatedRows = rows.flatMap(generateRow)
-      optNewline.fold(generatedRows)(_ => generatedRows.dropRight(1)) // there is 1 newline too much
-        .mkString(CR)
-    }
+  def generateParametersHelp(context: ModelContext,
+                             sortFunc: ParameterSortFunc = AlphabeticParameterSortFunc,
+                             filterFunc: ParameterFilter = AllFilterFunc,
+                             padding: String = DefaultPadding,
+                             optNewline: Option[String] = Some(""))
+                            (columns: ColumnGenerator*): String = {
+    val table = generateHelpTable(context, sortFunc, filterFunc)(columns: _*)
+    renderHelpTable(table, padding, optNewline)
   }
 
   /**
-   * A special ''OptionSortFunc'' that handles input parameters. The
+   * A special ''ParameterSortFunc'' that handles input parameters. The
    * parameters are sorted based on their expected order in the command line.
    * The function expects the list of options to be ordered has been filtered
    * to contain input parameters only.
@@ -573,6 +619,19 @@ object CliHelpGenerator {
     else list ++ emptyList.slice(0, toSize - list.size)
 
   /**
+   * Calculates the maximum column widths for the given ''HelpTable''. This
+   * function determines the widths of all lines in cells and then calculates
+   * the maximum per column.
+   *
+   * @param table the ''HelpTable''
+   * @return a sequence with the maximum widths per column
+   */
+  private def calcMaxColumnWidths(table: HelpTable): Seq[Int] = {
+    val widths = table map columnWidths
+    widths.transpose.map(_.max)
+  }
+
+  /**
    * Generates a string with a number of spaces that is used to pad the cells
    * of a table to a certain length. The length of the string is determined
    * from the maximum column width.
@@ -583,6 +642,42 @@ object CliHelpGenerator {
   private def paddingString(colWidths: Seq[Int]): String = {
     val maxSpaces = colWidths.max
     " " * maxSpaces
+  }
+
+  /**
+   * Does the actual rendering of a ''HelpTable'' based on the maximum column
+   * widths provided.
+   *
+   * @param table      the table to be rendered
+   * @param padding    the padding between columns
+   * @param optNewline the newline string to add
+   * @param maxWidths  the sequence with maximum column widths
+   * @return the result of the rendering
+   */
+  private def renderTableWithWidths(table: HelpTable, padding: String, optNewline: Option[String],
+                                    maxWidths: Seq[Int]): String = {
+    val spaces = paddingString(maxWidths)
+
+    // generates the row for an option that can consist of multiple lines;
+    // the lines have to be correctly aligned and padded
+    def generateRow(columns: Seq[List[String]]): Seq[String] = {
+      val maxLineCount = columns.map(_.size).max
+      val emptyList = List.fill(maxLineCount)("")
+      val filledColumns = columns.map(list => growList(list, maxLineCount, emptyList))
+
+      val lines = filledColumns.transpose.map(_.zip(maxWidths))
+        .map { line =>
+          line.map { t =>
+            val cell = t._1
+            cell + spaces.substring(0, t._2 - cell.length)
+          }.mkString(padding)
+        }
+      optNewline.fold(lines)(lines.toList :+ _)
+    }
+
+    val generatedRows = table.flatMap(generateRow)
+    optNewline.fold(generatedRows)(_ => generatedRows.dropRight(1)) // there is 1 newline too much
+      .mkString(CR)
   }
 
   /**
