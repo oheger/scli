@@ -354,7 +354,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("uri1", "uri2")
     val elements = args map (v => InputParameterElement(v))
     val cf = classifierFunc(args, elements)
-    val expArgMap = Map(ParameterParser.InputOption -> args)
+    val expArgMap = Map(ParameterParser.InputParameter -> args)
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgMap)
@@ -416,7 +416,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
         (pk("f"), "true"))),
       SwitchesElement(List((pk("flag"), "false"))))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map(ParameterParser.InputOption -> List("other"),
+    val expArgsMap = Map(ParameterParser.InputParameter -> List("other"),
       pk("v") -> List("true", "true"), pk("x") -> List("true"), pk("z") -> List("false"),
       pk("f") -> List("true"), pk("flag") -> List("false"))
 

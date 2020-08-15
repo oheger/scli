@@ -35,10 +35,10 @@ import scala.util.{Failure, Success, Try}
  */
 object ParameterParser {
   /**
-   * Key of an option that collects the input strings that are no values of
-   * options.
+   * Reserved key of a parameter that collects the input strings that are no
+   * values of options or switches.
    */
-  final val InputOption = ParameterKey("input", shortAlias = false)
+  final val InputParameter = ParameterKey("input", shortAlias = false)
 
   /**
    * An OptionPrefixes object with the default prefix for options. This is
@@ -440,7 +440,7 @@ object ParameterParser {
       .foldLeft(Map.empty[ParameterKey, List[String]]) { (argsMap, elem) =>
         elem._2 match {
           case InputParameterElement(value) =>
-            appendOptionValue(argsMap, InputOption, value)
+            appendOptionValue(argsMap, InputParameter, value)
 
           case OptionElement(key, optValue) =>
             optValue.fold(argsMap)(value => appendOptionValue(argsMap,

@@ -857,15 +857,16 @@ object ParameterExtractor {
   def inputValues(fromIdx: Int, toIdx: Int, optKey: Option[String] = None, optHelp: Option[String] = None,
                   last: Boolean = false): CliExtractor[OptionValue[String]] =
     CliExtractor(context => {
-      val inputs = context.parameters.parametersMap.getOrElse(ParameterParser.InputOption, Nil)
+      val inputs = context.parameters.parametersMap.getOrElse(ParameterParser.InputParameter, Nil)
+      //TODO mark key as special to not include any prefix
+      lazy val paramKey = optKey map(k => ParameterKey(k, shortAlias = false)) getOrElse ParameterParser.InputParameter
 
       // handles special negative index values and checks the index range
       def adjustAndCheckIndex(index: Int): Try[Int] = {
         val adjustedIndex = if (index < 0) inputs.size + index
         else index
-        //TODO use correct key for failure
         if (adjustedIndex >= 0 && adjustedIndex < inputs.size) Success(adjustedIndex)
-        else Failure(paramException(context, ParameterParser.InputOption, tooFewErrorText(adjustedIndex)))
+        else Failure(paramException(context, paramKey, tooFewErrorText(adjustedIndex)))
       }
 
       def tooFewErrorText(index: Int): String = {
@@ -874,8 +875,7 @@ object ParameterExtractor {
       }
 
       val result = if (last && inputs.size > toIdx + 1)
-      //TODO use correct key for failure
-      Failure(paramException(context, ParameterParser.InputOption,
+      Failure(paramException(context, paramKey,
         s"Too many input arguments; expected at most ${toIdx + 1}"))
         else
         for {
@@ -883,7 +883,7 @@ object ParameterExtractor {
           lastIndex <- adjustAndCheckIndex(toIdx)
         } yield inputs.slice(firstIndex, lastIndex + 1)
       val modelContext = context.modelContext.addInputParameter(fromIdx, optKey, optHelp)
-      (result, context.update(context.parameters keyAccessed ParameterParser.InputOption, modelContext))
+      (result, context.update(context.parameters keyAccessed ParameterParser.InputParameter, modelContext))
     }, optKey map (k => ParameterKey(k, shortAlias = false)))
 
   /**

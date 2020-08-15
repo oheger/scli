@@ -645,7 +645,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support the access to input parameters" in {
-    val parameters: Parameters = Map(ParameterParser.InputOption -> List("1", "2", "3"))
+    val parameters: Parameters = Map(ParameterParser.InputParameter -> List("1", "2", "3"))
     val extractor = inputValue(-2)
       .toInt
       .mandatory
