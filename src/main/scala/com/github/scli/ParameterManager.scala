@@ -35,6 +35,13 @@ import scala.util.{Failure, Success, Try}
  */
 object ParameterManager {
   /**
+   * An extractor for the help flag on the command line that is used if the
+   * application does not specify such an extractor. This extractor always
+   * reports a disabled help flag.
+   */
+  private val DefaultHelpExtractor: CliExtractor[Try[Boolean]] = constantExtractor(Success(false))
+
+  /**
    * Type definition for a function that does the initial parsing of the
    * command line arguments. The function expects the sequence of arguments as
    * input and categorizes the single elements into input arguments, options,
@@ -65,13 +72,24 @@ object ParameterManager {
    *                                supported
    * @param keyExtractor            optional function to extract keys
    * @param fileOptions             parameter keys referencing parameter files
+   * @param optHelpExtractor        optional ''CliExtractor'' to determine
+   *                                whether the user has requested help; this
+   *                                could be for instance a ''--help'' switch
    * @tparam A the result type of the ''CliExtractor''
    */
-  case class ExtractionSpec[A](extractor: CliExtractor[A],
+  case class ExtractionSpec[A](extractor: CliExtractor[Try[A]],
                                prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes,
                                supportCombinedSwitches: Boolean = false,
                                keyExtractor: KeyExtractorFunc = null,
-                               fileOptions: Seq[ParameterKey] = Nil) {
+                               fileOptions: Seq[ParameterKey] = Nil,
+                               optHelpExtractor: Option[CliExtractor[Try[Boolean]]] = None) {
+    /**
+     * Stores an internal extractor, which gets executed for this
+     * ''ExtractionSpec''. This extractor not only extracts the actual result
+     * for the application but also a help flag.
+     */
+    private[scli] val internalExtractor = constructInternalExtractor()
+
     /**
      * Stores a ''ParameterContext'' created based on the wrapped
      * ''CliExtractor''. From this context, all the metadata available about
@@ -85,13 +103,23 @@ object ParameterManager {
     lazy val modelContext: ModelContext = parameterContext.modelContext
 
     /**
+     * Constructs the internal extractor used by this specification. The
+     * internal extractor extends the main extractor by checking for a help
+     * flag.
+     *
+     * @return the internal extractor
+     */
+    private def constructInternalExtractor(): CliExtractor[Try[(A, Boolean)]] =
+      createExtractorWithHelpFlag(extractor, optHelpExtractor getOrElse DefaultHelpExtractor)
+
+    /**
      * Creates a ''ParameterContext'' for the ''CliExtractor'' contained in
      * this object.
      *
      * @return the ''ParameterContext''
      */
     private def constructParameterContext(): ParameterContext =
-      addFileOptionsToModelContext(ParameterExtractor.gatherMetaData(extractor))
+      addFileOptionsToModelContext(ParameterExtractor.gatherMetaData(internalExtractor))
 
     /**
      * Adds the options referencing parameter files to the model context. This
@@ -108,6 +136,37 @@ object ParameterManager {
       paramCtx.copy(modelContext = modelContext)
     }
   }
+
+  /**
+   * A data class storing context information about an operation to process the
+   * command line.
+   *
+   * This class extends the [[ParameterContext]] used by extraction operations
+   * by additional metadata. It especially stores information whether a flag
+   * was found on the command line requesting help. This information is needed
+   * to correctly interpret the result of processing a command line.
+   *
+   * @param parameterContext the ''ParameterContext'' generated during the
+   *                         extraction phase
+   * @param helpRequested    flag whether help was requested by the user
+   */
+  case class ProcessingContext(parameterContext: ParameterContext,
+                               helpRequested: Boolean)
+
+  /**
+   * Type definition for the result of an operation to process the command
+   * line. If the operation was successful, the result consists of the value
+   * produced by the [[CliExtractor]] and the initialized
+   * ''ProcessingContext''; as the operation can fail, this is wrapped in a
+   * ''Try''. If the extraction process fails, result is a ''Failure'' that
+   * contains a
+   * [[com.github.scli.ParameterExtractor#ParameterExtractionException]].
+   * From this exception, all information is available to generate a
+   * meaningful error message and usage information. Specifically, the failure
+   * messages have already been added to the model context in the parameter
+   * context available via the exception.
+   */
+  type ProcessingResult[A] = Try[(A, ProcessingContext)]
 
   /**
    * Returns a list with standard ''ExtractedKeyClassifierFunc'' functions to
@@ -216,7 +275,7 @@ object ParameterManager {
    *         context
    */
   def processCommandLine[A](args: Seq[String], extractor: CliExtractor[Try[A]], parser: ParsingFunc = null,
-                            checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] =
+                            checkUnconsumedParameters: Boolean = true): ProcessingResult[A] =
     processCommandLineSpec(args, ExtractionSpec(extractor), parser, checkUnconsumedParameters)
 
   /**
@@ -224,14 +283,8 @@ object ParameterManager {
    *
    * This function uses a ''ParsingFunc'' to parse the given sequence of
    * command line arguments and runs the ''CliExtractor'' contained in the
-   * ''ExtractionSpec'' provided on the result. A ''Try'' with the result of
-   * this extractor and the parameter context is returned. If the extraction
-   * process fails, result is a ''Failure'' that contains a
-   * [[com.github.scli.ParameterExtractor#ParameterExtractionException]].
-   * From this exception, all information is available to generate a
-   * meaningful error message and usage information. Specifically, the failure
-   * messages have already been added to the model context in the parameter
-   * context available via the exception.
+   * ''ExtractionSpec'' provided on the result. The final outcome is returned
+   * as a ''ProcessingResult''.
    *
    * @param args                      the sequence of command line arguments
    * @param spec                      the spec for the extraction operation
@@ -242,10 +295,11 @@ object ParameterManager {
    * @return a ''Try'' with the result of the extractor and the parameter
    *         context
    */
-  def processCommandLineSpec[A](args: Seq[String], spec: ExtractionSpec[Try[A]], parser: ParsingFunc = null,
-                                checkUnconsumedParameters: Boolean = true): Try[(A, ParameterContext)] = {
+  def processCommandLineSpec[A](args: Seq[String], spec: ExtractionSpec[A], parser: ParsingFunc = null,
+                                checkUnconsumedParameters: Boolean = true): ProcessingResult[A] = {
     val theParsingFunc = getOrDefault(parser, parsingFunc(spec))
-    extract(theParsingFunc(args), spec.extractor, checkUnconsumedParameters)
+    extract(theParsingFunc(args), spec.internalExtractor, checkUnconsumedParameters)
+      .map(t => (t._1._1, ProcessingContext(t._2, helpRequested = t._1._2)))
   }
 
   /**
@@ -387,4 +441,23 @@ object ParameterManager {
    */
   private def getOrDefault[A](value: A, default: => A): A =
     Option(value) getOrElse default
+
+  /**
+   * Generates a ''CliExtractor'' that evaluates a help parameter in addition
+   * to the regular parameters supported by an application.
+   *
+   * @param mainExtractor the main data extractor
+   * @param helpExtractor the extractor of the help flag
+   * @tparam A the type of the main extractor
+   * @return an extractor for the data and the help flag
+   */
+  private def createExtractorWithHelpFlag[A](mainExtractor: CliExtractor[Try[A]],
+                                             helpExtractor: CliExtractor[Try[Boolean]]):
+  CliExtractor[Try[(A, Boolean)]] =
+    for {
+      data <- mainExtractor
+      help <- helpExtractor
+    } yield createRepresentation(data, help) {
+      (_, _)
+    }
 }

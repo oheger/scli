@@ -18,7 +18,8 @@ package com.github.scli.sample.transfer
 
 import java.nio.file.{Files, Paths}
 
-import com.github.scli.ParameterExtractor.{ParameterContext, ParameterExtractionException}
+import com.github.scli.ParameterExtractor.ParameterExtractionException
+import com.github.scli.ParameterManager.ProcessingContext
 import com.github.scli.ParametersTestHelper._
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, _}
 import com.github.scli.{ConsoleReader, ParameterExtractor}
@@ -52,7 +53,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
    * @param args the command line arguments
    * @return a tuple with the extraction result and the updated context
    */
-  private def extract(args: Seq[String]): (TransferParameterManager.TransferCommandConfig, ParameterContext) = {
+  private def extract(args: Seq[String]): (TransferParameterManager.TransferCommandConfig, ProcessingContext) = {
     val triedResult = TransferParameterManager.processCommandLine(args)
     triedResult match {
       case Success(tuple) => tuple

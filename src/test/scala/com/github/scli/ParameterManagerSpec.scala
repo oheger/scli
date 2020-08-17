@@ -26,6 +26,7 @@ import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import scala.language.existentials
 import scala.util.{Failure, Success, Try}
 
 object ParameterManagerSpec {
@@ -111,13 +112,14 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val ExpParamsMap = Map(TestOptionPk -> List(TestOptionValue),
       pk("foo") -> List("bar", "baz"))
 
-    import scala.language.existentials
-    val (res, context) = triedResult(ParameterManager.processCommandLine(args, TestExtractor,
+    val (res, procContext) = triedResult(ParameterManager.processCommandLine(args, TestExtractor,
       checkUnconsumedParameters = false))
     res should be(ExpParamsMap)
+    val context = procContext.parameterContext
     context.parameters.parametersMap should be(ExpParamsMap)
     context.parameters.accessedParameters should contain only TestOptionPk
     context.modelContext.options(TestOptionPk).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
+    procContext.helpRequested shouldBe false
   }
 
   it should "check for unconsumed parameters" in {
@@ -319,5 +321,40 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures should have size 1
     val failure = exception.failures.head
     failure.key should be(FileOption)
+  }
+
+  it should "detect a help switch on the command line" in {
+    val HelpKey = ParameterKey("help", shortAlias = false)
+    val args = List("--" + TestOptionKey, TestOptionValue, "--" + HelpKey.key, "--foo", "bar", "--foo", "baz")
+    val ExpParamsMap = Map(TestOptionPk -> List(TestOptionValue),
+      pk("foo") -> List("bar", "baz"),
+      HelpKey -> List("true"))
+    val helpExtractor = ParameterExtractor.switchValue(HelpKey.key)
+    val spec = ExtractionSpec(TestExtractor, optHelpExtractor = Some(helpExtractor))
+
+    val (res, procContext) = triedResult(ParameterManager.processCommandLineSpec(args, spec,
+      checkUnconsumedParameters = false))
+    res should contain theSameElementsAs ExpParamsMap
+    val context = procContext.parameterContext
+    context.parameters.parametersMap should be(ExpParamsMap)
+    context.parameters.accessedParameters should contain only(TestOptionPk, HelpKey)
+    context.modelContext.options(TestOptionPk).attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
+    procContext.helpRequested shouldBe true
+  }
+
+  it should "handle a failure when extracting the help flag" in {
+    val HelpKey = ParameterKey("please-help", shortAlias = false)
+    val Alias = "h"
+    val args = List("--" + TestOptionKey, TestOptionValue, "-" + Alias, "maybe", "--foo", "bar")
+    val helpExtractor = ParameterExtractor.optionValue(HelpKey.key)
+      .alias(Alias)
+      .toBoolean
+      .mandatory
+    val spec = ExtractionSpec(TestExtractor, optHelpExtractor = Some(helpExtractor))
+
+    val exception = failedResult(ParameterManager.processCommandLineSpec(args, spec,
+      checkUnconsumedParameters = false))
+    exception.failures should have size 1
+    exception.failures.head.key should be(HelpKey)
   }
 }
