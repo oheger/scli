@@ -19,13 +19,14 @@ package com.github.scli
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.github.scli.ParameterExtractor.{CliExtractor, ParameterExtractionException}
-import com.github.scli.ParameterManager.ExtractionSpec
-import com.github.scli.ParameterModel.ParameterKey
+import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ParameterContext, ParameterExtractionException, Parameters}
+import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
+import com.github.scli.ParameterModel.{AliasMapping, ModelContext, ParameterKey}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import scala.collection.SortedSet
 import scala.language.existentials
 import scala.util.{Failure, Success, Try}
 
@@ -71,6 +72,19 @@ object ParameterManagerSpec {
       result
     }
     (extCount, counter)
+  }
+
+  /**
+   * Creates a test parameter context that does not contain any meaningful
+   * values.
+   *
+   * @return the test parameter context
+   */
+  private def createParameterContext(): ParameterContext = {
+    val modelContext = new ModelContext(Map.empty, SortedSet.empty, AliasMapping(Map.empty, Map.empty),
+      None, List("some", "groups"))
+    val params = Parameters(Map(TestOptionPk -> List(TestOptionValue)), Set.empty)
+    ParameterContext(params, modelContext, DummyConsoleReader)
   }
 }
 
@@ -356,5 +370,40 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       checkUnconsumedParameters = false))
     exception.failures should have size 1
     exception.failures.head.key should be(HelpKey)
+  }
+
+  it should "evaluate a successful processing result" in {
+    val ExtractResult = 42
+    val context = ProcessingContext(createParameterContext(), helpRequested = false)
+    val processResult: ProcessingResult[Int] = Success((ExtractResult, context))
+
+    ParameterManager.evaluate(processResult) should be(Right(ExtractResult))
+  }
+
+  it should "evaluate a successful processing result if help was requested" in {
+    val context = ProcessingContext(createParameterContext(), helpRequested = true)
+    val processResult: ProcessingResult[String] = Success(("ignored", context))
+
+    ParameterManager.evaluate(processResult) should be(Left(context))
+  }
+
+  it should "evaluate a failed processing result" in {
+    val paramCtx = createParameterContext()
+    val failure = ExtractionFailure(TestOptionPk, "failure", paramCtx)
+    val exception = ParameterExtractionException(failure)
+    val processResult: ProcessingResult[String] = Failure(exception)
+    val expContext = ProcessingContext(paramCtx, helpRequested = false)
+
+    ParameterManager.evaluate(processResult) should be(Left(expContext))
+  }
+
+  it should "evaluate a failed processing result with an unexpected exception" in {
+    val exception = new IllegalStateException("Unexpected exception")
+    val processResult: ProcessingResult[String] = Failure(exception)
+
+    val thrown = intercept[IllegalArgumentException] {
+      ParameterManager.evaluate(processResult)
+    }
+    thrown.getCause should be(exception)
   }
 }

@@ -349,6 +349,38 @@ object ParameterManager {
     }
 
   /**
+   * A function that simplifies the evaluation of a ''ProcessingResult''. This
+   * function supports an application in the decision whether it can continue
+   * with the processing of the processing result or should display a help
+   * message. If command line processing encountered failures or if the user
+   * has explicitly requested help (by setting a help switch on the command
+   * line), result is a ''Left'' with a ''ProcessingContext'' that can be used
+   * to display help information. Otherwise, all parameters could be parsed
+   * successfully, and the result is available as a ''Right'' to be consumed by
+   * the application.
+   *
+   * Note: In case of a failed result, this function assumes that the exception
+   * is of type [[ParameterExtractionException]]; if a different exception is
+   * found (which should not happen when the result was constructed by this
+   * module), an ''IllegalArgumentException'' exception is thrown.
+   *
+   * @param result the ''ProcessingResult'' to be evaluated
+   * @tparam A the type of the actual result produced by the extractor
+   * @return an ''Either'' simplifying the interpretation of the result
+   */
+  def evaluate[A](result: ProcessingResult[A]): Either[ProcessingContext, A] =
+    result match {
+      case Success((_, context)) if context.helpRequested =>
+        Left(context)
+      case Success((result, _)) =>
+        Right(result)
+      case Failure(e: ParameterExtractionException) =>
+        Left(ProcessingContext(e.parameterContext, helpRequested = false))
+      case Failure(e) =>
+        throw new IllegalArgumentException("Unexpected failure in ProcessingResult", e)
+    }
+
+  /**
    * Handles the extraction of data objects from the command line and
    * optionally checks for unconsumed parameters. In case of failures, it is
    * ensured that all messages are contained in the resulting exception.
