@@ -75,6 +75,84 @@ object TransferParameterManager {
   /** Conditional group identifier for an HTTP server. */
   private val ServerTypeHttp = "http"
 
+  private val HelpTransferCommand =
+    """The command defining the transfer operation to be executed. Depending on the command, additional \
+      |command-specific parameters are enabled or disabled. The following commands are supported \
+      |(case does not matter):
+      |- upload: uploads files to the server
+      |- download: downloads files from the server""".stripMargin
+
+  private val HelpTransferFiles =
+    """A list of files to be uploaded to or downloaded from the target server."""
+
+  private val HelpTransferServer =
+    """The URI of the server which is the target of the transfer operation. Different types of servers \
+      |are supported; depending on the server type, further parameters are enabled or disabled. \
+      |The server type is determined by the scheme of the URI provided: the schemes 'http' \
+      |or 'https' select an HTTP server; for all other schemes a file server is used.""".stripMargin
+
+  private val HelpChunkSize =
+    """Defines the chunk size for transfer operations (in kilobytes). Using this option, the data transfer \
+      |can be tweaked towards smaller or larger files.""".stripMargin
+
+  private val HelpTimeout =
+    """Defines a timeout (in seconds) for transfer operations. If a transfer takes longer than this time, \
+      |it is canceled, and an error is recorded.""".stripMargin
+
+  private val HelpLog =
+    """Allows specifying log messages for the current transfer operation. The parameter can occur multiple \
+      |times, so that multiple log messages can be set.""".stripMargin
+
+  private val HelpTag =
+    """Allows specifying a tag for the current transfer operation. The tag is stored in the transfer log."""
+
+  private val HelpDryRun =
+    """Allows enabling a dry-run or test mode, in which no actual files are transferred."""
+
+  private val HelpCryptMode =
+    """Determines what kind of encryption is used during the transfer process. This parameter \
+      |can have the following values (case does not matter):
+      |- None: encryption is disabled
+      |- Files: the content of files is encrypted
+      |- FilesAndNames: the content of files and their names are encrypted""".stripMargin
+
+  private val HelpCryptPassword =
+    """Sets the password to be used for encryption. This parameter is evaluated only if encryption \
+      |is enabled; then it must be either provided on the command line or it is read from the console.""".stripMargin
+
+  private val HelpCryptAlg =
+    """Defines the algorithm to be used for encryption. This parameter is evaluated only if encryption \
+      |is enabled.""".stripMargin
+
+  private val HelpHttpServerUser =
+    """Sets the user name for authentication against an HTTP server."""
+
+  private val HelpHttpServerPassword =
+    """Sets the password for authentication against an HTTP server. This parameter is evaluated only \
+      |if the target server is an HTTP server; then the password must either be provided on the command \
+      |line or it is read from the console.""".stripMargin
+
+  private val HelpFileServerRoot =
+    """Sets the root path of the file server. All files that are transferred are stored in this path."""
+
+  private val HelpFileServerUmask =
+    """Defines the Unix umask for new files stored on the file server."""
+
+  private val HelpUploadHashes =
+    """Determines whether hashes should be uploaded together with files."""
+
+  private val HelpRemoveUploaded =
+    """Determines whether local files should be removed after a successful upload. (If an upload fails, \
+      |the file is not removed.)""".stripMargin
+
+  private val HelpTargetFolder =
+    """Defines the local target folder for download operations. All files that are downloaded are stored \
+      |in a folder structure below this directory.""".stripMargin
+
+  private val HelpSkipExisting =
+    """Determines whether files already existing on the local hard drive should not be overridden by \
+      |files downloaded from the server.""".stripMargin
+
   /**
    * An enumeration defining the usage of encryption for a transfer operation.
    *
@@ -250,9 +328,9 @@ object TransferParameterManager {
    * @return the extractor for the ''HttpServerConfig''
    */
   private[transfer] def httpServerConfigExtractor: CliExtractor[Try[ServerConfig]] = {
-    val extUsr = optionValue("user")
+    val extUsr = optionValue("user", Some(HelpHttpServerUser))
       .mandatory
-    val extPwd = passwordExtractor("password", "HTTP server password")
+    val extPwd = passwordExtractor("password", "HTTP server password", HelpHttpServerPassword)
     for {
       user <- extUsr
       pwd <- extPwd
@@ -281,25 +359,26 @@ object TransferParameterManager {
    * @return the extractor for the ''TransferConfig''
    */
   private def transferConfigExtractor: CliExtractor[Try[TransferConfig]] = {
-    val extSrcFiles = inputValues(fromIdx = 1, toIdx = -2, optKey = Some("transferFiles"))
+    val extSrcFiles = inputValues(fromIdx = 1, toIdx = -2, optKey = Some("transferFiles"),
+      optHelp = Some(HelpTransferFiles))
       .multiplicity(atLeast = 1)
       .toPath
       .map(_.map(_.toList))
     val extServerUri = serverUriExtractor.mandatory
-    val extChunkSize = optionValue("chunk-size")
+    val extChunkSize = optionValue("chunk-size", Some(HelpChunkSize))
       .toInt
       .fallbackValue(DefaultChunkSize)
       .mandatory
       .alias("s")
-    val extTimeout = optionValue("timeout")
+    val extTimeout = optionValue("timeout", Some(HelpTimeout))
       .alias("t")
       .toInt
       .mapTo(t => t.seconds)
-    val extLogs = multiOptionValue("log")
+    val extLogs = multiOptionValue("log", Some(HelpLog))
       .alias("l")
-    val extTag = optionValue("tag")
+    val extTag = optionValue("tag", Some(HelpTag))
       .alias("T")
-    val extDryRun = switchValue("dry-run")
+    val extDryRun = switchValue("dry-run", Some(HelpDryRun))
       .alias("d")
 
     for {
@@ -324,7 +403,7 @@ object TransferParameterManager {
    * @return the extractor for the command config
    */
   private def commandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
-    val extCmdName = inputValue(index = 0, optKey = Some("transfer-command"))
+    val extCmdName = inputValue(index = 0, optKey = Some("transferCommand"), optHelp = Some(HelpTransferCommand))
       .toLower
       .mandatory
     val groupExtractors = Map(CommandUpload -> uploadCommandConfigExtractor,
@@ -360,7 +439,7 @@ object TransferParameterManager {
    * last input parameter.
    */
   private lazy val serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
-    inputValue(optKey = Some("serverUri"), index = -1)
+    inputValue(optKey = Some("serverUri"), index = -1, optHelp = Some(HelpTransferServer))
 
   /**
    * Returns an extractor for a (mandatory) password option. The extractor
@@ -369,10 +448,11 @@ object TransferParameterManager {
    *
    * @param key    the key of the option
    * @param prompt the string to prompt the user
+   * @param help   the help text for the password option
    * @return the password extractor for this key
    */
-  private def passwordExtractor(key: String, prompt: String): CliExtractor[Try[String]] =
-    optionValue(key)
+  private def passwordExtractor(key: String, prompt: String, help: String): CliExtractor[Try[String]] =
+    optionValue(key, Some(help))
       .fallback(consoleReaderValue(key, optPrompt = Some(prompt)))
       .mandatory
 
@@ -380,7 +460,7 @@ object TransferParameterManager {
    * An extractor that extracts a crypt mode value from a command line option.
    */
   private lazy val cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
-    optionValue("crypt-mode")
+    optionValue("crypt-mode", Some(HelpCryptMode))
       .alias("c")
       .toUpper
       .toEnum(CryptMode.Literals.get)
@@ -395,8 +475,8 @@ object TransferParameterManager {
    * @return the extractor for the defined ''CryptConfig''
    */
   private def definedCryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
-    val extCryptPass = passwordExtractor("crypt-password", "Encryption password")
-    val extCryptAlg = optionValue("crypt-alg")
+    val extCryptPass = passwordExtractor("crypt-password", "Encryption password", HelpCryptPassword)
+    val extCryptAlg = optionValue("crypt-alg", Some(HelpCryptAlg))
       .fallbackValue(DefaultCryptAlgorithm)
       .mandatory
     for {
@@ -412,9 +492,9 @@ object TransferParameterManager {
    * @return the extractor for the ''UploadCommandConfig''
    */
   private def uploadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
-    val extUploadHashes = switchValue("upload-hashes")
+    val extUploadHashes = switchValue("upload-hashes", Some(HelpUploadHashes))
       .alias("H")
-    val extRemoveUploaded = switchValue("remove-uploaded-files")
+    val extRemoveUploaded = switchValue("remove-uploaded-files", Some(HelpRemoveUploaded))
       .alias("C")
     for {
       uploadHashes <- extUploadHashes
@@ -428,10 +508,10 @@ object TransferParameterManager {
    * @return the extractor for the ''DownloadCommandConfig''
    */
   private def downloadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
-    val extTargetPath = optionValue("target-folder")
+    val extTargetPath = optionValue("target-folder", Some(HelpTargetFolder))
       .toPath
       .mandatory
-    val extOverride = switchValue("skip-existing", presentValue = false)
+    val extOverride = switchValue("skip-existing", presentValue = false, optHelp = Some(HelpSkipExisting))
     for {
       target <- extTargetPath
       fOverride <- extOverride
@@ -444,8 +524,8 @@ object TransferParameterManager {
    * @return the extractor for the ''FileServerConfig''
    */
   private def fileServerConfigExtractor: CliExtractor[Try[ServerConfig]] = {
-    val extRootPath = optionValue("root-path")
-    val extUmask = optionValue("umask")
+    val extRootPath = optionValue("root-path", Some(HelpFileServerRoot))
+    val extUmask = optionValue("umask", Some(HelpFileServerUmask))
       .toInt
       .fallbackValue(DefaultUmask)
       .mandatory
