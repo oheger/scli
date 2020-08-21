@@ -20,9 +20,9 @@ import java.nio.file.Path
 import java.util.Locale
 
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterManager
+import com.github.scli.{CliHelpGenerator, ParameterManager}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext}
-import com.github.scli.ParameterModel.ParameterKey
+import com.github.scli.ParameterModel.{AttrHelpText, ParameterKey}
 
 import scala.concurrent.duration.{Duration, _}
 import scala.util.{Success, Try}
@@ -304,6 +304,46 @@ object TransferParameterManager {
       processedArgs <- ParameterManager.processParameterFiles(args, spec)(classifierFunc)
       result <- ParameterManager.processCommandLineSpec(processedArgs, spec, parser = parseFunc)
     } yield result
+  }
+
+  /**
+   * Processes the given sequence of command line arguments and evaluates the
+   * result. The resulting ''Either'' can be used to determine whether
+   * processing should continue or help information should be displayed.
+   *
+   * @param args the sequence with command line arguments
+   * @return an ''Either'' with the evaluated command line processing result
+   */
+  def evaluateCommandLine(args: Seq[String]): Either[ProcessingContext, TransferCommandConfig] =
+    ParameterManager.evaluate(processCommandLine(args))
+
+  /**
+   * Generates help information for this application based on the context
+   * provided.
+   *
+   * @param context the ''ProcessingContext'' with the current parameters and
+   *                errors
+   * @return a formatted string with help information
+   */
+  def generateHelp(context: ProcessingContext): String = {
+    import CliHelpGenerator._
+    val modelContext = context.parameterContext.modelContext
+    val keyGenerator = parameterNameColumnGenerator()
+    val helpGenerator = wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70)
+
+    val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
+      sortFunc = inputParamSortFunc(modelContext))(keyGenerator, helpGenerator)
+    val tableOptions = generateHelpTable(modelContext,
+      filterFunc = negate(InputParamsFilterFunc))(keyGenerator, helpGenerator)
+    val helpTexts = renderHelpTables(List(tableParams, tableOptions))
+    val buf = new StringBuilder(1024)
+    buf.append("Usage: transfer [options] ")
+      .append(generateInputParamsOverview(modelContext).mkString(" "))
+      .append(CR)
+      .append(CR)
+      .append(helpTexts.head)
+      .append(helpTexts(1))
+    buf.toString()
   }
 
   /**
