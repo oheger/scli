@@ -855,11 +855,11 @@ object ParameterExtractor {
    * @return the extractor to extract these input values
    */
   def inputValues(fromIdx: Int, toIdx: Int, optKey: Option[String] = None, optHelp: Option[String] = None,
-                  last: Boolean = false): CliExtractor[OptionValue[String]] =
+                  last: Boolean = false): CliExtractor[OptionValue[String]] = {
+    val optInputKey = optKey map (k => ParameterKey(k, shortAlias = false, hasPrefix = false))
     CliExtractor(context => {
       val inputs = context.parameters.parametersMap.getOrElse(ParameterParser.InputParameter, Nil)
-      //TODO mark key as special to not include any prefix
-      lazy val paramKey = optKey map(k => ParameterKey(k, shortAlias = false)) getOrElse ParameterParser.InputParameter
+      lazy val paramKey = optInputKey getOrElse ParameterParser.InputParameter
 
       // handles special negative index values and checks the index range
       def adjustAndCheckIndex(index: Int): Try[Int] = {
@@ -875,16 +875,17 @@ object ParameterExtractor {
       }
 
       val result = if (last && inputs.size > toIdx + 1)
-      Failure(paramException(context, paramKey,
-        s"Too many input arguments; expected at most ${toIdx + 1}"))
-        else
+        Failure(paramException(context, paramKey,
+          s"Too many input arguments; expected at most ${toIdx + 1}"))
+      else
         for {
           firstIndex <- adjustAndCheckIndex(fromIdx)
           lastIndex <- adjustAndCheckIndex(toIdx)
         } yield inputs.slice(firstIndex, lastIndex + 1)
       val modelContext = context.modelContext.addInputParameter(fromIdx, optKey, optHelp)
       (result, context.update(context.parameters keyAccessed ParameterParser.InputParameter, modelContext))
-    }, optKey map (k => ParameterKey(k, shortAlias = false)))
+    }, optInputKey)
+  }
 
   /**
    * Returns an extractor that extracts the value of a command line switch. A

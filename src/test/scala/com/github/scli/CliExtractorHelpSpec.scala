@@ -247,11 +247,12 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support descriptions and keys for input parameters" in {
-    val Key2 = ParameterKey("target", shortAlias = false)
-    val Key3 = ParameterKey("sourceFiles", shortAlias = false)
+    val Key1 = Key.copy(hasPrefix = false)
+    val Key2 = ParameterKey("target", shortAlias = false, hasPrefix = false)
+    val Key3 = ParameterKey("sourceFiles", shortAlias = false, hasPrefix = false)
     val Help2 = "The target directory"
     val Help3 = "List of the files to be copied"
-    val ExpInputs = List(InputParameterRef(0, Key2), InputParameterRef(1, Key), InputParameterRef(2, Key3))
+    val ExpInputs = List(InputParameterRef(0, Key2), InputParameterRef(1, Key1), InputParameterRef(2, Key3))
     val extInp1 = inputValue(1, optKey = Some(Key.key), optHelp = Some(HelpText))
     val extInp2 = inputValue(0, optKey = Some(Key2.key), optHelp = Some(Help2))
     val extInp3 = inputValues(2, -1, optKey = Some(Key3.key), optHelp = Some(Help3))
@@ -262,28 +263,29 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     } yield List(i1, i2, i3)
 
     val modelContext = generateModelContext(ext)
-    modelContext.options.keySet should contain theSameElementsAs List(Key, Key2, Key3)
-    modelContext.options(Key).attributes(ParameterModel.AttrHelpText) should be(HelpText)
+    modelContext.options.keySet should contain theSameElementsAs List(Key1, Key2, Key3)
+    modelContext.options(Key1).attributes(ParameterModel.AttrHelpText) should be(HelpText)
     modelContext.options(Key2).attributes(ParameterModel.AttrHelpText) should be(Help2)
     modelContext.options(Key3).attributes(ParameterModel.AttrHelpText) should be(Help3)
     modelContext.inputs should contain theSameElementsInOrderAs ExpInputs
   }
 
   it should "support attributes for input parameters" in {
+    val KeyInput = Key.copy(hasPrefix = false)
     val ext = inputValue(1, Some(Key.key))
     val modelContext1 = generateModelContext(ext)
 
     val modelContext2 = modelContext1.addAttribute("foo", "bar")
-    modelContext2.inputs should contain only InputParameterRef(1, Key)
-    val attrs = modelContext2.options(Key)
+    modelContext2.inputs should contain only InputParameterRef(1, KeyInput)
+    val attrs = modelContext2.options(KeyInput)
     attrs.attributes("foo") should be("bar")
   }
 
   it should "support input parameters with negative indices" in {
-    val Key1 = ParameterKey("k1", shortAlias = false)
-    val Key2 = ParameterKey("k2", shortAlias = false)
-    val Key3 = ParameterKey("k3", shortAlias = false)
-    val Key4 = ParameterKey("k4", shortAlias = false)
+    val Key1 = ParameterKey("k1", shortAlias = false, hasPrefix = false)
+    val Key2 = ParameterKey("k2", shortAlias = false, hasPrefix = false)
+    val Key3 = ParameterKey("k3", shortAlias = false, hasPrefix = false)
+    val Key4 = ParameterKey("k4", shortAlias = false, hasPrefix = false)
     val ExpInputs = List(InputParameterRef(0, Key1), InputParameterRef(1, Key2),
       InputParameterRef(-2, Key3), InputParameterRef(-1, Key4))
     val extInp1 = inputValue(0, optKey = Some(Key1.key), optHelp = Some(HelpText))
@@ -303,7 +305,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "generate a key for an input parameter if necessary" in {
     val Index = 17
-    val ExpKey = ParameterKey(ParameterModel.KeyInput + Index, shortAlias = false)
+    val ExpKey = ParameterKey(ParameterModel.KeyInput + Index, shortAlias = false, hasPrefix = false)
     val ext = inputValue(Index)
 
     val modelContext = generateModelContext(ext)
@@ -483,10 +485,12 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "set the parameter type attribute for an input parameter" in {
+    val KeyInput = Key.copy(hasPrefix = false)
     val ext = inputValue(1, optKey = Some(Key.key))
 
     val modelContext = generateModelContext(ext)
-    fetchAttribute(modelContext, Key, ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeInput)
+    fetchAttribute(modelContext, KeyInput,
+      ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeInput)
   }
 
   it should "set the parameter type attribute for a switch" in {
@@ -677,9 +681,9 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "provide a special sort function for input parameters" in {
-    val Key1 = ParameterKey("source", shortAlias = false)
-    val Key2 = ParameterKey("destination", shortAlias = false)
-    val Key3 = ParameterKey("flags", shortAlias = false)
+    val Key1 = ParameterKey("source", shortAlias = false, hasPrefix = false)
+    val Key2 = ParameterKey("destination", shortAlias = false, hasPrefix = false)
+    val Key3 = ParameterKey("flags", shortAlias = false, hasPrefix = false)
     val modelContext = createModelContext()
       .addInputParameter(1, Some(Key1.key), None)
       .addInputParameter(2, Some(Key2.key), None)
@@ -693,8 +697,8 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "handle non-input parameters in the special sort function" in {
-    val Key1 = ParameterKey("source", shortAlias = false)
-    val Key2 = ParameterKey("destination", shortAlias = false)
+    val Key1 = ParameterKey("source", shortAlias = false, hasPrefix = false)
+    val Key2 = ParameterKey("destination", shortAlias = false, hasPrefix = false)
     val modelContext = createModelContext()
       .addInputParameter(1, Some(Key1.key), None)
       .addInputParameter(2, Some(Key2.key), None)
@@ -721,13 +725,14 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "provide a filter function that filters for input parameters" in {
-    val Key2 = ParameterKey("testInput", shortAlias = false)
+    val Key1 = Key.copy(hasPrefix = false)
+    val Key2 = ParameterKey("testInput", shortAlias = false, hasPrefix = false)
     val modelContext = createModelContext()
-      .addInputParameter(1, Some(Key.key), None)
+      .addInputParameter(1, Some(Key1.key), None)
       .addOption(ParameterKey("ignored", shortAlias = false), None)
       .addInputParameter(2, Some(Key2.key), Some("text"))
     val ExpResult = List(ParameterMetaData(Key2, modelContext.options(Key2)),
-      ParameterMetaData(Key, modelContext.options(Key)))
+      ParameterMetaData(Key1, modelContext.options(Key1)))
 
     val result = modelContext.parameterMetaData.filter(HelpGenerator.InputParamsFilterFunc)
     result should contain theSameElementsAs ExpResult
@@ -800,7 +805,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "allow combining filters with OR semantics" in {
-    val KeyInput = ParameterKey("myInput", shortAlias = false)
+    val KeyInput = ParameterKey("myInput", shortAlias = false, hasPrefix = false)
     val Group = "ImportantGroup"
     val modelContext = createModelContext()
       .addOption(ParameterKey("ignored", shortAlias = false), Some("foo"))

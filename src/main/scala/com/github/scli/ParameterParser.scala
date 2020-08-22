@@ -38,7 +38,7 @@ object ParameterParser {
    * Reserved key of a parameter that collects the input strings that are no
    * values of options or switches.
    */
-  final val InputParameter = ParameterKey("input", shortAlias = false)
+  final val InputParameter = ParameterKey("input", shortAlias = false, hasPrefix = false)
 
   /**
    * An OptionPrefixes object with the default prefix for options. This is

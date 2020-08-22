@@ -107,10 +107,16 @@ object ParameterModel {
    * parameters. It makes it explicit whether a string is to be interpreted as
    * normal or short key.
    *
+   * There are even keys that do not have a prefix at all: keys for input
+   * parameters. Such keys can be modeled using this class as well.
+   *
    * @param key        the string-based key
    * @param shortAlias flag whether this key is a short alias
+   * @param hasPrefix  flag whether this key requires a prefix
    */
-  case class ParameterKey(key: String, shortAlias: Boolean)
+  case class ParameterKey(key: String,
+                          shortAlias: Boolean,
+                          hasPrefix: Boolean = true)
 
   /**
    * A data class for keeping track on alias names assigned to parameters.
@@ -242,7 +248,7 @@ object ParameterModel {
      */
     def addInputParameter(index: Int, optKey: Option[String], text: Option[String]): ModelContext = {
       val key = optKey.getOrElse(KeyInput + index)
-      val paramKey = ParameterKey(key, shortAlias = false)
+      val paramKey = ParameterKey(key, shortAlias = false, hasPrefix = false)
       val inputRef = InputParameterRef(index, paramKey)
       contextWithParameter(paramKey, text, ParameterTypeInput,
         inputs union Set(inputRef))

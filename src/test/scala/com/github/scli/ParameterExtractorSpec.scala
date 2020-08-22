@@ -109,11 +109,11 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    * @param expMsgParts strings to be contained in the message
    * @return the ''ExtractionFailure'' unchanged
    */
-  private def checkExtractionFailure(failure: ExtractionFailure, expKey: String = Key,
+  private def checkExtractionFailure(failure: ExtractionFailure, expKey: ParameterKey = TestParamKey,
                                      expParams: ParametersMap = TestParameters.parametersMap)
                                     (expMsgParts: String*): ExtractionFailure = {
 
-    failure.key.key should be(expKey)
+    failure.key should be(expKey)
     failure.context.parameters.parametersMap should be(expParams)
     expMsgParts foreach { part =>
       failure.message should include(part)
@@ -132,7 +132,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    * @param expMsgParts strings to be contained in the message
    * @return the ''ExtractionFailure'' unchanged
    */
-  private def checkExtractionException(exception: ParameterExtractionException, expKey: String = Key,
+  private def checkExtractionException(exception: ParameterExtractionException, expKey: ParameterKey = TestParamKey,
                                        expParams: ParametersMap = NextParameters.parametersMap)
                                       (expMsgParts: String*): ExtractionFailure = {
     exception.failures should have size 1
@@ -777,16 +777,17 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValue(-InputValues.size - 1)
 
     val (res, _) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputParameter.key,
+    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputParameter,
       expParams = TestParametersWithInputs.parametersMap)("-1")
   }
 
   it should "yield a failure if the index of an input value is too big" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val extractor = ParameterExtractor.inputValues(1, InputValues.size, optKey = Some(Key))
+    val paramKey = ParameterKey("my-input", shortAlias = false, hasPrefix = false)
+    val extractor = ParameterExtractor.inputValues(1, InputValues.size, optKey = Some(paramKey.key))
 
     val (res, _) = ParameterExtractor.runExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = Key,
+    checkExtractionException(expectExtractionException(res), expKey = paramKey,
       expParams = TestParametersWithInputs.parametersMap)("few input arguments")
   }
 
@@ -795,16 +796,18 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val extractor = ParameterExtractor.inputValue(1, last = true)
 
     val res = ParameterExtractor.tryExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputParameter.key,
+    checkExtractionException(expectExtractionException(res), expKey = ParameterParser.InputParameter,
       expParams = TestParametersWithInputs.parametersMap)("at most 2")
+    ParameterParser.InputParameter.hasPrefix shouldBe false
   }
 
   it should "use the correct key in a failure that too many input parameters have been specified" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val extractor = ParameterExtractor.inputValue(1, optKey = Some(Key), last = true)
+    val paramKey = ParameterKey("someInput", hasPrefix = false, shortAlias = false)
+    val extractor = ParameterExtractor.inputValue(1, optKey = Some(paramKey.key), last = true)
 
     val res = ParameterExtractor.tryExtractor(extractor, TestParametersWithInputs)
-    checkExtractionException(expectExtractionException(res), expKey = Key,
+    checkExtractionException(expectExtractionException(res), expKey = paramKey,
       expParams = TestParametersWithInputs.parametersMap)("at most 2")
   }
 
@@ -812,7 +815,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val paramKey = Some("myInput")
     val extractor = ParameterExtractor.inputValue(1, optKey = paramKey)
 
-    extractor.key should be(pk(paramKey.get))
+    extractor.key should be(ParameterKey(paramKey.get, shortAlias = false, hasPrefix = false))
   }
 
   it should "provide an extractor for switches" in {
