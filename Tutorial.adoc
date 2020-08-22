@@ -893,7 +893,7 @@ The single function offered by `ParameterManager` to apply an extractor to the
 application's command line is `processCommandLine()`. At minimum, it expects
 the command line (as a sequence of strings) and the extractor to execute. Its
 result is a `Try` of a tuple with the extractor's result and a
-`ParameterContext`.
+`ProcessingContext`.
 
 The extractor is supposed to return a `Try` of a specific type; depending on
 the transformations it applies, there is always the chance that something goes
@@ -901,9 +901,10 @@ wrong. This is also the reason why `processCommandLine()` returns a `Try` -
 failure results produced by the extractor need to be communicated to the
 caller.
 
-The second result of `processCommandLine()`, the parameter context, is not that
+The second result of `processCommandLine()`, the processing context, is not that
 obvious. It contains information that is useful, for instance, to display a
-help message to the user. For now, we will ignore it.
+help message to the user. For now, we will ignore it. `ParameterManager` has a
+type definition named `ProcessingResult` to represent this tuple.
 
 So if we have an extractor yielding a result of type `Data` (for an imaginary
 data class), and the sequence `args` contains the command line parameters of
@@ -1469,3 +1470,222 @@ private def serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
 
 Note that by extending the selection logic, it is pretty easy to add support
 for configuration options for other types of servers.
+
+=== Generating help
+
+This section describes the functionality provided by SCLI related to the
+generation of help information.
+
+==== Deciding when to display help
+
+Displaying help information is a typical use case of command line applications.
+If the set of supported parameters is not trivial, it is hard for users to
+remember the exact syntax, and therefore, there should be ways to get an
+explanation about the applications' abilities, or a notification if invalid
+parameters were specified.
+
+Command line applications usually display help information if at least one of
+the following conditions hold:
+
+* Invalid or missing mandatory parameters have been detected.
+* The user has explicitly requested help, e.g. by passing in a specific switch
+  on the command line, such as `--help`.
+
+The section about <<Running extractors>> showed the result returned by
+`ParameterManager` for the processing of the command line: a `Try` of a tuple
+with the actual extraction result and a `ProcessingContext` object. Based on
+this information, the application now needs to decide whether it can consume
+the result and do its actual job or whether it should show a help screen and
+exit. As the data types involved make this decision not trivial - one has to
+inspect the `Try` and check certain attributes of the context object -, there
+is a helper function to simplify this task: `ParameterManager.evaluate()`.
+
+The function accepts the result of the command line processing and converts it
+to an `Either`, which is either a `Right` with the extraction result or a
+`Left` with the `ProcessingContext`. In case of the `Right`, the application
+can be sure that its parameters have been parsed successfully; so it can go
+ahead making use of them. Otherwise, it should use the processing context to
+generate help information and stop processing afterwards.
+
+The demo _transfer_ application contains a main class - `TransferApp` - to
+demonstrate the decision logic necessary. It mainly delegates to
+`TransferParameterManager` to trigger command line processing and evaluation,
+but then checks whether a transfer can be done or help needs to be displayed:
+
+[source,scala]
+----
+object TransferApp {
+  def main(args: Array[String]): Unit = {
+    TransferParameterManager.evaluateCommandLine(args.toIndexedSeq) match {
+      case Right(config) => transfer(config)
+      case Left(context) =>
+        println(TransferParameterManager.generateHelp(context))
+    }
+  }
+
+  private def transfer(config: TransferCommandConfig): Unit = {
+    // actual transfer logic
+  }
+}
+----
+
+The `evaluateCommandLine()` function of `TransferParameterManager` is
+implemented as follows:
+
+[source,scala]
+----
+def evaluateCommandLine(args: Seq[String]): Either[ProcessingContext, TransferCommandConfig] =
+  ParameterManager.evaluate(processCommandLine(args))
+----
+
+It calls its own function to process the command line (which we have presented
+in the section <<Reading parameter files>>), and then delegates to the
+parameter manager in order to evaluate the result. `TransferApp` now matches
+over the resulting `Either` to determine the actions to take. In case of a
+`Left` it delegates again to `TransferParameterManager` to generate help
+information. In the remaining parts of this section, we will discuss in detail
+how this generation of help screens works.
+
+==== Generating a basic help screen
+
+Before digging into the details of help screen generation, some basic
+understanding of the concepts used by SCLI in this area is helpful. We have
+already seen that help generation is based on a `ProcessingContext` object
+obtained by evaluating a command line processing result. Such a processing
+context contains a `ParameterContext` object and a flag whether the user has
+explicitly requested help. The flag is useful to distinguish between the
+reasons why to display help; it could also affect the output generated by the
+application. For instance, if the flag is *false*, the application knows that
+errors were detected during command line processing, and it should probably
+present those to the user.
+
+The `ParameterContext` stores information that has been generated during
+command line processing. This includes a map of parameters as the result of the
+first parsing phase and a `ModelContext` object. The latter has information
+about all the parameters supported by the application with additional metadata
+attributes; the attributes stem from the declaration of extractor objects using
+the domain-specific language offered by SCLI.
+
+The principle idea behind the generation of help screens is to iterate over the
+parameters stored in the `ModelContext`, maybe filter them based on certain
+criteria, sort them, and display some of their metadata attributes in a
+suitable form. SCLI has special support for the generation of tabular data. It
+offers functions that do the iteration (which is customizable by passing in
+filter and sort functions) and can invoke so-called _column generator
+functions_ for each parameter. This yields a table with rows representing the
+parameters selected and columns corresponding to the column generator functions
+provided. SCLI can layout such tables, so that they can be directly printed to
+the console. It offers a set of pre-defined column generator functions, but
+applications can easily define their own ones to address special needs.
+
+In order to generate meaningful help screens, sufficient metadata must be
+available for the application's parameters. Some attributes are generated
+automatically when declaring extractors, for instance the parameter key,
+possible aliases, its type (option, switch, etc.), its multiplicity, or default
+values to apply. In the context of help screens, the most relevant attribute is
+probably a help text. This is a text created by the application developer that
+describes a specific parameter. The examples in this tutorial have skipped help
+texts so far, but all the functions that allow the declaration of a parameter
+support them. So the first step in generating help screens is the definition of
+help texts for all the parameters available and assign them when declaring the
+corresponding extractors.
+
+Let's see how this is done in the demo application: The
+`TransferParameterManager` class defines constants for the help texts of the
+parameters it supports. The fragment below shows an excerpt from these
+declarations:
+
+[source,scala]
+----
+private val HelpTransferCommand =
+  """The command defining the transfer operation to be executed. Depending on the command, additional \
+    |command-specific parameters are enabled or disabled. The following commands are supported \
+    |(case does not matter):
+    |- upload: uploads files to the server
+    |- download: downloads files from the server""".stripMargin
+
+private val HelpTransferFiles =
+  """A list of files to be uploaded to or downloaded from the target server."""
+
+private val HelpTransferServer =
+  """The URI of the server which is the target of the transfer operation. Different types of servers \
+    |are supported; depending on the server type, further parameters are enabled or disabled. \
+    |The server type is determined by the scheme of the URI provided: the schemes 'http' \
+    |or 'https' select an HTTP server; for all other schemes a file server is used.""".stripMargin
+
+private val HelpChunkSize =
+  """Defines the chunk size for transfer operations (in kilobytes). Using this option, the data transfer \
+    |can be tweaked towards smaller or larger files.""".stripMargin
+----
+
+Here Scala's multi-line strings are used to define help texts. Per default,
+line breaks in these declarations become part of the strings and would
+therefore appear in the output as well. This is sometimes desired, for instance
+in the help text of the transfer command where the description of each command
+should start on a new line. In contrast, line breaks made just to format the
+source code should have no effect to the output. This is achieved by using a
+backslash as line continuation character.
+
+With the constants for help texts in place, they can be referenced when
+declaring extractors. Extractors support an `Option` argument with a help text
+that is set to `None` per default. `TransferParameterManager` now passes an
+explicit help text value in. Here is again a fragment showing how this is done;
+note the `Some(HelpText)` parameters in the definitions of options, switches,
+or input parameters:
+
+[source,scala]
+----
+val extSrcFiles = inputValues(fromIdx = 1, toIdx = -2, optKey = Some("transferFiles"),
+  optHelp = Some(HelpTransferFiles))
+  .multiplicity(atLeast = 1)
+  .toPath
+  .map(_.map(_.toList))
+val extChunkSize = optionValue("chunk-size", Some(HelpChunkSize))
+  .toInt
+  .fallbackValue(DefaultChunkSize)
+  .mandatory
+  .alias("s")
+val extDryRun = switchValue("dry-run", Some(HelpDryRun))
+  .alias("d")
+----
+
+Now everything is reade for actually generating a help screen. To do this, we
+make use of functionality in the `HelpGenerator` module; it contains a bunch of
+functions that support producing tabular output with help information. The
+column generator functions mentioned in the introductory paragraphs are located
+here as well. We will start with a bare minimum and refine the result in the
+following sections.
+
+To present the user a minimum of help information, we should display all the
+parameters supported by the application together with their help texts. The
+`TransferParameterManager.generateHelp()` function taken from the demo
+application shows how this can be done:
+
+[source,scala]
+----
+def generateHelp(context: ProcessingContext): String = {
+  import HelpGenerator._
+  val modelContext = context.parameterContext.modelContext
+  val keyGenerator = parameterNameColumnGenerator()
+  val helpGenerator = attributeColumnGenerator(AttrHelpText)
+
+  generateParametersHelp(modelContext)(keyGenerator, helpGenerator)
+}
+----
+
+The function imports `HelpGenerator._` to have direct access to all the
+functions and constants defined in this module. It then declares two column
+generator functions: one to display the parameter names and one to show the
+help texts assigned to parameters. Both are standard column generator functions
+provided by `HelpGenerator`. The latter is pretty generic and can output an
+arbitrary attribute from the metadata of a parameter; the help text is stored
+as such an attribute.
+
+NOTE: The `attributeColumnGenerator()` function is not limited to the help
+text, but can be used to display other attributes from the metadata of
+parameters as well. The `ParameterModel` module defines constants for all the
+attributes that are available; these constants start with the prefix `Attr`.
+
+The actual help text is now produced by the
+`HelpGenerator.generateParametersHelp()` function passing in the model context
+(obtained from the `ProcessingContext`) and the list of column generators.
