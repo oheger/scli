@@ -1689,3 +1689,48 @@ attributes that are available; these constants start with the prefix `Attr`.
 The actual help text is now produced by the
 `HelpGenerator.generateParametersHelp()` function passing in the model context
 (obtained from the `ProcessingContext`) and the list of column generators.
+
+==== Soft-wrapping help texts
+
+When we start the _transfer_ demo application in its current form and enter
+invalid parameters it prints out a help text, but the output does not really
+look nice; the help texts are often too long and flow into the next line, and
+line continue characters are not evaluated. This is because the column
+generator we use to display the help texts of parameters,
+`attributeColumnGenerator()`, is very generic and just outputs the value of the
+attribute selected verbatim. To improve the output, we can wrap the function
+into another function that can deal with long, multi-lined texts:
+`wrapColumnGenerator()`. The function expects the generator function to wrap
+and a maximum text length. It obtains the text from the wrapped generator and
+inserts line breaks automatically (where whitespace is detected), to enforce
+the maximum line length. It handles the line continuation characters as well.
+When we change the declaration of the column generator function to the help
+text column as follows:
+
+[source,scala]
+----
+val helpGenerator = wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70)
+----
+
+the output becomes much more readable, as shown in the fragment below:
+
+[source]
+----
+ --chunk-size             Defines the chunk size for transfer operations (in kilobytes). Using
+                          this option, the data transfer can be tweaked towards smaller or
+                          larger files.
+
+ --crypt-alg              Defines the algorithm to be used for encryption. This parameter is
+                          evaluated only if encryption is enabled.
+
+ --crypt-mode             Determines what kind of encryption is used during the transfer
+                          process. This parameter can have the following values (case does not
+                          matter):
+                          - None: encryption is disabled
+                          - Files: the content of files is encrypted
+                          - FilesAndNames: the content of files and their names are encrypted
+----
+
+As column generators are just functions, they can be composed to produce more
+complex results. Many of the generator functions offered by `HelpGenerator`
+follow this principle.
