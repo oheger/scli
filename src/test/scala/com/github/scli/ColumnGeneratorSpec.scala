@@ -283,6 +283,14 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     generator(data) should contain only (Prefix + ShortKey.key)
   }
 
+  it should "handle keys without prefix in the parameter name column generator" in {
+    val InputKey = ParameterKey("someInputParam", shortAlias = false, hasPrefix = false)
+    val data = testOptionMetaData(InputKey, HelpText)
+
+    val generator = HelpGenerator.parameterNameColumnGenerator()
+    generator(data) should contain only InputKey.key
+  }
+
   it should "provide a ColumnGenerator that renders the aliases of a parameter" in {
     val LongAlias = ParameterKey("alternative", shortAlias = false)
     val aliases = List(ShortKey, LongAlias)

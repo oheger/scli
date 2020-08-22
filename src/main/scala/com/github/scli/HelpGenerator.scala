@@ -825,8 +825,10 @@ object HelpGenerator {
    * @param shortOptionPrefix the prefix for short keys
    * @return the key with the correct prefix
    */
-  private def prefixedKey(key: ParameterKey, longOptionPrefix: String, shortOptionPrefix: String): String = {
-    val prefix = if (key.shortAlias) shortOptionPrefix else longOptionPrefix
-    prefix + key.key
-  }
+  private def prefixedKey(key: ParameterKey, longOptionPrefix: String, shortOptionPrefix: String): String =
+    key match {
+      case ParameterKey(k, _, false) => k
+      case ParameterKey(k, false, true) => longOptionPrefix + k
+      case ParameterKey(k, true, true) => shortOptionPrefix + k
+    }
 }
