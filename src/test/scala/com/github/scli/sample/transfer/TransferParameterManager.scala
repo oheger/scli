@@ -20,7 +20,7 @@ import java.nio.file.Path
 import java.util.Locale
 
 import com.github.scli.ParameterExtractor._
-import com.github.scli.{CliHelpGenerator, ParameterManager}
+import com.github.scli.{HelpGenerator, ParameterManager}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext}
 import com.github.scli.ParameterModel.{AttrHelpText, ParameterKey}
 
@@ -326,7 +326,7 @@ object TransferParameterManager {
    * @return a formatted string with help information
    */
   def generateHelp(context: ProcessingContext): String = {
-    import CliHelpGenerator._
+    import HelpGenerator._
     val modelContext = context.parameterContext.modelContext
     val keyGenerator = parameterNameColumnGenerator()
     val helpGenerator = wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70)

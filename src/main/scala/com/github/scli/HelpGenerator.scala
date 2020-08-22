@@ -30,7 +30,7 @@ import scala.collection.mutable.ListBuffer
  * automatically. This module defines classes to collect this information and
  * to generate help or usage texts out of it.
  */
-object CliHelpGenerator {
+object HelpGenerator {
 
   /**
    * The default prefix indicating a long key for a command line option or
@@ -456,7 +456,7 @@ object CliHelpGenerator {
    * @param generator   the generator function to decorate
    * @param prefixLines a list with lines to add as prefix to the generator
    * @param prefixText  a text to add as prefix to each original line
-   * @return the ''CliHelpGenerator'' generating a prefix
+   * @return the ''ColumnGenerator'' generating a prefix
    */
   def prefixColumnGenerator(generator: ColumnGenerator, prefixLines: List[String] = Nil,
                             prefixText: Option[String] = None): ColumnGenerator =

@@ -271,7 +271,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "detect an unsupported transfer command" in {
     val args = List("unknownCmd", "file1", "file2", "/file/server", "--target-folder", "target")
 
-    expectFailureInOptions(args, "transfer-command")
+    expectFailureInOptions(args, "transferCommand")
   }
 
   it should "detect transfer commands in a case-insensitive manner" in {

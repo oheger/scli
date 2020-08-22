@@ -16,7 +16,7 @@
 
 package com.github.scli
 
-import com.github.scli.CliHelpGenerator.ColumnGenerator
+import com.github.scli.HelpGenerator.ColumnGenerator
 import com.github.scli.ParameterModel.{ParameterAttributes, ParameterKey, ParameterMetaData}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -29,24 +29,24 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   import HelpGeneratorTestHelper._
 
-  "CliHelpGenerator" should "provide an attribute ColumnGenerator that handles undefined attributes" in {
+  "HelpGenerator" should "provide an attribute ColumnGenerator that handles undefined attributes" in {
     val data = testOptionMetaData(1)
-    val generator = CliHelpGenerator.attributeColumnGenerator(testKey(2).key)
+    val generator = HelpGenerator.attributeColumnGenerator(testKey(2).key)
 
     generator(data) should have size 0
   }
 
   it should "provide a ColumnGenerator that reads the value of an attribute" in {
     val data = testOptionMetaData(Key, HelpText)
-    val generator = CliHelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
+    val generator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
 
     generator(data) should be(List(HelpText))
   }
 
   it should "provide a default values ColumnGenerator that returns the original value" in {
     val data = testOptionMetaData(Key, HelpText)
-    val generator = CliHelpGenerator.defaultValueColumnGenerator(
-      CliHelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText), "foo", "bar")
+    val generator = HelpGenerator.defaultValueColumnGenerator(
+      HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText), "foo", "bar")
 
     generator(data) should be(List(HelpText))
   }
@@ -54,8 +54,8 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "provide a default values ColumnGenerator that returns the defaults if necessary" in {
     val data = testOptionMetaData(1)
     val defaults = List("These", "are", "the", "default", "values")
-    val generator = CliHelpGenerator.defaultValueColumnGenerator(
-      CliHelpGenerator.attributeColumnGenerator(Key.key), defaults: _*)
+    val generator = HelpGenerator.defaultValueColumnGenerator(
+      HelpGenerator.attributeColumnGenerator(Key.key), defaults: _*)
 
     generator(data) should be(defaults)
   }
@@ -66,7 +66,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val ExpResult = PrefixLines ++ List(">>Line1", ">>Line2")
     val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
 
-    val generator = CliHelpGenerator.prefixColumnGenerator(orgGenerator, PrefixLines, Some(PrefixText))
+    val generator = HelpGenerator.prefixColumnGenerator(orgGenerator, PrefixLines, Some(PrefixText))
     generator(testOptionMetaData(1)) should be(ExpResult)
   }
 
@@ -74,17 +74,17 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val data = testOptionMetaData(Key, HelpText)
     val PrefixLines = List("", "p")
     val ExpResult = PrefixLines ++ List(HelpText)
-    val orgGenerator = CliHelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
 
-    val generator = CliHelpGenerator.prefixColumnGenerator(orgGenerator, PrefixLines)
+    val generator = HelpGenerator.prefixColumnGenerator(orgGenerator, PrefixLines)
     generator(data) should be(ExpResult)
   }
 
   it should "provide a prefix generator that returns no data if the wrapped generator yields no results" in {
     val data = testOptionMetaData(42)
-    val orgGenerator = CliHelpGenerator.attributeColumnGenerator("nonExistingKey")
+    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExistingKey")
 
-    val generator = CliHelpGenerator.prefixColumnGenerator(orgGenerator,
+    val generator = HelpGenerator.prefixColumnGenerator(orgGenerator,
       prefixText = Some("prefix"), prefixLines = List("a", "b", "c"))
     generator(data) should have size 0
   }
@@ -92,11 +92,11 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "provide a ColumnGenerator that composes the results of other generators" in {
     val attributes = Map("a1" -> "v1", "a2" -> "v2", "a3" -> "v3")
     val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
-    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
-    val g3 = CliHelpGenerator.attributeColumnGenerator("a3")
+    val g1 = HelpGenerator.attributeColumnGenerator("a1")
+    val g2 = HelpGenerator.attributeColumnGenerator("a2")
+    val g3 = HelpGenerator.attributeColumnGenerator("a3")
 
-    val generator = CliHelpGenerator.composeColumnGenerator(g1, g2, g3)
+    val generator = HelpGenerator.composeColumnGenerator(g1, g2, g3)
     val result = generator(data)
     result should be(List("v1", "v2", "v3"))
   }
@@ -104,10 +104,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "provide a ColumnGenerator that composes a line from two generators" in {
     val attributes = Map("a1" -> "v1", "a2" -> "v2")
     val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
-    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+    val g1 = HelpGenerator.attributeColumnGenerator("a1")
+    val g2 = HelpGenerator.attributeColumnGenerator("a2")
 
-    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
+    val generator = HelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
     val result = generator(data)
     result should be(List("v1, v2"))
   }
@@ -115,10 +115,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "provide a ColumnGenerator that composes a line if generator 2 does not produce a result" in {
     val attributes = Map("a1" -> "v1")
     val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
-    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+    val g1 = HelpGenerator.attributeColumnGenerator("a1")
+    val g2 = HelpGenerator.attributeColumnGenerator("a2")
 
-    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
+    val generator = HelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
     val result = generator(data)
     result should be(List("v1"))
   }
@@ -126,29 +126,29 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "provide a ColumnGenerator that composes a line if generator 1 does not produce a result" in {
     val attributes = Map("a1" -> "v1")
     val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
-    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+    val g1 = HelpGenerator.attributeColumnGenerator("a1")
+    val g2 = HelpGenerator.attributeColumnGenerator("a2")
 
-    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g2, g1, ", ")
+    val generator = HelpGenerator.composeSingleLineColumnGenerator(g2, g1, ", ")
     val result = generator(data)
     result should be(List("v1"))
   }
 
   it should "provide a ColumnGenerator that composes a line if both generators do not produce a result" in {
     val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
-    val g1 = CliHelpGenerator.attributeColumnGenerator("a1")
-    val g2 = CliHelpGenerator.attributeColumnGenerator("a2")
+    val g1 = HelpGenerator.attributeColumnGenerator("a1")
+    val g2 = HelpGenerator.attributeColumnGenerator("a2")
 
-    val generator = CliHelpGenerator.composeSingleLineColumnGenerator(g2, g1, "*")
+    val generator = HelpGenerator.composeSingleLineColumnGenerator(g2, g1, "*")
     val result = generator(data)
     result should have size 0
   }
 
   it should "provide a ColumnGenerator that appends a separator and handles an empty result" in {
     val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
-    val gen = CliHelpGenerator.attributeColumnGenerator("someKey")
+    val gen = HelpGenerator.attributeColumnGenerator("someKey")
 
-    val generator = CliHelpGenerator.separatorColumnGenerator(gen, "---")
+    val generator = HelpGenerator.separatorColumnGenerator(gen, "---")
     val result = generator(data)
     result should have size 0
   }
@@ -157,9 +157,9 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val Attr = "testAttr"
     val Value = "aValue"
     val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> Value)))
-    val gen = CliHelpGenerator.attributeColumnGenerator(Attr)
+    val gen = HelpGenerator.attributeColumnGenerator(Attr)
 
-    val generator = CliHelpGenerator.separatorColumnGenerator(gen, "***")
+    val generator = HelpGenerator.separatorColumnGenerator(gen, "***")
     val result = generator(data)
     result should contain only Value
   }
@@ -169,7 +169,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> "v1,v2,v3")))
     val gen: ColumnGenerator = data => data.attributes.attributes(Attr).split(",").toList
 
-    val generator = CliHelpGenerator.separatorColumnGenerator(gen, ";")
+    val generator = HelpGenerator.separatorColumnGenerator(gen, ";")
     val result = generator(data)
     result should be(List("v1;", "v2;", "v3"))
   }
@@ -179,16 +179,16 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> "v1,v2,v3")))
     val gen: ColumnGenerator = data => data.attributes.attributes(Attr).split(",").toList
 
-    val generator = CliHelpGenerator.singleLineColumnGenerator(gen, "; ")
+    val generator = HelpGenerator.singleLineColumnGenerator(gen, "; ")
     val result = generator(data)
     result should contain only "v1; v2; v3"
   }
 
   it should "provide a ColumnGenerator that converts a result to a single line and handles an empty result" in {
     val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
-    val gen = CliHelpGenerator.attributeColumnGenerator("undefined")
+    val gen = HelpGenerator.attributeColumnGenerator("undefined")
 
-    val generator = CliHelpGenerator.singleLineColumnGenerator(gen, "~~~")
+    val generator = HelpGenerator.singleLineColumnGenerator(gen, "~~~")
     val result = generator(data)
     result should have size 0
   }
@@ -197,9 +197,9 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val Attr = "singleLineAttr"
     val Value = "foo"
     val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> Value)))
-    val gen = CliHelpGenerator.attributeColumnGenerator(Attr)
+    val gen = HelpGenerator.attributeColumnGenerator(Attr)
 
-    val generator = CliHelpGenerator.singleLineColumnGenerator(gen, "===")
+    val generator = HelpGenerator.singleLineColumnGenerator(gen, "===")
     val result = generator(data)
     result should contain only Value
   }
@@ -219,9 +219,9 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
       "ipsum dolor sit amet."
     )
     val data = testOptionMetaData(Key, text)
-    val orgGenerator = CliHelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
 
-    val generator = CliHelpGenerator.wrapColumnGenerator(orgGenerator, 30)
+    val generator = HelpGenerator.wrapColumnGenerator(orgGenerator, 30)
     generator(data) should be(ExpResult)
   }
 
@@ -229,9 +229,9 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val text = "supercalifragilisticexpialidocious"
     val ExpResult = List("supercalifragilisticexpialidoc", "ious")
     val data = testOptionMetaData(Key, text)
-    val orgGenerator = CliHelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
 
-    val generator = CliHelpGenerator.wrapColumnGenerator(orgGenerator, 30)
+    val generator = HelpGenerator.wrapColumnGenerator(orgGenerator, 30)
     generator(data) should be(ExpResult)
   }
 
@@ -247,31 +247,31 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
       "dolor sit amet."
     )
     val data = testOptionMetaData(Key, text)
-    val orgGenerator = CliHelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
 
-    val generator = CliHelpGenerator.wrapColumnGenerator(orgGenerator, 60)
+    val generator = HelpGenerator.wrapColumnGenerator(orgGenerator, 60)
     generator(data) should be(ExpResult)
   }
 
   it should "provide a ColumnGenerator for the parameter name" in {
     val data = testOptionMetaData(Key, HelpText)
 
-    val generator = CliHelpGenerator.parameterNameColumnGenerator()
-    generator(data) should contain only (CliHelpGenerator.DefaultLongOptionPrefix + Key.key)
+    val generator = HelpGenerator.parameterNameColumnGenerator()
+    generator(data) should contain only (HelpGenerator.DefaultLongOptionPrefix + Key.key)
   }
 
   it should "provide a ColumnGenerator that outputs the correct prefix for the parameter name" in {
     val data = testOptionMetaData(ShortKey, HelpText)
 
-    val generator = CliHelpGenerator.parameterNameColumnGenerator()
-    generator(data) should contain only (CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key)
+    val generator = HelpGenerator.parameterNameColumnGenerator()
+    generator(data) should contain only (HelpGenerator.DefaultShortOptionPrefix + ShortKey.key)
   }
 
   it should "support customizing the long prefix for the parameter name column generator" in {
     val Prefix = "/"
     val data = testOptionMetaData(Key, HelpText)
 
-    val generator = CliHelpGenerator.parameterNameColumnGenerator(Prefix)
+    val generator = HelpGenerator.parameterNameColumnGenerator(Prefix)
     generator(data) should contain only (Prefix + Key.key)
   }
 
@@ -279,18 +279,18 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val Prefix = "#"
     val data = testOptionMetaData(ShortKey, HelpText)
 
-    val generator = CliHelpGenerator.parameterNameColumnGenerator(shortOptionPrefix = Prefix)
+    val generator = HelpGenerator.parameterNameColumnGenerator(shortOptionPrefix = Prefix)
     generator(data) should contain only (Prefix + ShortKey.key)
   }
 
   it should "provide a ColumnGenerator that renders the aliases of a parameter" in {
     val LongAlias = ParameterKey("alternative", shortAlias = false)
     val aliases = List(ShortKey, LongAlias)
-    val expResult = List(CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key,
-      CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key)
+    val expResult = List(HelpGenerator.DefaultShortOptionPrefix + ShortKey.key,
+      HelpGenerator.DefaultLongOptionPrefix + LongAlias.key)
     val data = testOptionMetaData(Key, HelpText, aliases)
 
-    val generator = CliHelpGenerator.parameterAliasColumnGenerator()
+    val generator = HelpGenerator.parameterAliasColumnGenerator()
     generator(data) should contain theSameElementsInOrderAs expResult
   }
 
@@ -302,7 +302,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val expResult = List(ShortPrefix + ShortKey.key, LongPrefix + LongAlias.key)
     val data = testOptionMetaData(Key, HelpText, aliases)
 
-    val generator = CliHelpGenerator.parameterAliasColumnGenerator(shortOptionPrefix = ShortPrefix,
+    val generator = HelpGenerator.parameterAliasColumnGenerator(shortOptionPrefix = ShortPrefix,
       longOptionPrefix = LongPrefix)
     generator(data) should contain theSameElementsInOrderAs expResult
   }
@@ -312,34 +312,34 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val attributes = Map(ParameterModel.AttrMultiplicity -> Multiplicity)
     val data = ParameterMetaData(Key, ParameterAttributes(attributes))
 
-    val generator = CliHelpGenerator.multiplicityColumnGenerator
+    val generator = HelpGenerator.multiplicityColumnGenerator
     generator(data) should contain only Multiplicity
   }
 
   it should "provide a multiplicity ColumnGenerator that uses the correct default multiplicity" in {
     val data = testOptionMetaData(1)
 
-    val generator = CliHelpGenerator.multiplicityColumnGenerator
+    val generator = HelpGenerator.multiplicityColumnGenerator
     generator(data) should contain only Multiplicity.UnspecifiedMultiplicityString
   }
 
   it should "provide a ColumnGenerator for keys and aliases that handles missing aliases" in {
     val data = testOptionMetaData(Key, HelpText)
-    val expResult = CliHelpGenerator.DefaultLongOptionPrefix + Key.key
+    val expResult = HelpGenerator.DefaultLongOptionPrefix + Key.key
 
-    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator()
+    val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator()
     generator(data) should contain only expResult
   }
 
   it should "provide a ColumnGenerator for keys and aliases that displays aliases" in {
     val LongAlias = ParameterKey("anotherAlias", shortAlias = false)
     val aliases = List(ShortKey, LongAlias)
-    val expResult = CliHelpGenerator.DefaultLongOptionPrefix + Key.key + ", " +
-      CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key + ", " +
-      CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key
+    val expResult = HelpGenerator.DefaultLongOptionPrefix + Key.key + ", " +
+      HelpGenerator.DefaultShortOptionPrefix + ShortKey.key + ", " +
+      HelpGenerator.DefaultLongOptionPrefix + LongAlias.key
     val data = testOptionMetaData(Key, HelpText, aliases)
 
-    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator()
+    val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator()
     generator(data) should contain only expResult
   }
 
@@ -347,12 +347,12 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val Separator = ";"
     val LongAlias = ParameterKey("anotherAlias", shortAlias = false)
     val aliases = List(ShortKey, LongAlias)
-    val expResult = CliHelpGenerator.DefaultLongOptionPrefix + Key.key + Separator +
-      CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key + Separator +
-      CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key
+    val expResult = HelpGenerator.DefaultLongOptionPrefix + Key.key + Separator +
+      HelpGenerator.DefaultShortOptionPrefix + ShortKey.key + Separator +
+      HelpGenerator.DefaultLongOptionPrefix + LongAlias.key
     val data = testOptionMetaData(Key, HelpText, aliases)
 
-    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(separator = Separator)
+    val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator(separator = Separator)
     generator(data) should contain only expResult
   }
 
@@ -364,7 +364,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val expResult = LongPrefix + Key.key + ", " + ShortPrefix + ShortKey.key + ", " + LongPrefix + LongAlias.key
     val data = testOptionMetaData(Key, HelpText, aliases)
 
-    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(longOptionPrefix = LongPrefix,
+    val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator(longOptionPrefix = LongPrefix,
       shortOptionPrefix = ShortPrefix)
     generator(data) should contain only expResult
   }
@@ -374,19 +374,19 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val data = testOptionMetaData(ShortKey, HelpText)
     val expResult = ShortPrefix + ShortKey.key
 
-    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(shortOptionPrefix = ShortPrefix)
+    val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator(shortOptionPrefix = ShortPrefix)
     generator(data) should contain only expResult
   }
 
   it should "provide a ColumnGenerator for keys and alias that supports line wrapping" in {
     val LongAlias = ParameterKey("foo", shortAlias = false)
     val aliases = List(ShortKey, LongAlias)
-    val expResult = List(CliHelpGenerator.DefaultLongOptionPrefix + Key.key + ",",
-      CliHelpGenerator.DefaultShortOptionPrefix + ShortKey.key + ", " +
-        CliHelpGenerator.DefaultLongOptionPrefix + LongAlias.key)
+    val expResult = List(HelpGenerator.DefaultLongOptionPrefix + Key.key + ",",
+      HelpGenerator.DefaultShortOptionPrefix + ShortKey.key + ", " +
+        HelpGenerator.DefaultLongOptionPrefix + LongAlias.key)
     val data = testOptionMetaData(Key, HelpText, aliases)
 
-    val generator = CliHelpGenerator.parameterKeyWithAliasesColumnGenerator(maxLength = 13)
+    val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator(maxLength = 13)
     generator(data) should be(expResult)
   }
 }
