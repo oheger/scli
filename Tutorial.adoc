@@ -1734,3 +1734,65 @@ the output becomes much more readable, as shown in the fragment below:
 As column generators are just functions, they can be composed to produce more
 complex results. Many of the generator functions offered by `HelpGenerator`
 follow this principle.
+
+==== Showing input parameters first
+
+In the help information generated so far, input parameters appear as any other
+parameters in the list, sorted by their keys. For users, this may be a bit
+confusing, as these parameters are somewhat special and have to be present in
+any case. So it makes sense to have two tables with parameters: one for the
+input parameters and one for options and switches.
+
+While the `generateParametersHelp()` function we used so far generates tabular
+help data and renders it immediately, we now do the rendering separately. This
+has the advantage that the tables for the input parameters and the other
+parameters can be aligned, so that they have equal column widths. The code how
+to produce the enhanced output is shown next:
+
+[source,scala]
+----
+  def generateHelp(context: ProcessingContext): String = {
+    import HelpGenerator._
+    val modelContext = context.parameterContext.modelContext
+    val keyGenerator = parameterNameColumnGenerator()
+    val helpGenerator = wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70)
+
+    val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
+      sortFunc = inputParamSortFunc(modelContext))(keyGenerator, helpGenerator)
+    val tableOptions = generateHelpTable(modelContext,
+      filterFunc = negate(InputParamsFilterFunc))(keyGenerator, helpGenerator)
+    val helpTexts = renderHelpTables(List(tableParams, tableOptions))
+    val buf = new StringBuilder(1024)
+    buf.append(helpTexts.head)
+      .append(helpTexts(1))
+    buf.toString()
+  }
+----
+
+A table with help information is generated using the `generateHelpTable()`
+function. The function requires the model context, and supports some further
+arguments to customize the content of the resulting table. Here we provide a
+filter function and a sort function. The filter function is necessary to
+restrict the data in the tables: the first table should contain only input
+parameters, the second one all but input parameters. The `HelpGenerator` module
+provides pre-defined filter functions for this purpose. `InputParamsFilterFunc`
+is a constant that filters for input parameters only. The module also supports
+logical operators on filter functions. For the generation of the second table,
+we use the `negate()` function that produces the inverse of a filter; so the
+filter function `negate(InputParamsFilterFunc)` selects all the parameters,
+which are not of type input parameter.
+
+`generateHelpTable()` further supports a function to sort the rows of the
+table. The default sort function sorts rows alphabetically on the parameter
+keys. This is fine for the second table for options and switches; for input
+parameters, this order is not ideal though: for them, the order in which they
+appear on the command line is crucial. The `inputParamsSortFunc()` function
+from the `HelpGenerator` module returns a sort function that adheres to this
+order.
+
+Both tables have the same structure, therefore, we use the same column
+generator functions. The `renderHelpTables()` function finally creates a string
+representation for the passed in tables. Each table is converted to its own
+string, so the strings could be printed separately (e.g. with different
+headings or explanatory texts). However, the function ensures that the columns
+of the tables have been padded to the same lengths.
