@@ -220,7 +220,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
 
   it should "extract a command config for uploads and a file server" in {
     val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes",
-      "--remove-uploaded-files", "--root-path", "/data", "--umask", "660",
+      "--remove-uploaded", "--root-path", "/data", "--umask", "660",
       "--crypt-mode", "filesANDNames", "--crypt-password", "secret")
 
     val config = extractResult(args)

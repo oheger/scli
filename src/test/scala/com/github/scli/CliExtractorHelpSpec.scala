@@ -858,7 +858,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "generate the overview of an input parameter if the upper bound is unrestricted" in {
     val modelContext = addInputParameter(createModelContext(), "1..*")
-    val ExpResult = s"<${Key.key}> [...]"
+    val ExpResult = s"<${Key.key}1> [<${Key.key}2> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
     result should contain only ExpResult
@@ -866,7 +866,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "generate the overview of an input parameter if the lower bound is > 2" in {
     val modelContext = addInputParameter(createModelContext(), "3..*")
-    val ExpResult = s"<${Key.key}1>...<${Key.key}3> [...]"
+    val ExpResult = s"<${Key.key}1>...<${Key.key}3> [<${Key.key}4> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
     result should contain only ExpResult
@@ -882,7 +882,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "generate the overview of an optional input parameter" in {
     val modelContext = addInputParameter(createModelContext(), "0..*")
-    val ExpResult = s"[<${Key.key}> ...]"
+    val ExpResult = s"[<${Key.key}1> <${Key.key}2> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
     result should contain only ExpResult
@@ -893,7 +893,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val modelContext = addInputParameter(
       addInputParameter(createModelContext(), "1..1", key = Key2),
       "1..*", index = 2)
-    val ExpResult = List(s"<$Key2>", s"<${Key.key}> [...]")
+    val ExpResult = List(s"<$Key2>", s"<${Key.key}1> [<${Key.key}2> ...]")
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
     result should contain theSameElementsInOrderAs ExpResult
@@ -902,7 +902,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "generate the overview of an input parameter if no multiplicity is available" in {
     val modelContext = createModelContext()
       .addInputParameter(1, Some(Key.key), None)
-    val ExpResult = s"[<${Key.key}> ...]"
+    val ExpResult = s"[<${Key.key}1> <${Key.key}2> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
     result should contain only ExpResult
@@ -912,7 +912,7 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val symbols = InputParamOverviewSymbols(optionalPrefix = "{", optionalSuffix = "}",
       keyPrefix = "(", keySuffix = ")", ellipsis = "_")
     val modelContext = addInputParameter(createModelContext(), "3..*")
-    val ExpResult = s"(${Key.key}1)_(${Key.key}3) {_}"
+    val ExpResult = s"(${Key.key}1)_(${Key.key}3) {(${Key.key}4) _}"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext, symbols)
     result should contain only ExpResult

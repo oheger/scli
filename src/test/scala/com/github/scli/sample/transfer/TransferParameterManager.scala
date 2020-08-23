@@ -534,7 +534,7 @@ object TransferParameterManager {
   private def uploadCommandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
     val extUploadHashes = switchValue("upload-hashes", Some(HelpUploadHashes))
       .alias("H")
-    val extRemoveUploaded = switchValue("remove-uploaded-files", Some(HelpRemoveUploaded))
+    val extRemoveUploaded = switchValue("remove-uploaded", Some(HelpRemoveUploaded))
       .alias("C")
     for {
       uploadHashes <- extUploadHashes

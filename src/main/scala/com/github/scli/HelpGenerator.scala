@@ -768,7 +768,7 @@ object HelpGenerator {
     else if (multiplicity.lower > 1) s"${symbols.decorateKey(key + "1")}${symbols.ellipsis}" +
       symbols.decorateKey(key + multiplicity.lower)
     else {
-      val index = if (!multiplicity.unbounded && multiplicity.upper > multiplicity.lower) "1" else ""
+      val index = if (multiplicity.unbounded || multiplicity.upper > multiplicity.lower) "1" else ""
       symbols.decorateKey(key + index)
     }
   }
@@ -788,8 +788,10 @@ object HelpGenerator {
                                               symbols: InputParamOverviewSymbols): String =
     if (!multiplicity.unbounded && multiplicity.upper <= multiplicity.lower) ""
     else {
-      val result = if (multiplicity.unbounded) symbols.ellipsis
-      else {
+      val result = if (multiplicity.unbounded) {
+        val index = if (multiplicity.optional) 2 else multiplicity.lower + 1
+        s"${symbols.decorateKey(key + index)} ${symbols.ellipsis}"
+      } else {
         val upperKey = s"${symbols.decorateKey(key + multiplicity.upper)}"
         if (multiplicity.upper > multiplicity.lower + 1) symbols.ellipsis + upperKey
         else upperKey

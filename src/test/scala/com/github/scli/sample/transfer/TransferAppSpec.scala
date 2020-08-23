@@ -163,7 +163,8 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
     val output = checkHelp(executeTransfer(Array.empty))
 
     output should include("<transferCommand>")
-    output should include("<transferFiles>")
+    output should include("<transferFiles1>")
+    output should include("[<transferFiles2> ...]")
     output should include("<serverUri>")
   }
 
