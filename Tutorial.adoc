@@ -1796,3 +1796,51 @@ representation for the passed in tables. Each table is converted to its own
 string, so the strings could be printed separately (e.g. with different
 headings or explanatory texts). However, the function ensures that the columns
 of the tables have been padded to the same lengths.
+
+==== Generating a short overview of input parameters
+
+Many command line applications show a short synopsis of their intended usage
+that lists at least all their input parameters. The parameters are decorated
+with special symbols to indicate whether they are optional or whether they can
+be repeated. SCLI supports the generation of such an overview; so the
+_transfer_ demo application makes use of this feature.
+
+`HelpGenerator` offers the function `generateInputParamsOverview()`. It expects
+the model context and returns a list containing the keys of all input
+parameters with special decorations. The caller is then free how to display
+this information. As the _transfer_ application wants to produce a single-line
+overview, it invokes `mkString()` on this list. Here is the updated code to
+generate the help screen:
+
+[source,scala]
+----
+  val buf = new StringBuilder(1024)
+  buf.append("Usage: transfer [options] ")
+    .append(generateInputParamsOverview(modelContext).mkString(" "))
+    .append(CR)
+    .append(CR)
+    .append(helpTexts.head)
+    .append(helpTexts(1))
+  buf.toString()
+----
+
+So the help screen starts with a line showing the intended usage of the
+application. Then - after two empty lines - the tables for the input parameters
+and the options and switches follow. `CR` is a constant provided by
+`HelpGenerator`, which has been initialized to the new-line character of the
+current platform; this is an easy means to add new-lines to the generated help
+output. The _Usage_ line looks as follows:
+
+ Usage: transfer [options] <transferCommand> <transferFiles1> [<transferFiles2> ...] <serverUri>
+
+The auto-generated part contains entries for all the input parameters
+supported. Single-valued, mandatory parameters appear with their key in angular
+brackets. Optional parameters are decorated with square brackets. If a
+parameter can have multiple values, the output shows multiple keys with
+indices; optional values have again square brackets. An ellipsis indicates that
+further values are possible.
+
+If you do not like the symbols to mark parameters or indicate their
+multiplicity, you can change them by creating an instance of the
+`InputParamOverviewSymbols` case class and pass it to the
+`generateInputParamsOverview()` function.
