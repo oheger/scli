@@ -932,4 +932,18 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     }
     result should have size 1
   }
+
+  it should "de-duplicate aliases of a parameter" in {
+    val alias = ParameterKey("a", shortAlias = true)
+    val aliasList = List(alias)
+    val context = modelContextWithOptions(2)
+      .addOption(Key, None)
+      .addAlias(alias)
+      .addAlias(alias)
+
+    val result = context.parameterMetaData.filter { data =>
+      data.key == Key && data.aliases == aliasList
+    }
+    result should have size 1
+  }
 }

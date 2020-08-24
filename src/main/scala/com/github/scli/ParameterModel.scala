@@ -139,9 +139,12 @@ object ParameterModel {
      */
     def addAlias(key: ParameterKey, alias: ParameterKey): AliasMapping = {
       val aliasList = aliasesForKey.getOrElse(key, Nil)
-      val updatedAliasList = aliasList :+ alias
-      AliasMapping(aliasesForKey + (key -> updatedAliasList),
-        keyForAlias + (alias -> key))
+      if (aliasList.contains(alias)) this
+      else {
+        val updatedAliasList = aliasList :+ alias
+        AliasMapping(aliasesForKey + (key -> updatedAliasList),
+          keyForAlias + (alias -> key))
+      }
     }
   }
 
