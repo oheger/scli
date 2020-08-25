@@ -1844,3 +1844,32 @@ If you do not like the symbols to mark parameters or indicate their
 multiplicity, you can change them by creating an instance of the
 `InputParamOverviewSymbols` case class and pass it to the
 `generateInputParamsOverview()` function.
+
+==== Showing parameter aliases
+
+If an application defines aliases for its parameters, these alternative keys
+should of course be visible in help screens. With the current implementation of
+`TransferParameterManager.generateHelp()`, this is not the case for the
+_transfer_ demo application.
+
+The reason for this short-coming is that the function uses the column generator
+`parameterNameColumnGenerator()` to display the parameter keys in the help
+tables it generates. This generator function is pretty basic, and - as its name
+indicates - just outputs the key of a parameter. Fortunately, `HelpGenerator`
+offers a more powerful function for our purpose:
+`parameterKeyWithAliasesColumnGenerator()`. This function displays the key and
+all the aliases defined for a parameter separated by a configurable delimiter
+character. It is also possible to specify a maximum width for the output to
+wrap the line if long keys are used. As a further configuration option, the
+function supports customizing the parameter prefixes in its output. Per default
+it uses the prefix `--` for long parameter keys and `-` for short keys. If an
+application has different conventions, it should adapt these settings.
+
+`TransferParameterManager` only uses the option to limit the width of the
+output generated, so the declaration of the column generator function for the
+parameter keys becomes:
+
+[source,scala]
+----
+val keyGenerator = parameterKeyWithAliasesColumnGenerator(maxLength = 18)
+----

@@ -191,4 +191,11 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
     val posParam = assertHelpForKey(output, "transferFiles", "A list of files to")
     posParam should be < posOption
   }
+
+  it should "display aliases for parameters in the help text" in {
+    val output = checkHelp(executeTransfer(Array.empty))
+
+    assertHelpForKey(output, "--dry-run", "-d")
+    assertHelpForKey(output, "--tag", "-T")
+  }
 }

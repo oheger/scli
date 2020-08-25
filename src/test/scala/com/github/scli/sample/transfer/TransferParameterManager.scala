@@ -328,7 +328,7 @@ object TransferParameterManager {
   def generateHelp(context: ProcessingContext): String = {
     import HelpGenerator._
     val modelContext = context.parameterContext.modelContext
-    val keyGenerator = parameterNameColumnGenerator()
+    val keyGenerator = parameterKeyWithAliasesColumnGenerator(maxLength = 18)
     val helpGenerator = wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70)
 
     val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
