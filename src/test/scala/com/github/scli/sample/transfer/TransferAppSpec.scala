@@ -198,4 +198,13 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
     assertHelpForKey(output, "--dry-run", "-d")
     assertHelpForKey(output, "--tag", "-T")
   }
+
+  it should "display default values for parameters" in {
+    val args = withInputParameters("download", 1, httpServer = false, "--umask", "007",
+    "--unknown")
+    val output = checkHelp(executeTransfer(Array.empty))
+
+    output should include("Default value: 8192")
+    output should include("Default value: read-only")
+  }
 }

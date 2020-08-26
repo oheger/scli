@@ -22,7 +22,7 @@ import java.util.Locale
 import com.github.scli.ParameterExtractor._
 import com.github.scli.{HelpGenerator, ParameterManager}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext}
-import com.github.scli.ParameterModel.{AttrHelpText, ParameterKey}
+import com.github.scli.ParameterModel.{AttrFallbackValue, AttrHelpText, ParameterKey}
 
 import scala.concurrent.duration.{Duration, _}
 import scala.util.{Success, Try}
@@ -329,7 +329,10 @@ object TransferParameterManager {
     import HelpGenerator._
     val modelContext = context.parameterContext.modelContext
     val keyGenerator = parameterKeyWithAliasesColumnGenerator(maxLength = 18)
-    val helpGenerator = wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70)
+    val helpGenerator = composeColumnGenerator(
+      wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70),
+      prefixColumnGenerator(attributeColumnGenerator(AttrFallbackValue),
+      prefixText = Some("Default value: ")))
 
     val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
       sortFunc = inputParamSortFunc(modelContext))(keyGenerator, helpGenerator)
@@ -567,7 +570,7 @@ object TransferParameterManager {
     val extRootPath = optionValue("root-path", Some(HelpFileServerRoot))
     val extUmask = optionValue("umask", Some(HelpFileServerUmask))
       .toInt
-      .fallbackValue(DefaultUmask)
+      .fallbackValueWithDesc(Some("read-only"), DefaultUmask)
       .mandatory
     for {
       rootPath <- extRootPath

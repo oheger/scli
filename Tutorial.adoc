@@ -1873,3 +1873,90 @@ parameter keys becomes:
 ----
 val keyGenerator = parameterKeyWithAliasesColumnGenerator(maxLength = 18)
 ----
+
+==== Showing parameter default values
+
+For optional parameters, it is often helpful to show the user the default value
+the application assumes if the user has not specified this parameter. When
+declaring extractors, default values are automatically recorded as an attribute
+of the parameter; so they are available to column generators when producing
+help screens.
+
+The _transfer_ demo application wants to show this information in its help
+output; it can be obtained using an `attributeColumnGenerator()` function for
+the `AttrFallback` attribute. The easiest option would be adding this function
+as a new column to the help tables produced by the application. This is
+perfectly fine, but to demonstrate some other functionality, the default values
+should be integrated with the help text of the parameters. (One advantage of
+this approach is that it helps to prevent the table from becoming too wide.)
+So if a default value exists for a parameter, it should be displayed in a new
+line after the help text, prefixed with the string _Default value:_.
+
+`HelpGenerator` offers some functions that can combine the output of other
+column generator functions. That way the content of a cell in the help table
+can be produced by multiple generators, and thus can contain different pieces
+of information. One of these functions is `composeColumnGenerator()`, which
+just concatenates the lines produced by the generators passed as arguments to
+the function. Another function of this type is `prefixColumnGenerator()`. It
+wraps another column generator and adds a configurable prefix to its result,
+but only if a result is produced at all.
+
+We can solve the requirement with the default value by combining these two
+functions: With `prefixColumnGenerator()`, we add the prefix _Default value:_
+to the actual default value; with `composeColumnGenerator()`, the resulting
+string for the default value is appended to the help text. If no default value
+is present, these functions do not generate any additional output. Below is the
+improved declaration of the generator for the help column integrating the
+functions described:
+
+[source,scala]
+----
+val helpGenerator = composeColumnGenerator(
+  wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70),
+  prefixColumnGenerator(attributeColumnGenerator(AttrFallbackValue),
+  prefixText = Some("Default value: ")))
+----
+
+SCLI records default values for all parameters that have a `fallbackValue()`
+modifier in their declaration, and also for switches (where the default value
+is equivalent to the absence of the switch). Per default, it stores the string
+representation of the default value, which is a good choice in most cases. If
+you need an alternative or more explicit description of a default value, use
+the `fallbackValueWithDesc()` modifier instead of `fallbackValue()`. It accepts
+an additional `Option` argument with the description of the default value. (The
+argument is an `Option` because by setting it to `None` the recording of the
+default value can be suppressed.)
+
+The _transfer_ demo application sets a default value for the _umask_ to apply
+when transferring data to a file server. However, instead of the octal value,
+a more meaningful description should be presented to the user. Therefore, the
+declaration of the corresponding extractor looks as follows:
+
+[source,scala]
+----
+val extUmask = optionValue("umask", Some(HelpFileServerUmask))
+  .toInt
+  .fallbackValueWithDesc(Some("read-only"), DefaultUmask)
+  .mandatory
+----
+
+The fragment below shows an excerpt of the help screen generated based on the
+improvements described in this subsection:
+
+[source]
+----
+--chunk-size, -s    Defines the chunk size for transfer operations (in kilobytes). Using
+                    this option, the data transfer can be tweaked towards smaller or
+                    larger files.
+                    Default value: 8192
+
+--crypt-alg         Defines the algorithm to be used for encryption. This parameter is
+                    evaluated only if encryption is enabled.
+                    Default value: RSA
+
+--umask             Defines the Unix umask for new files stored on the file server.
+                    Default value: read-only
+
+--upload-hashes,    Determines whether hashes should be uploaded together with files.
+-H                  Default value: false
+----
