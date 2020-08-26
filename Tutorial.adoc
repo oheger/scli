@@ -1690,6 +1690,48 @@ The actual help text is now produced by the
 `HelpGenerator.generateParametersHelp()` function passing in the model context
 (obtained from the `ProcessingContext`) and the list of column generators.
 
+==== Allowing the user to request help
+
+It is certainly good practice for an application to display help information if
+the user has entered invalid parameters. Most applications offering a command
+line interface allow their users to request help information explicitly in
+addition. This makes sense, for instance, if the user knows all mandatory
+parameters, but needs help with optional ones; then the command line is
+syntactically correct, and the application would just happily do whatever it
+does with this input. So applications typically define a special flag, such as
+`--help`; when present on the command line, the application displays its help
+screen, no matter whether the parameters passed in are valid or not.
+
+To support such a special help flag, SCLI requires the application to define an
+extractor of type `Try[Boolean]`. The most straight-forward way of defining an
+extractor of this type is using a <<Extracting the value of a switch,switch>>,
+as switches natively operate on booleans. However, the application is free to
+declare any extractor with this result type.
+
+In order to enable this switch, it has to be added to the `ExtractionSpec` that
+configures the command line processing operation as described in
+<<Running an extractor with custom settings>>. SCLI then executes this
+extractor automatically and is thus able to detect the user's request for help.
+
+The _transfer_ demo application supports the classical `--help` switch, which
+can also be abbreviated using the alias `-h`. The following code fragment shows
+the declaration of the corresponding extractor, and how it is passed to the
+`ExtractionSpec`:
+
+[source,scala]
+----
+val helpSwitch = switchValue("help", optHelp = Some(HelpHelp))
+  .alias("h")
+val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
+  supportCombinedSwitches = true, optHelpExtractor = Some(helpSwitch),
+  fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)))
+----
+
+The help extractor is expected in the `optHelpExtractor` argument of
+`ExtractionSpec`. Note again that this is a regular extractor, so all
+properties and modifiers are available for its declaration. In this special
+case, it is assigned a help text that will apear on the help screen.
+
 ==== Soft-wrapping help texts
 
 When we start the _transfer_ demo application in its current form and enter

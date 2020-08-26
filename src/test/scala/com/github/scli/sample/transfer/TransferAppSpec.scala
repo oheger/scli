@@ -201,10 +201,31 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
 
   it should "display default values for parameters" in {
     val args = withInputParameters("download", 1, httpServer = false, "--umask", "007",
-    "--unknown")
-    val output = checkHelp(executeTransfer(Array.empty))
+      "--unknown")
+    val output = checkHelp(executeTransfer(args))
 
     output should include("Default value: 8192")
     output should include("Default value: read-only")
+  }
+
+  /**
+   * Checks whether the help screen is displayed if the specified switch is
+   * passed on the command line.
+   *
+   * @param switch the switch to add to the command line
+   */
+  private def checkHelpRequest(switch: String): Unit = {
+    val args = withInputParameters("download", 2, httpServer = false, switch)
+    val output = checkHelp(executeTransfer(args))
+
+    assertHelpForKey(output, "--help", "Displays this help")
+  }
+
+  it should "display the help screen if requested with the --help switch" in {
+    checkHelpRequest("--help")
+  }
+
+  it should "display the help screen if requested with the -h switch" in {
+    checkHelpRequest("-h")
   }
 }

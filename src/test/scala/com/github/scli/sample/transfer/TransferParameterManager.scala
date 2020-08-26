@@ -153,6 +153,12 @@ object TransferParameterManager {
     """Determines whether files already existing on the local hard drive should not be overridden by \
       |files downloaded from the server.""".stripMargin
 
+  private val HelpHelp =
+    """Displays this help screen.
+      |If a valid command is given on the command line, help about the options specific to this \
+      |command is displayed. Otherwise, the help screen lists only the options common to all \
+      |commands.""".stripMargin
+
   /**
    * An enumeration defining the usage of encryption for a transfer operation.
    *
@@ -294,8 +300,10 @@ object TransferParameterManager {
   def processCommandLine(args: Seq[String]): Try[(TransferCommandConfig, ProcessingContext)] = {
     val keyExtractor = ParameterManager.defaultKeyExtractor() andThen (opt =>
       opt.map(key => if (key.shortAlias) key else key.copy(key = key.key.toLowerCase(Locale.ROOT))))
+    val helpSwitch = switchValue("help", optHelp = Some(HelpHelp))
+      .alias("h")
     val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
-      supportCombinedSwitches = true,
+      supportCombinedSwitches = true, optHelpExtractor = Some(helpSwitch),
       fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)))
     val classifierFunc = ParameterManager.classifierFunc(spec)
     val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
@@ -332,7 +340,7 @@ object TransferParameterManager {
     val helpGenerator = composeColumnGenerator(
       wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70),
       prefixColumnGenerator(attributeColumnGenerator(AttrFallbackValue),
-      prefixText = Some("Default value: ")))
+        prefixText = Some("Default value: ")))
 
     val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
       sortFunc = inputParamSortFunc(modelContext))(keyGenerator, helpGenerator)
