@@ -60,23 +60,22 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     generator(data) should be(defaults)
   }
 
-  it should "provide a prefix generator that adds prefix data to another one" in {
-    val PrefixLines = List("A prefix line", "Another prefix line")
+  it should "provide a prefix generator that adds a prefix text to the lines of another one" in {
     val PrefixText = ">>"
-    val ExpResult = PrefixLines ++ List(">>Line1", ">>Line2")
+    val ExpResult = List(">>Line1", ">>Line2")
     val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
 
-    val generator = HelpGenerator.prefixColumnGenerator(orgGenerator, PrefixLines, Some(PrefixText))
+    val generator = HelpGenerator.prefixTextColumnGenerator(orgGenerator, PrefixText)
     generator(testOptionMetaData(1)) should be(ExpResult)
   }
 
-  it should "provide a prefix generator that only adds prefix lines" in {
+  it should "provide a prefix generator that adds prefix lines to another one" in {
     val data = testOptionMetaData(Key, HelpText)
     val PrefixLines = List("", "p")
     val ExpResult = PrefixLines ++ List(HelpText)
     val orgGenerator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
 
-    val generator = HelpGenerator.prefixColumnGenerator(orgGenerator, PrefixLines)
+    val generator = HelpGenerator.prefixLinesColumnGenerator(orgGenerator, PrefixLines)
     generator(data) should be(ExpResult)
   }
 
@@ -84,9 +83,40 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val data = testOptionMetaData(42)
     val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExistingKey")
 
-    val generator = HelpGenerator.prefixColumnGenerator(orgGenerator,
-      prefixText = Some("prefix"), prefixLines = List("a", "b", "c"))
+    val generator = HelpGenerator.prefixLinesColumnGenerator(orgGenerator, List("a", "b", "c"))
     generator(data) should have size 0
+  }
+
+  it should "provide a prefix generator that adds a generated prefix" in {
+    val AttrPrefix = "thePrefix"
+    val attributes = Map(AttrPrefix -> "=>")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
+    val prefixGenerator = HelpGenerator.attributeColumnGenerator(AttrPrefix)
+    val ExpResult = List("=>Line1", "=>Line2")
+
+    val generator = HelpGenerator.prefixGeneratedColumnGenerator(orgGenerator, prefixGenerator)
+    generator(data) should be(ExpResult)
+  }
+
+  it should "provide a generated prefix generator that handles empty output from the wrapped generator" in {
+    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+    val prefixGenerator: ColumnGenerator = _ => throw new UnsupportedOperationException("Unexpected call")
+
+    val generator = HelpGenerator.prefixGeneratedColumnGenerator(orgGenerator, prefixGenerator)
+    generator(testOptionMetaData(1)) should have size 0
+  }
+
+  it should "provide a generated prefix generator that handles empty output from the prefix generator" in {
+    val Value = "someValue"
+    val Attr = "DataAttribute"
+    val attributes = Map(Attr -> Value)
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(Attr)
+    val prefixGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+
+    val generator = HelpGenerator.prefixGeneratedColumnGenerator(orgGenerator, prefixGenerator)
+    generator(data) should contain only Value
   }
 
   it should "provide a ColumnGenerator that composes the results of other generators" in {

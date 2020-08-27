@@ -1955,8 +1955,7 @@ functions described:
 ----
 val helpGenerator = composeColumnGenerator(
   wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70),
-  prefixColumnGenerator(attributeColumnGenerator(AttrFallbackValue),
-  prefixText = Some("Default value: ")))
+  prefixTextColumnGenerator(attributeColumnGenerator(AttrFallbackValue), "Default value: "))
 ----
 
 SCLI records default values for all parameters that have a `fallbackValue()`

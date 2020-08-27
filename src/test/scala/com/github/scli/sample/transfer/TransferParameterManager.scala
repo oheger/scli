@@ -339,8 +339,7 @@ object TransferParameterManager {
     val keyGenerator = parameterKeyWithAliasesColumnGenerator(maxLength = 18)
     val helpGenerator = composeColumnGenerator(
       wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70),
-      prefixColumnGenerator(attributeColumnGenerator(AttrFallbackValue),
-        prefixText = Some("Default value: ")))
+      prefixTextColumnGenerator(attributeColumnGenerator(AttrFallbackValue), "Default value: "))
 
     val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
       sortFunc = inputParamSortFunc(modelContext))(keyGenerator, helpGenerator)
