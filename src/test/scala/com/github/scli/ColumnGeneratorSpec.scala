@@ -397,4 +397,43 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val generator = HelpGenerator.parameterKeyWithAliasesColumnGenerator(maxLength = 13)
     generator(data) should be(expResult)
   }
+
+  it should "provide a ColumnGenerator that detects a mandatory parameter" in {
+    val Output = "It's mandatory"
+    val attributes = Map(ParameterModel.AttrMultiplicity -> "1..*")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+
+    val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some(Output),
+      optOptionalText = Some("This text should not appear"))
+    generator(data) should contain only Output
+  }
+
+  it should "provide a ColumnGenerator that detects a parameter with default value as optional" in {
+    val Output = "No"
+    val attributes = Map(ParameterModel.AttrMultiplicity -> "1..1",
+      ParameterModel.AttrFallbackValue -> "fallback")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+
+    val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some("yes"),
+      optOptionalText = Some(Output))
+    generator(data) should contain only Output
+  }
+
+  it should "provide a ColumnGenerator that detects an optional parameter" in {
+    val Output = "It's optional"
+    val attributes = Map(ParameterModel.AttrMultiplicity -> "0..1")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+
+    val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some("to ignore"),
+      optOptionalText = Some(Output))
+    generator(data) should contain only Output
+  }
+
+  it should "provide a ColumnGenerator detecting mandatory parameters that handles empty texts" in {
+    val attributes = Map.empty[String, String]
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+
+    val generator = HelpGenerator.mandatoryColumnGenerator()
+    generator(data) should have size 0
+  }
 }

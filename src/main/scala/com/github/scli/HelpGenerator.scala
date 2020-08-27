@@ -429,6 +429,30 @@ object HelpGenerator {
     defaultValueColumnGenerator(attributeColumnGenerator(AttrMultiplicity), Multiplicity.UnspecifiedMultiplicityString)
 
   /**
+   * Returns a ''ColumnGenerator'' that determines whether a parameter is
+   * mandatory or optional and outputs a corresponding text. With this
+   * generator a more readable description for the lower bound of a parameter
+   * can be produced than with ''multiplicityColumnGenerator''. Another use
+   * case would be decorating the keys of parameters in a special way.
+   *
+   * @param optMandatoryText optional text to display for mandatory parameters
+   * @param optOptionalText  optional text to display for optional parameters
+   * @return the ''ColumnGenerator'' detecting mandatory and optional
+   *         parameters
+   */
+  def mandatoryColumnGenerator(optMandatoryText: Option[String] = None, optOptionalText: Option[String] = None):
+  ColumnGenerator = {
+    val multiplicityGenerator = multiplicityColumnGenerator
+    data => {
+      val multiplicity = multiplicityGenerator(data).head
+      val optText = if (multiplicity.startsWith("0") || data.attributes.attributes.contains(AttrFallbackValue))
+        optOptionalText
+      else optMandatoryText
+      optText.toList
+    }
+  }
+
+  /**
    * Returns a ''ColumnGenerator'' function that applies a default value to
    * another generator function. The passed in function is invoked first. If
    * it does not yield any values, the default values are returned.
@@ -503,7 +527,7 @@ object HelpGenerator {
    * ''composeColumnGenerator()'', but it only combines the results of a
    * single line of two generators. It checks whether both generators produce
    * at least one line. If so, result is a single line containing the text from
-   * both separators separated by the separator provided. If only one of the
+   * both extractors separated by the separator provided. If only one of the
    * generators produces a result line, this line is returned. If a generator
    * produces multiple lines, all lines except for the first one are ignored.
    * This function is useful if a table cell should contain the values of
