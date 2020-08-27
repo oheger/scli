@@ -408,9 +408,30 @@ object HelpGenerator {
    */
   def parameterKeyWithAliasesColumnGenerator(longOptionPrefix: String = DefaultLongOptionPrefix,
                                              shortOptionPrefix: String = DefaultShortOptionPrefix,
-                                             separator: String = ", ", maxLength: Int = 0): ColumnGenerator = {
-    val lineGenerator = composeSingleLineColumnGenerator(
-      parameterNameColumnGenerator(longOptionPrefix, shortOptionPrefix),
+                                             separator: String = ", ", maxLength: Int = 0): ColumnGenerator =
+    parameterKeyGeneratedWithAliasesColumnGenerator(parameterNameColumnGenerator(longOptionPrefix, shortOptionPrefix),
+      longOptionPrefix, shortOptionPrefix, separator, maxLength)
+
+  /**
+   * Returns a ''ColumnGenerator'' function that generates a single line result
+   * containing a generated parameter key and all its aliases. This function is
+   * analogous to ''parameterKeyWithAliasesColumnGenerator()'', but it obtains
+   * the parameter key from another ''ColumnGenerator''. Thus it is possible to
+   * decorate the key based on the attributes of the parameter.
+   *
+   * @param keyGenerator      the ''ColumnGenerator'' obtaining the parameter key
+   * @param longOptionPrefix  a prefix added to long parameter names
+   * @param shortOptionPrefix a prefix added to short parameter names
+   * @param separator         the separator character
+   * @param maxLength         the maximum length for line wrapping; 0 or negative to
+   *                          disable line wrapping
+   * @return the ''ColumnGenerator'' generating the key and its aliases
+   */
+  def parameterKeyGeneratedWithAliasesColumnGenerator(keyGenerator: ColumnGenerator,
+                                                      longOptionPrefix: String = DefaultLongOptionPrefix,
+                                                      shortOptionPrefix: String = DefaultShortOptionPrefix,
+                                                      separator: String = ", ", maxLength: Int = 0): ColumnGenerator = {
+    val lineGenerator = composeSingleLineColumnGenerator(keyGenerator,
       singleLineColumnGenerator(parameterAliasColumnGenerator(longOptionPrefix, shortOptionPrefix),
         separator), separator)
     if (maxLength > 0)

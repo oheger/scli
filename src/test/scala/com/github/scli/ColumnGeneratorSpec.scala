@@ -487,6 +487,18 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     generator(data) should be(expResult)
   }
 
+  it should "provide a ColumnGenerator for a generated key and its aliases" in {
+    val keyGenerator =
+      HelpGenerator.mapLinesColumnGenerator(HelpGenerator.parameterNameColumnGenerator())("'" + _ + "'")
+    val aliases = List(ShortKey)
+    val expResult = List("'" + HelpGenerator.DefaultLongOptionPrefix + Key.key + "', " +
+      HelpGenerator.DefaultShortOptionPrefix + ShortKey.key)
+    val data = testOptionMetaData(Key, HelpText, aliases)
+
+    val generator = HelpGenerator.parameterKeyGeneratedWithAliasesColumnGenerator(keyGenerator)
+    generator(data) should be(expResult)
+  }
+
   it should "provide a ColumnGenerator that detects a mandatory parameter" in {
     val Output = "It's mandatory"
     val attributes = Map(ParameterModel.AttrMultiplicity -> "1..*")
