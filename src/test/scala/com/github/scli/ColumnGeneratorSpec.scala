@@ -119,6 +119,65 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     generator(data) should contain only Value
   }
 
+  it should "provide a suffix generator that adds a suffix text to the lines of another one" in {
+    val SuffixText = "<<"
+    val ExpResult = List("Line1<<", "Line2<<")
+    val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
+
+    val generator = HelpGenerator.suffixTextColumnGenerator(orgGenerator, SuffixText)
+    generator(testOptionMetaData(1)) should be(ExpResult)
+  }
+
+  it should "provide a suffix generator that adds suffix lines to another one" in {
+    val data = testOptionMetaData(Key, HelpText)
+    val SuffixLines = List("", "p")
+    val ExpResult = List(HelpText) ++ SuffixLines
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(ParameterModel.AttrHelpText)
+
+    val generator = HelpGenerator.suffixLinesColumnGenerator(orgGenerator, SuffixLines)
+    generator(data) should be(ExpResult)
+  }
+
+  it should "provide a suffix generator that returns no data if the wrapped generator yields no results" in {
+    val data = testOptionMetaData(42)
+    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExistingKey")
+
+    val generator = HelpGenerator.suffixLinesColumnGenerator(orgGenerator, List("a", "b", "c"))
+    generator(data) should have size 0
+  }
+
+  it should "provide a suffix generator that adds a generated suffix" in {
+    val AttrSuffix = "thePrefix"
+    val attributes = Map(AttrSuffix -> "<=")
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
+    val suffixGenerator = HelpGenerator.attributeColumnGenerator(AttrSuffix)
+    val ExpResult = List("Line1<=", "Line2<=")
+
+    val generator = HelpGenerator.suffixGeneratedColumnGenerator(orgGenerator, suffixGenerator)
+    generator(data) should be(ExpResult)
+  }
+
+  it should "provide a generated suffix generator that handles empty output from the wrapped generator" in {
+    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+    val suffixGenerator: ColumnGenerator = _ => throw new UnsupportedOperationException("Unexpected call")
+
+    val generator = HelpGenerator.suffixGeneratedColumnGenerator(orgGenerator, suffixGenerator)
+    generator(testOptionMetaData(1)) should have size 0
+  }
+
+  it should "provide a generated suffix generator that handles empty output from the suffix generator" in {
+    val Value = "someValue"
+    val Attr = "DataAttribute"
+    val attributes = Map(Attr -> Value)
+    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(Attr)
+    val suffixGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+
+    val generator = HelpGenerator.suffixGeneratedColumnGenerator(orgGenerator, suffixGenerator)
+    generator(data) should contain only Value
+  }
+
   it should "provide a ColumnGenerator that composes the results of other generators" in {
     val attributes = Map("a1" -> "v1", "a2" -> "v2", "a3" -> "v3")
     val data = ParameterMetaData(Key, ParameterAttributes(attributes))
