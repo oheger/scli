@@ -228,4 +228,13 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
   it should "display the help screen if requested with the -h switch" in {
     checkHelpRequest("-h")
   }
+
+  it should "mark mandatory parameter keys" in {
+    val args = withInputParameters("upload", 1, httpServer = true, "-h",
+    "--password", "secret")
+    val output = checkHelp(executeTransfer(args))
+
+    output.indexOf("transferCommand*") should be < 0
+    output.indexOf("--user*") should be > 0
+  }
 }

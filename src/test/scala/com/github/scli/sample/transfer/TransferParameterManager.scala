@@ -336,22 +336,30 @@ object TransferParameterManager {
   def generateHelp(context: ProcessingContext): String = {
     import HelpGenerator._
     val modelContext = context.parameterContext.modelContext
-    val keyGenerator = parameterKeyWithAliasesColumnGenerator(maxLength = 18)
+    val paramNameGenerator = parameterNameColumnGenerator()
+    val optionKeyGenerator = suffixGeneratedColumnGenerator(paramNameGenerator,
+    mandatoryColumnGenerator(optMandatoryText = Some("*")))
+      val keyGenerator = parameterKeyGeneratedWithAliasesColumnGenerator(optionKeyGenerator, maxLength = 20)
     val helpGenerator = composeColumnGenerator(
-      wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 70),
+      wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 60),
       prefixTextColumnGenerator(attributeColumnGenerator(AttrFallbackValue), "Default value: "))
 
     val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
-      sortFunc = inputParamSortFunc(modelContext))(keyGenerator, helpGenerator)
+      sortFunc = inputParamSortFunc(modelContext))(paramNameGenerator, helpGenerator)
     val tableOptions = generateHelpTable(modelContext,
       filterFunc = negate(InputParamsFilterFunc))(keyGenerator, helpGenerator)
     val helpTexts = renderHelpTables(List(tableParams, tableOptions))
-    val buf = new StringBuilder(1024)
+    val buf = new StringBuilder(4096)
     buf.append("Usage: transfer [options] ")
       .append(generateInputParamsOverview(modelContext).mkString(" "))
       .append(CR)
       .append(CR)
       .append(helpTexts.head)
+      .append(CR)
+      .append("The following options and switches are supported,")
+      .append(CR)
+      .append("(parameters marked with * are mandatory:")
+      .append(CR)
       .append(helpTexts(1))
     buf.toString()
   }

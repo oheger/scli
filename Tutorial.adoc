@@ -2001,3 +2001,93 @@ improvements described in this subsection:
 --upload-hashes,    Determines whether hashes should be uploaded together with files.
 -H                  Default value: false
 ----
+
+==== Marking mandatory parameters
+
+To demonstrate some more functionality related to combining the results of
+multiple column generator functions, the _transfer_ demo application adds a
+special marker to the options in the help screen that are mandatory; the keys
+of such options are followed by an asterisk (*). (Only the keys, aliases are
+not affected.)
+
+To implement this feature, `TransferParameterManager` uses a combination of
+multiple column generator functions, all provided by `HelpGenerator`:
+
+* `mandatoryColumnGenerator()` checks whether a parameter is mandatory. It
+  expects two optional texts defining the result of the function for mandatory
+  and optional parameters. This function can produce the asterisk for mandatory
+  parameters.
+* `parameterNameColumnGenerator()` produces a result containing only the key of
+  a parameter.
+* `suffixGeneratedColumnGenerator()` allows appending a single-line result
+  produced by a column generator to the result of another column generator.
+  This function can append the output of `mandatoryColumnGenerator()` to the
+  parameter key. Note that there are multiple functions to add prefixes or
+  suffixes to the results of other generators; the functions differ in the way
+  the prefixes or suffixes are specified: as hard-coded texts or lines, or as
+  the result of another generator function.
+* `parameterKeyGeneratedWithAliasesColumnGenerator()` is an extended version
+  of `parameterKeyWithAliasesColumnGenerator()` used before. It allows the
+  definition of a column generator function that produces the parameter key.
+
+In its `generateHelp()` function, `TransferParameterManager` composes these
+functions to construct the column generator function for the first column of
+the table for options and switches. The table for input parameters uses a
+different, more simple generator for the column with parameter keys. For this
+application, input parameters are always mandatory, so adding special
+indicators is pointless; in addition, input parameters cannot have aliases, so
+the basic `parameterNameColumnGenerator()` is sufficient for this purpose.
+
+The following listing shows the generation of the help screen after these
+modifications:
+
+[source,scala]
+----
+  def generateHelp(context: ProcessingContext): String = {
+    import HelpGenerator._
+    val modelContext = context.parameterContext.modelContext
+    val paramNameGenerator = parameterNameColumnGenerator()
+    val optionKeyGenerator = suffixGeneratedColumnGenerator(paramNameGenerator,
+    mandatoryColumnGenerator(optMandatoryText = Some("*")))
+      val keyGenerator = parameterKeyGeneratedWithAliasesColumnGenerator(optionKeyGenerator, maxLength = 20)
+    val helpGenerator = composeColumnGenerator(
+      wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 60),
+      prefixTextColumnGenerator(attributeColumnGenerator(AttrFallbackValue), "Default value: "))
+
+    val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
+      sortFunc = inputParamSortFunc(modelContext))(paramNameGenerator, helpGenerator)
+    val tableOptions = generateHelpTable(modelContext,
+      filterFunc = negate(InputParamsFilterFunc))(keyGenerator, helpGenerator)
+    val helpTexts = renderHelpTables(List(tableParams, tableOptions))
+    val buf = new StringBuilder(4096)
+    buf.append("Usage: transfer [options] ")
+      .append(generateInputParamsOverview(modelContext).mkString(" "))
+      .append(CR)
+      .append(CR)
+      .append(helpTexts.head)
+      .append(CR)
+      .append("The following options and switches are supported,")
+      .append(CR)
+      .append("(parameters marked with * are mandatory:")
+      .append(CR)
+      .append(helpTexts(1))
+    buf.toString()
+  }
+----
+
+Note how the declaration of `optionKeyGenerator` combines the generator
+functions outlined above. We also added some descriptive text before the table
+for the options and switches. Below is an excerpt of the help screen showing
+a mandatory and an optional option:
+
+[source]
+----
+--target-folder*     Defines the local target folder for download operations. All
+                     files that are downloaded are stored in a folder structure
+                     below this directory.
+
+--timeout, -t        Defines a timeout (in seconds) for transfer operations. If a
+                     transfer takes longer than this time, it is canceled, and an
+                     error is recorded.
+----
+
