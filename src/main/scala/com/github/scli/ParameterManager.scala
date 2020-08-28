@@ -110,7 +110,8 @@ object ParameterManager {
      * @return the internal extractor
      */
     private def constructInternalExtractor(): CliExtractor[Try[(A, Boolean)]] =
-      createExtractorWithHelpFlag(extractor, optHelpExtractor getOrElse DefaultHelpExtractor)
+      createExtractorWithHelpFlag(extractor,
+        createInternalHelpExtractor(optHelpExtractor getOrElse DefaultHelpExtractor))
 
     /**
      * Creates a ''ParameterContext'' for the ''CliExtractor'' contained in
@@ -487,9 +488,32 @@ object ParameterManager {
                                              helpExtractor: CliExtractor[Try[Boolean]]):
   CliExtractor[Try[(A, Boolean)]] =
     for {
-      data <- mainExtractor
       help <- helpExtractor
+      data <- mainExtractor
     } yield createRepresentation(data, help) {
       (_, _)
+    }
+
+  /**
+   * Creates the extractor that is used internally to check whether the user
+   * has requested help. This function creates an extractor derived from the
+   * one passed in, which replaces the [[ConsoleReader]] in the parameter
+   * context if a help request is detected. This prevents that the user is
+   * prompted on the console to enter missing passwords before the help screen
+   * is displayed.
+   *
+   * @param ext the original help extractor
+   * @return the internal, extended help extractor
+   */
+  private def createInternalHelpExtractor(ext: CliExtractor[Try[Boolean]]): CliExtractor[Try[Boolean]] =
+    ext mapWithContext { (result, context) =>
+      val updContext = result match {
+        case Success(true) =>
+          context.copy(reader = DummyConsoleReader)
+        case Failure(_) =>
+          context.copy(reader = DummyConsoleReader)
+        case _ => context
+      }
+      (result, updContext)
     }
 }

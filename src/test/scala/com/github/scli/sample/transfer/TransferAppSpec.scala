@@ -231,10 +231,17 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
 
   it should "mark mandatory parameter keys" in {
     val args = withInputParameters("upload", 1, httpServer = true, "-h",
-    "--password", "secret")
+      "--password", "secret")
     val output = checkHelp(executeTransfer(args))
 
     output.indexOf("transferCommand*") should be < 0
     output.indexOf("--user*") should be > 0
+  }
+
+  it should "not read passwords from the console if the help flag is present" in {
+    val args = withInputParameters("Download", 1, httpServer = false,
+      "--crypt-mode", "files", "-h")
+
+    checkHelp(executeTransfer(args))
   }
 }

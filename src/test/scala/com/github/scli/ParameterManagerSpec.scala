@@ -43,18 +43,8 @@ object ParameterManagerSpec {
   /** A help text for the test option. */
   private val HelpTestOption = "This is the help text for the test option."
 
-  /**
-   * A test extractor that can be used by test cases. The extractor returns
-   * the current parameters map as result. It also adds the test option to the
-   * map of accessed options and to the model context.
-   */
-  private val TestExtractor = ParameterManager.wrapTryExtractor(CliExtractor(context => {
-    if (context.reader == DefaultConsoleReader) {
-      val nextContext = context.update(context.parameters.keyAccessed(TestOptionPk),
-        context.modelContext.addOption(TestOptionPk, Some(HelpTestOption)))
-      (context.parameters.parametersMap, nextContext)
-    } else (Map.empty, context)
-  }))
+  /** The default test extractor. */
+  private val TestExtractor = createTestExtractor(DefaultConsoleReader)
 
   /**
    * Generates an extractor based on the given one that counts the number of
@@ -86,6 +76,25 @@ object ParameterManagerSpec {
     val params = Parameters(Map(TestOptionPk -> List(TestOptionValue)), Set.empty)
     ParameterContext(params, modelContext, DummyConsoleReader)
   }
+
+  /**
+   * Creates a test extractor that can be used by test cases. The extractor
+   * returns the current parameters map as result if the expected reader is
+   * found in the parameter context. It also adds the test option to the map of
+   * accessed options and to the model context.
+   *
+   * @param expReader the expected console reader
+   * @return the test extractor
+   */
+  private def createTestExtractor(expReader: ConsoleReader):
+  CliExtractor[Try[Map[ParameterKey, Iterable[String]]]] =
+    ParameterManager.wrapTryExtractor(CliExtractor(context => {
+      if (context.reader == expReader) {
+        val nextContext = context.update(context.parameters.keyAccessed(TestOptionPk),
+          context.modelContext.addOption(TestOptionPk, Some(HelpTestOption)))
+        (context.parameters.parametersMap, nextContext)
+      } else (Map.empty, context)
+    }))
 }
 
 /**
@@ -344,7 +353,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       pk("foo") -> List("bar", "baz"),
       HelpKey -> List("true"))
     val helpExtractor = ParameterExtractor.switchValue(HelpKey.key)
-    val spec = ExtractionSpec(TestExtractor, optHelpExtractor = Some(helpExtractor))
+    val spec = ExtractionSpec(createTestExtractor(DummyConsoleReader), optHelpExtractor = Some(helpExtractor))
 
     val (res, procContext) = triedResult(ParameterManager.processCommandLineSpec(args, spec,
       checkUnconsumedParameters = false))
@@ -364,12 +373,13 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       .alias(Alias)
       .toBoolean
       .mandatory
-    val spec = ExtractionSpec(TestExtractor, optHelpExtractor = Some(helpExtractor))
+    val spec = ExtractionSpec(createTestExtractor(DummyConsoleReader), optHelpExtractor = Some(helpExtractor))
 
     val exception = failedResult(ParameterManager.processCommandLineSpec(args, spec,
       checkUnconsumedParameters = false))
     exception.failures should have size 1
     exception.failures.head.key should be(HelpKey)
+    exception.parameterContext.reader should be(DummyConsoleReader)
   }
 
   it should "evaluate a successful processing result" in {
