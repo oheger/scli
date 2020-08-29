@@ -986,4 +986,42 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     filter(parameterDataForGroup(Key, Group)) shouldBe true
     filter(testOptionMetaData(1)) shouldBe false
   }
+
+  it should "create a conditional group extractor that handles a true result" in {
+    val Group = "if-group"
+    val params = Map(Key -> List("true"))
+    val extCond = switchValue(Key.key)
+
+    val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, Group)
+    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    res should be(Success(Group))
+  }
+
+  it should "create a conditional group extractor that handles a false result" in {
+    val Group = "else-group"
+    val params = Map(Key -> List("false"))
+    val extCond = switchValue(Key.key)
+
+    val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore", Some(Group))
+    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    res should be(Success(Group))
+  }
+
+  it should "create a conditional group extractor that handles a false result if the else group is undefined" in {
+    val params = Map(Key -> List("false"))
+    val extCond = switchValue(Key.key)
+
+    val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore")
+    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    res.isSuccess shouldBe false
+  }
+
+  it should "create a conditional group extractor that handles a failure result" in {
+    val params = Map(Key -> List("not a boolean value"))
+    val extCond = switchValue(Key.key)
+
+    val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore")
+    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    res.isSuccess shouldBe false
+  }
 }

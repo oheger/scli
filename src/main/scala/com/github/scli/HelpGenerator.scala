@@ -354,6 +354,24 @@ object HelpGenerator {
     data => !filter(data)
 
   /**
+   * Converts an extractor for a boolean condition to an extractor selecting
+   * a group. This function expects the names of the groups representing the
+   * if and the else case (for the results '''true''' or '''false''' of the
+   * original extractor). It returns an extractor that modifies the original
+   * one to map the boolean result to these group names.
+   *
+   * @param condExt   the extractor for the condition
+   * @param ifGroup   the name of the if group (the '''true''' case)
+   * @param elseGroup optional name of the else group (the '''false''' case)
+   * @return the resulting group name extractor
+   */
+  def conditionalGroupExtractor(condExt: CliExtractor[Try[Boolean]], ifGroup: String,
+                                elseGroup: Option[String] = None): CliExtractor[Try[String]] =
+    condExt map (_.map { condition =>
+      if (condition) ifGroup else elseGroup.get
+    })
+
+  /**
    * Generates a ''ParameterFilter'' to filter for all the groups referenced in
    * the given values. This function interprets the passed in collection as the
    * active parameter groups based on the parameters provided by the user. It
