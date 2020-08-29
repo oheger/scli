@@ -16,10 +16,12 @@
 
 package com.github.scli
 
+import com.github.scli.ParameterExtractor.{CliExtractor, ParameterContext}
 import com.github.scli.ParameterModel._
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 /**
  * A module providing functionality related to the generation of help
@@ -350,6 +352,51 @@ object HelpGenerator {
    */
   def negate(filter: ParameterFilter): ParameterFilter =
     data => !filter(data)
+
+  /**
+   * Generates a ''ParameterFilter'' to filter for all the groups referenced in
+   * the given values. This function interprets the passed in collection as the
+   * active parameter groups based on the parameters provided by the user. It
+   * constructs a filter that selects parameters in all these groups, filtering
+   * out failure results. Optionally, the filter can include the parameters
+   * that are not assigned to any group.
+   *
+   * @param groupValues    a collection with extracted group values
+   * @param includeNoGroup flag whether to include parameters with no group
+   * @return the ''ParameterFilter'' selecting parameters in these groups
+   */
+  def contextGroupFilterForValues(groupValues: Iterable[Try[String]], includeNoGroup: Boolean = true):
+  ParameterFilter = {
+    val groups = groupValues.flatMap(_.toOption).toSeq
+    val noGroupFilter: ParameterFilter = if (includeNoGroup) UnassignedGroupFilterFunc
+    else _ => false
+    groups.foldLeft(noGroupFilter) { (filter, group) =>
+      orFilter(filter, groupFilterFunc(group))
+    }
+  }
+
+  /**
+   * Generates a ''ParameterFilter'' to filter for all the groups referenced by
+   * the given collection of extractors. This function can be used to construct
+   * a filter for context-sensitive help screens. The idea is that an
+   * application using conditional extraction logic already has extractors to
+   * obtain parameter groups; these extractors can be passed to this function.
+   * It then runs the extractors against the current parameters, and collects
+   * the success results. With these results, it invokes
+   * ''contextGroupFilterForValues()''.
+   *
+   * @param context        the parameter context
+   * @param extractors     a collection with extractors for conditional groups
+   * @param includeNoGroup flag whether to include parameters with no group
+   * @return the ''ParameterFilter'' selecting parameters in context groups
+   */
+  def contextGroupFilterForExtractors(context: ParameterContext, extractors: Iterable[CliExtractor[Try[String]]],
+                                      includeNoGroup: Boolean = true): ParameterFilter = {
+    val groupValues = extractors map { ext =>
+      ParameterExtractor.tryExtractor(ext, context.parameters)(DummyConsoleReader) map (_._1)
+    }
+    contextGroupFilterForValues(groupValues, includeNoGroup)
+  }
 
   /**
    * Returns a ''ColumnGenerator'' function that produces a single text line

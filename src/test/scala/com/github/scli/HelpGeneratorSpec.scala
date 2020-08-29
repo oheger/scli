@@ -20,7 +20,7 @@ import java.util.Locale
 
 import com.github.scli.HelpGenerator.{ColumnGenerator, HelpTable, InputParamOverviewSymbols, ParameterFilter, ParameterSortFunc}
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{InputParameterRef, ModelContext, ParameterAttributes, ParameterKey, ParameterMetaData}
+import com.github.scli.ParameterModel.{AttrGroup, InputParameterRef, ModelContext, ParameterAttributes, ParameterKey, ParameterMetaData}
 import HelpGeneratorTestHelper._
 import org.mockito.Mockito._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -30,7 +30,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import scala.collection.SortedSet
 import scala.util.Success
 
-object CliExtractorHelpSpec {
+object HelpGeneratorSpec {
   /** The platform-specific line separator. */
   private val CR = System.lineSeparator()
 
@@ -112,15 +112,28 @@ object CliExtractorHelpSpec {
                                 index: Int = 1): ModelContext =
     modelContext.addInputParameter(index, Some(key), None)
       .addAttribute(ParameterModel.AttrMultiplicity, multiplicity)
+
+  /**
+   * Returns a ''ParameterMetaData'' object for the given key with an attribute
+   * map that has the group attribute specified.
+   *
+   * @param key       the parameter key
+   * @param attrGroup the group(s) the key belongs to
+   * @return the ''ParameterMetaData'' with this information
+   */
+  private def parameterDataForGroup(key: ParameterKey, attrGroup: String): ParameterMetaData = {
+    val attributes = Map(AttrGroup -> (attrGroup + ","))
+    ParameterMetaData(key, ParameterAttributes(attributes))
+  }
 }
 
 /**
  * Test class for testing whether help and usage texts can be generated
  * correctly from ''CliExtractor'' objects.
  */
-class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
+class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
-  import CliExtractorHelpSpec._
+  import HelpGeneratorSpec._
 
   "The CLI library" should "store a help text for an option" in {
     val ext = multiOptionValue(Key.key, help = Some(HelpText))
@@ -945,5 +958,32 @@ class CliExtractorHelpSpec extends AnyFlatSpec with Matchers with MockitoSugar {
       data.key == Key && data.aliases == aliasList
     }
     result should have size 1
+  }
+
+  it should "create a group context filter based on extractors" in {
+    val Group1 = "myFirstGroup"
+    val Group2 = "MyOtherGroup"
+    val params = Map(testKey(1) -> List(Group1), testKey(2) -> List(Group2))
+    val paramCtx = ParameterContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
+    val ext1 = optionValue(testKey(1).key).mandatory
+    val ext2 = optionValue(testKey(2).key).mandatory
+    val extErr = optionValue("undefined").mandatory
+
+    val filter = HelpGenerator.contextGroupFilterForExtractors(paramCtx, List(ext1, ext2, extErr))
+    filter(parameterDataForGroup(testKey(1), Group1)) shouldBe true
+    filter(parameterDataForGroup(testKey(2), "test," + Group2)) shouldBe true
+    filter(parameterDataForGroup(testKey(1), "unknown-group")) shouldBe false
+    filter(testOptionMetaData(1)) shouldBe true
+  }
+
+  it should "create a group context filter that excludes parameters without a group" in {
+    val Group = "aGroup"
+    val params = Map(Key -> List(Group))
+    val paramCtx = ParameterContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
+    val ext = optionValue(Key.key).mandatory
+
+    val filter = HelpGenerator.contextGroupFilterForExtractors(paramCtx, List(ext), includeNoGroup = false)
+    filter(parameterDataForGroup(Key, Group)) shouldBe true
+    filter(testOptionMetaData(1)) shouldBe false
   }
 }
