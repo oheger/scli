@@ -19,6 +19,7 @@ package com.github.scli.sample.transfer
 import java.nio.file.Path
 import java.util.Locale
 
+import com.github.scli.HelpGenerator.ParameterFilter
 import com.github.scli.ParameterExtractor._
 import com.github.scli.{HelpGenerator, ParameterManager}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext}
@@ -74,6 +75,9 @@ object TransferParameterManager {
 
   /** Conditional group identifier for an HTTP server. */
   private val ServerTypeHttp = "http"
+
+  /** A group for parameters related to encryption. */
+  private val GroupEncryption = "encryption"
 
   private val HelpTransferCommand =
     """The command defining the transfer operation to be executed. Depending on the command, additional \
@@ -154,10 +158,14 @@ object TransferParameterManager {
       |files downloaded from the server.""".stripMargin
 
   private val HelpHelp =
-    """Displays this help screen.
-      |If a valid command is given on the command line, help about the options specific to this \
-      |command is displayed. Otherwise, the help screen lists only the options common to all \
-      |commands.""".stripMargin
+    """Displays a screen with help information.
+      |transfer --help shows information about the parameters commons to all commands.
+      |transfer <command> --help in addition shows the parameters specific to this command.
+      |Some parameters are specific to the target server of transfer operations. In order to display \
+      |them, a valid server URI must be provided, e.g.:
+      |transfer download file.txt http://target.server.com --help
+      |To include help about options related to encryption, specify a valid crypt mode, e.g.:
+      |transfer --crypt-mode files --help""".stripMargin
 
   /**
    * An enumeration defining the usage of encryption for a transfer operation.
@@ -338,16 +346,17 @@ object TransferParameterManager {
     val modelContext = context.parameterContext.modelContext
     val paramNameGenerator = parameterNameColumnGenerator()
     val optionKeyGenerator = suffixGeneratedColumnGenerator(paramNameGenerator,
-    mandatoryColumnGenerator(optMandatoryText = Some("*")))
-      val keyGenerator = parameterKeyGeneratedWithAliasesColumnGenerator(optionKeyGenerator, maxLength = 20)
+      mandatoryColumnGenerator(optMandatoryText = Some("*")))
+    val keyGenerator = parameterKeyGeneratedWithAliasesColumnGenerator(optionKeyGenerator, maxLength = 20)
     val helpGenerator = composeColumnGenerator(
       wrapColumnGenerator(attributeColumnGenerator(AttrHelpText), 60),
       prefixTextColumnGenerator(attributeColumnGenerator(AttrFallbackValue), "Default value: "))
 
+    val optionsFilter = createOptionsFilter(context.parameterContext)
     val tableParams = generateHelpTable(modelContext, filterFunc = InputParamsFilterFunc,
       sortFunc = inputParamSortFunc(modelContext))(paramNameGenerator, helpGenerator)
     val tableOptions = generateHelpTable(modelContext,
-      filterFunc = negate(InputParamsFilterFunc))(keyGenerator, helpGenerator)
+      filterFunc = optionsFilter)(keyGenerator, helpGenerator)
     val helpTexts = renderHelpTables(List(tableParams, tableOptions))
     val buf = new StringBuilder(4096)
     buf.append("Usage: transfer [options] ")
@@ -372,10 +381,8 @@ object TransferParameterManager {
    * @return the extractor for the ''CryptConfig''
    */
   private[transfer] def cryptConfigExtractor: CliExtractor[Try[CryptConfig]] = {
-    val extCryptEnabled = cryptModeExtractor
-      .map(triedMode => triedMode.map(_ != CryptMode.None))
-    conditionalValue(extCryptEnabled, ifExt = definedCryptConfigExtractor,
-      elseExt = constantExtractor(Success(DisabledCryptConfig)))
+    conditionalValue(cryptEnabledExtractor, ifExt = definedCryptConfigExtractor,
+      elseExt = constantExtractor(Success(DisabledCryptConfig)), ifGroup = Some(GroupEncryption))
   }
 
   /**
@@ -461,12 +468,9 @@ object TransferParameterManager {
    * @return the extractor for the command config
    */
   private def commandConfigExtractor: CliExtractor[Try[CommandConfig]] = {
-    val extCmdName = inputValue(index = 0, optKey = Some("transferCommand"), optHelp = Some(HelpTransferCommand))
-      .toLower
-      .mandatory
     val groupExtractors = Map(CommandUpload -> uploadCommandConfigExtractor,
       CommandDownload -> downloadCommandConfigExtractor)
-    conditionalGroupValue(extCmdName, groupExtractors)
+    conditionalGroupValue(commandExtractor, groupExtractors)
   }
 
   /**
@@ -499,6 +503,12 @@ object TransferParameterManager {
   private lazy val serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
     inputValue(optKey = Some("serverUri"), index = -1, optHelp = Some(HelpTransferServer))
 
+  /** The extractor for the command passed to the application. */
+  private lazy val commandExtractor: CliExtractor[Try[String]] =
+    inputValue(index = 0, optKey = Some("transferCommand"), optHelp = Some(HelpTransferCommand))
+      .toLower
+      .mandatory
+
   /**
    * Returns an extractor for a (mandatory) password option. The extractor
    * reads the password from the console if it has not been specified on the
@@ -524,6 +534,12 @@ object TransferParameterManager {
       .toEnum(CryptMode.Literals.get)
       .fallbackValue(CryptMode.None)
       .mandatory
+
+  /**
+   * An extractor that determines whether encryption is enabled or disabled.
+   */
+  private lazy val cryptEnabledExtractor = cryptModeExtractor
+    .map(triedMode => triedMode.map(_ != CryptMode.None))
 
   /**
    * Returns an extractor for the ''CryptConfig'' if the crypt mode is set to
@@ -591,5 +607,21 @@ object TransferParameterManager {
       rootPath <- extRootPath
       mask <- extUmask
     } yield createRepresentation(rootPath, mask)(FileServerConfig)
+  }
+
+  /**
+   * Returns the filter function for the help table for options. This filter
+   * selects only options and switches that are relevant for the parameters
+   * entered by the user.
+   *
+   * @param paramCtx the current ''ParameterContext''
+   * @return the filter for the help table for options
+   */
+  private def createOptionsFilter(paramCtx: ParameterContext): ParameterFilter = {
+    import HelpGenerator._
+    val cryptGroupExtractor = conditionalGroupExtractor(cryptEnabledExtractor, GroupEncryption)
+    val contextFilter = contextGroupFilterForExtractors(paramCtx,
+      List(commandExtractor, serverTypeExtractor, cryptGroupExtractor))
+    andFilter(negate(InputParamsFilterFunc), contextFilter)
   }
 }
