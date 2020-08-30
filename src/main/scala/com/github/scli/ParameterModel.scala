@@ -95,6 +95,14 @@ object ParameterModel {
   final val EmptyAliasMapping = AliasMapping(Map.empty, Map.empty)
 
   /**
+   * Constant for a special group name referencing an unassigned group. It can
+   * happen that extractors are executed inside and outside a group context.
+   * Using this special group name, it can be determined whether the extractor
+   * has been used at least once outside any group context.
+   */
+  private[scli] val UnassignedGroup = "scli:unassigned"
+
+  /**
    * A data class to represent the key of a parameter.
    *
    * Some CLI applications distinguish between normal (long) parameter names
@@ -363,9 +371,8 @@ object ParameterModel {
                                      inputRefs: SortedSet[InputParameterRef]): ModelContext = {
       val existingAttrs = options.get(key).map(_.attributes) getOrElse Map.empty
       val existingGroups = existingAttrs.getOrElse(AttrGroup, "")
-      val attrs = addOptionalAttribute(
-        addOptionalAttribute(Map.empty, AttrHelpText, text),
-        AttrGroup, groupAttribute.map(existingGroups + _)) + (AttrParameterType -> optionType)
+      val attrs = addOptionalAttribute(Map.empty, AttrHelpText, text) +
+        (AttrGroup -> (existingGroups + groupAttribute)) + (AttrParameterType -> optionType)
       val help = ParameterAttributes(existingAttrs ++ attrs)
       copy(options = options + (key -> help), inputs = inputRefs, optCurrentKey = Some(key))
     }
@@ -390,16 +397,16 @@ object ParameterModel {
     private def activeGroupNames: String = groups.mkString(GroupSeparator) + GroupSeparator
 
     /**
-     * Returns an ''Option'' with the current value of the group attribute. If
-     * there are active groups, the ''Option'' contains their names;
-     * otherwise, it is empty.
+     * Returns the current value of the group attribute. If there are active
+     * groups, a concatenation of their names is returned; otherwise, the group
+     * name is the special ''unassigned'' group.
      *
-     * @return an ''Option'' with the names of the currently active groups
+     * @return the names of the currently active groups
      */
-    private def groupAttribute: Option[String] =
+    private def groupAttribute: String =
       activeGroupNames match {
-        case GroupSeparator => None
-        case s => Some(s)
+        case GroupSeparator => UnassignedGroup
+        case s => s
       }
 
     /**

@@ -61,6 +61,7 @@ object HelpGeneratorTestHelper {
    */
   def testOptionMetaData(key: ParameterKey, help: String, aliases: List[ParameterKey] = Nil): ParameterMetaData = {
     val attrs = Map(ParameterModel.AttrHelpText -> help,
+      ParameterModel.AttrGroup -> ParameterModel.UnassignedGroup,
       ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption)
     ParameterMetaData(key, ParameterAttributes(attrs), aliases)
   }

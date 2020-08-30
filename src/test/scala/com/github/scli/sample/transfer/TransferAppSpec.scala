@@ -181,8 +181,7 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
 
     assertHelpForKey(output, "chunk-size", "Defines the chunk size")
     assertHelpForKey(output, "dry-run", "Allows enabling a dry-run")
-    //TODO fails currently, but should succeed
-    //assertHelpForKey(output, "crypt-mode", "Determines what kind of encryption")
+    assertHelpForKey(output, "crypt-mode", "Determines what kind of encryption")
   }
 
   it should "display input parameters before options in the help text" in {
@@ -220,7 +219,7 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
     val args = withInputParameters("download", 2, httpServer = false, switch)
     val output = checkHelp(executeTransfer(args))
 
-    assertHelpForKey(output, "--help", "Displays this help")
+    assertHelpForKey(output, "--help", "Displays a screen with help information")
   }
 
   it should "display the help screen if requested with the --help switch" in {

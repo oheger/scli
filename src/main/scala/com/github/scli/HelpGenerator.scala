@@ -75,7 +75,9 @@ object HelpGenerator {
    * depend on a context, but are always valid.
    */
   final val UnassignedGroupFilterFunc: ParameterFilter =
-    data => !data.attributes.attributes.contains(AttrGroup)
+    data =>
+      data.attributes.attributes.getOrElse(AttrGroup, ParameterModel.UnassignedGroup)
+        .contains(ParameterModel.UnassignedGroup)
 
   /** The default padding string to separate columns of the help text. */
   final val DefaultPadding: String = "  "
