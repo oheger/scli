@@ -769,16 +769,24 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "provide a filter function that accepts elements belonging to multiple groups" in {
     val Group1 = "IncludeGroup1"
     val Group2 = "IncludeGroup2"
+    val Key2 = testKey(10)
+    val Key3 = testKey(20)
     val modelContext = createModelContext()
-      .addOption(ParameterKey("ignored1", shortAlias = false), Some("ignored help 1"))
+      .addOption(ParameterKey("ignored", shortAlias = false), Some("ignored help 1"))
       .startGroup(Group2)
-      .addOption(ParameterKey("ignored2", shortAlias = false), None)
+      .addOption(Key2, None)
       .startGroup(Group1)
       .addOption(Key, Some(HelpText))
-    val ExpResult = ParameterMetaData(Key, modelContext.options(Key))
+      .endGroup()
+      .endGroup()
+      .startGroup(Group1)
+      .addOption(Key3, None)
+    val ExpResult = List(ParameterMetaData(Key, modelContext.options(Key)),
+      ParameterMetaData(Key2, modelContext.options(Key2)),
+      ParameterMetaData(Key3, modelContext.options(Key3)))
 
     val result = modelContext.parameterMetaData.filter(HelpGenerator.groupFilterFunc(Group1, Group2))
-    result should contain only ExpResult
+    result should contain theSameElementsAs ExpResult
   }
 
   it should "provide a filter function that accepts elements not assigned to any group" in {

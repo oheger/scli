@@ -305,15 +305,16 @@ object HelpGenerator {
   }
 
   /**
-   * Returns a filter function that accepts only options belonging to all of
-   * the given groups.
+   * Returns a filter function that accepts only options belonging to any of
+   * the given groups. So this filter implements ''or'' semantics on the list
+   * of groups provided.
    *
    * @param groups the name of the groups the options must belong to
-   * @return the function that filters for all of these groups
+   * @return the function that filters for any of these groups
    */
   def groupFilterFunc(groups: String*): ParameterFilter =
     data =>
-      groups.forall(group => isInGroup(data.attributes, group))
+      groups.exists(group => isInGroup(data.attributes, group))
 
   /**
    * Returns a filter function that accepts only options that have the given
@@ -388,11 +389,9 @@ object HelpGenerator {
   def contextGroupFilterForValues(groupValues: Iterable[Try[String]], includeNoGroup: Boolean = true):
   ParameterFilter = {
     val groups = groupValues.flatMap(_.toOption).toSeq
-    val noGroupFilter: ParameterFilter = if (includeNoGroup) UnassignedGroupFilterFunc
-    else _ => false
-    groups.foldLeft(noGroupFilter) { (filter, group) =>
-      orFilter(filter, groupFilterFunc(group))
-    }
+    val groupsFilter = groupFilterFunc(groups: _*)
+    if (includeNoGroup) orFilter(groupsFilter, UnassignedGroupFilterFunc)
+    else groupsFilter
   }
 
   /**
