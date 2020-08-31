@@ -2091,3 +2091,166 @@ a mandatory and an optional option:
                      error is recorded.
 ----
 
+==== Context-sensitive help
+
+For applications with a complex set of parameters, it does not always make
+sense to display all the parameters supported on a single help screen. This is
+especially true if some parameters are relevant only under certain
+circumstances or conditions. The _transfer_ demo application falls into this
+category. Here are some examples of parameters that are valid only in special
+situations:
+
+* The _transfer_ application supports different commands. For each command,
+  specific parameters exist. These parameters are allowed only when the user
+  selected this special command; some may then be even mandatory.
+* The application supports different types of target servers. The server type
+  is determined from the server URI parameter. Some parameters are specific to
+  server types.
+* The parameters related to encryption are only relevant if encryption is
+  enabled using the `--crypt-mode` option. If encryption is turned off (by
+  explicitly setting the crypt mode to `None` or skipping this parameter),
+  it is an error to place these parameters on the command line.
+
+It would be rather confusing if the help screen lists a parameter as mandatory,
+but when the user adds this parameter, the application complains that it is not
+allowed. Therefore, the help screen produced by an application should be
+_context-sensitive_; i.e. it should list only parameters that are compatible
+with and related to the parameters contained on the current command line.
+
+Let's make this more concrete on the example of the _transfer_ demo
+application. If a user does not provide any parameters, but just types:
+
+ transfer --help
+
+The resulting help screen should show only the parameters that are common to
+all commands and server types. The help texts should, however, give indications
+how to request further help, e.g. by entering a command. This would be the next
+step:
+
+ transfer upload --help
+
+This command would produce a help screen with all common parameters plus the
+ones specific to the _upload_ command. By providing further context (in form of
+additional parameters), the user can request more specific help, e.g. with:
+
+ transfer download file.txt http://target.server.com --crypt-mode files -h
+
+Now the help screen would list common parameters, parameters for the _download_
+command, parameters for HTTP servers, and parameters related to encryption.
+
+Context-sensitive help is directly related to
+<<Conditional extractors,conditional extraction logic>>. SCLI can record
+so-called groups in the metadata of parameters that correspond to the
+conditional execution paths. When using the `conditionalGroupValue()` function
+as described in <<Commands>>, you specify an extractor acting as group
+selector; this group name gets stored in the metadata. When using the
+`conditionalValue()` function instead (refer to <<Simple conditional logic>>),
+you can provide arbitrary group names for the *if* and the *else* paths.
+For extractors executed unconditionally, the corresponding parameters become
+part of a special _unassigned_ group. Parameters can also belong to multiple
+groups if there is nested conditional logic.
+
+So after processing of the command line, for each parameter the information is
+available, to which group(s) it belongs. To display context-sensitive help now
+means filtering parameters based on their group metadata attribute.
+`HelpGenerator` offers a function for this purpose, `groupFilterFunc()`, which
+expects a collection of group names and produces a filter function that accepts
+all the parameters that are in at least one of these groups.
+
+The most complicated part is now to determine the names of the groups that are
+of interest in the current context. You basically need to figure out, which
+parameters related to groups and conditional extraction logic the user has
+provided on the command line. To come back to the _transfer_ sample
+application: If the user has specified a command, the filter has to accept
+parameters in a group with the same name (commands are directly mapped to group
+names). If the user has provided a target server URI, based on this URI, the
+groups for the file server or the HTTP server become relevant.
+
+An application using conditional extraction logic has already defined
+extractors that obtain group names to be evaluated by the conditional
+functions. Here are the relevant extractors used by `TransferParameterManager`:
+
+[source,scala]
+----
+private lazy val serverTypeExtractor: CliExtractor[Try[String]] =
+  serverUriExtractor.mapTo { uri =>
+    if (uri.startsWith("http://") || uri.startsWith("https://")) ServerTypeHttp else ServerTypeFile
+  }.mandatory
+
+private lazy val commandExtractor: CliExtractor[Try[String]] =
+  inputValue(index = 0, optKey = Some("transferCommand"), optHelp = Some(HelpTransferCommand))
+    .toLower
+    .mandatory
+
+private lazy val cryptModeExtractor: CliExtractor[Try[CryptMode.Value]] =
+  optionValue("crypt-mode", Some(HelpCryptMode))
+    .alias("c")
+    .toUpper
+    .toEnum(CryptMode.Literals.get)
+    .fallbackValue(CryptMode.None)
+    .mandatory
+
+private lazy val cryptEnabledExtractor = cryptModeExtractor
+  .map(triedMode => triedMode.map(_ != CryptMode.None))
+----
+
+`commandExtractor` (refer to <<Commands>>) extracts the name of the command
+provided by the user. `serverTypeExtractor` (refer to
+<<Complex group selection logic>>) inspects the server URI for the type of the
+server. `cryptEnabledExtractor` (refer to <<Simple conditional logic>>) checks
+whether encryption is enabled. While the first ones directly return group
+names, the latter yields a Boolean and requires a mapping to the final group
+name. `HelpGenerator` offers the function `conditionalGroupExtractor()` for
+this purpose. The function expects a boolean extractor, the name of the group
+if the result is *true*, and an optional group name for the result *false*. It
+returns an extractor of type string that does the correct mapping to group
+names.
+
+When generating the help screen, we have the parameters specified by the user
+(in parsed form as part of the `ProcessingContext` object), and the extractors
+that return the names of the current conditional groups. We can now run these
+extractors on the parameters to actually obtain the group names and construct a
+filter function from the results. This is, however, a bit cumbersome, as we
+would also have to deal with possible failures during the extractions.
+Fortunately, `HelpGenerator` provides another function that does exactly this:
+`contextGroupFilterForExtractors()`. The function expects the current parameter
+context, and a list with extractors of type string. It runs the extractors
+against the parameters in the context and collects all successful results.
+From these it constructs a filter selecting the parameters relevant for
+context-sensitive help.
+
+Let's see how the _transfer_ demo application, namely
+`TransferParameterManager`, makes use of this functionality. It defines a
+helper function to construct the filter function to apply to the table with
+options and switches. (The table with input parameters does not require
+context-sensitive help, as these parameters are always mandatory.)
+
+[source,scala]
+----
+private def createOptionsFilter(paramCtx: ParameterContext): ParameterFilter = {
+  import HelpGenerator._
+  val cryptGroupExtractor = conditionalGroupExtractor(cryptEnabledExtractor, GroupEncryption)
+  val contextFilter = contextGroupFilterForExtractors(paramCtx,
+    List(commandExtractor, serverTypeExtractor, cryptGroupExtractor))
+  andFilter(negate(InputParamsFilterFunc), contextFilter)
+}
+----
+
+The function maps the extractor checking whether encryption is enabled to an
+extractor returning a group name. It now has three extractors for
+context-sensitive group names. It passes a list with these extractors to the
+`contextGroupFilterForExtractors()` function to obtain the context filter. As
+a last step, it adds a condition to exclude input parameters, as the table
+should contain only options and switches. In the `generateHelp()` function,
+`TransferParameterManager` invokes this function and uses the resulting filter
+function for the generation of the options table:
+
+[source,scala]
+----
+val optionsFilter = createOptionsFilter(context.parameterContext)
+val tableOptions = generateHelpTable(modelContext,
+  filterFunc = optionsFilter)(keyGenerator, helpGenerator)
+----
+
+The help screens produced by the application now contain more or less
+parameters, depending on the arguments the user has provided.
