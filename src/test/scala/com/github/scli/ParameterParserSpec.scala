@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{FileVisitResult, Files, Path, SimpleFileVisitor}
 import java.nio.file.attribute.BasicFileAttributes
 
-import com.github.scli.ParameterModel.{ModelContext, ParameterAttributes, ParameterKey}
+import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey}
 import com.github.scli.ParameterParser.{AliasResolverFunc, CliClassifierFunc, CliElement, ExtractedKeyClassifierFunc, InputParameterElement, OptionElement, OptionPrefixes, ParameterFileException, ParametersMap, SwitchesElement}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.BeforeAndAfterEach
@@ -102,11 +102,23 @@ object ParameterParserSpec {
    * @param attributes the attributes for the test option key
    * @return the resulting model context
    */
-  private def createModelContext(attributes: Map[String, String]): ModelContext = {
-    val optionAttributes = Map(TestKey -> ParameterAttributes(attributes))
+  private def createModelContext(attributes: ParameterAttributes): ModelContext = {
+    val optionAttributes = Map(TestKey -> attributes)
     val aliasMapping = ParameterModel.EmptyAliasMapping.addAlias(TestKey, AliasKey)
     new ModelContext(optionAttributes, SortedSet.empty, aliasMapping, None, Nil)
   }
+
+  /**
+   * Helper function to create a ''ParameterAttributes'' object with a single
+   * value only.
+   *
+   * @param key   the attribute key
+   * @param value the value of this attribute
+   * @tparam A the data type of the attribute
+   * @return the ''ParameterAttributes'' containing this attribute
+   */
+  private def singleAttr[A <: AnyRef](key: ParameterAttributeKey[A], value: A): ParameterAttributes =
+    new ParameterAttributes + (key -> value)
 }
 
 /**
@@ -577,7 +589,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "provide a key classifier for options that handles an option key" in {
     val args = List("someKey", TestValue)
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, args, 0) should be(Some(OptionElement(TestKey, Some(TestValue))))
@@ -585,7 +597,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "provide a key classifier for options that checks the option type" in {
     val args = List("someKey", TestValue)
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeSwitch))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, args, 0) should be(None)
@@ -593,7 +605,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "provide a key classifier for options that handles a missing attribute" in {
     val args = List("someKey", "someOtherKey", TestValue)
-    val context = createModelContext(Map(ParameterModel.AttrGroup -> "someGroup"))
+    val context = createModelContext(singleAttr(ParameterModel.AttrGroup, "someGroup"))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, args, 1) should be(None)
@@ -602,7 +614,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   it should "provide a key classifier for options that handles an unknown parameter key" in {
     val UnknownKey = pk("unknownKey")
     val args = List("someKey", "someOtherKey", TestValue)
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(UnknownKey, args, 1) should be(None)
@@ -610,67 +622,75 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "provide a key classifier for options that handles a missing option value" in {
     val args = List("key1", "key2", TestKey.key)
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, args, 2) should be(Some(OptionElement(TestKey, None)))
   }
 
   it should "provide a key classifier for switches that handles a switch key" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
-      ParameterModel.AttrSwitchValue -> "true"))
+    val attributes = new ParameterAttributes +
+      (ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch) +
+      (ParameterModel.AttrSwitchValue -> "true")
+    val context = createModelContext(attributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
   }
 
   it should "provide a key classifier for switches that evaluates the value of the switch" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
-      ParameterModel.AttrSwitchValue -> "false"))
+    val attributes = new ParameterAttributes +
+      (ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch) +
+      (ParameterModel.AttrSwitchValue -> "false")
+    val context = createModelContext(attributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "false")))))
   }
 
   it should "provide a key classifier for switches that evaluates the parameter type" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(None)
   }
 
   it should "provide a key classifier for switches that handles an unknown parameter key" in {
-    val context = createModelContext(Map.empty)
+    val context = createModelContext(new ParameterAttributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(None)
   }
 
   it should "provide a key classifier for switches that handles a missing switch value attribute" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeSwitch))
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
   }
 
   it should "handle aliases when accessing metadata during classification" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
-      ParameterModel.AttrSwitchValue -> "false"))
+    val attributes = new ParameterAttributes +
+      (ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch) +
+      (ParameterModel.AttrSwitchValue -> "false")
+    val context = createModelContext(attributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(context.aliasMapping.keyForAlias.get)
     classifier(AliasKey, Nil, 0) should be(Some(SwitchesElement(List((AliasKey, "false")))))
   }
 
   it should "provide a multi key classifier for switches that handles long switch keys" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch,
-      ParameterModel.AttrSwitchValue -> "true"))
+    val attributes = new ParameterAttributes +
+      (ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeSwitch) +
+      (ParameterModel.AttrSwitchValue -> "true")
+    val context = createModelContext(attributes)
 
     val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
   }
 
   it should "provide a multi key classifier for switches that handles long keys for non-switches" in {
-    val context = createModelContext(Map(ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption))
+    val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, Nil, 0) should be(None)
@@ -680,7 +700,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val AliasKey2 = ParameterKey("x", shortAlias = true)
     val multiKey = ParameterKey(AliasKey.key + AliasKey2.key, shortAlias = true)
     val expElement = SwitchesElement(List((AliasKey, "false"), (AliasKey2, "true")))
-    val context = createModelContext(Map(ParameterModel.AttrSwitchValue -> "false"))
+    val context = createModelContext(singleAttr(ParameterModel.AttrSwitchValue, "false"))
 
     val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(context.aliasMapping.keyForAlias.get)
     classifier(multiKey, Nil, 0) should be(Some(expElement))

@@ -16,7 +16,7 @@
 
 package com.github.scli
 
-import com.github.scli.ParameterModel.{ParameterAttributes, ParameterKey, ParameterMetaData}
+import com.github.scli.ParameterModel.{ParameterAttributeKey, ParameterAttributes, ParameterKey, ParameterMetaData}
 
 /**
  * An object defining some commons constants and functions used by tests of the
@@ -31,6 +31,9 @@ object HelpGeneratorTestHelper {
 
   /** A test help text. */
   final val HelpText = "Test help text for the test help option."
+
+  /** Constant for an attribute key that is never defined. */
+  final val UndefinedAttribute = ParameterAttributeKey[String]("undefined")
 
   /**
    * Generates the key of the test option with the given index.
@@ -60,10 +63,9 @@ object HelpGeneratorTestHelper {
    * @return the resulting meta data
    */
   def testOptionMetaData(key: ParameterKey, help: String, aliases: List[ParameterKey] = Nil): ParameterMetaData = {
-    val attrs = Map(ParameterModel.AttrHelpText -> help,
-      ParameterModel.AttrGroup -> ParameterModel.UnassignedGroup,
-      ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption)
-    ParameterMetaData(key, ParameterAttributes(attrs), aliases)
+    val attrs = new ParameterAttributes + (ParameterModel.AttrHelpText -> help) +
+      (ParameterModel.AttrGroup -> ParameterModel.UnassignedGroup) +
+      (ParameterModel.AttrParameterType -> ParameterModel.ParameterTypeOption)
+    ParameterMetaData(key, attrs, aliases)
   }
-
 }

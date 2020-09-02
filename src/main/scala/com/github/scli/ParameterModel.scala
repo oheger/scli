@@ -17,6 +17,7 @@
 package com.github.scli
 
 import scala.collection.SortedSet
+import scala.reflect.ClassTag
 
 /**
  * A module providing classes and constants to construct a model for the
@@ -33,13 +34,13 @@ import scala.collection.SortedSet
  */
 object ParameterModel {
   /** The attribute representing the help text of an option. */
-  final val AttrHelpText = "helpText"
+  final val AttrHelpText = ParameterAttributeKey[String]("helpText")
 
   /** The attribute with a description for the fallback value. */
-  final val AttrFallbackValue = "fallbackValue"
+  final val AttrFallbackValue = ParameterAttributeKey[String]("fallbackValue")
 
   /** The attribute defining the multiplicity of an option. */
-  final val AttrMultiplicity = "multiplicity"
+  final val AttrMultiplicity = ParameterAttributeKey[String]("multiplicity")
 
   /**
    * The attribute assigning a group to an option. Groups are used to handle
@@ -49,14 +50,14 @@ object ParameterModel {
    * can then be indicated that the options belonging to a group are allowed
    * only if specific conditions are fulfilled.
    */
-  final val AttrGroup = "group"
+  final val AttrGroup = ParameterAttributeKey[String]("group")
 
   /**
    * The attribute defining the type of a parameter. This attribute contains
    * the information whether a parameter is an option, a switch, or an input
    * parameter.
    */
-  final val AttrParameterType = "parameterType"
+  final val AttrParameterType = ParameterAttributeKey[String]("parameterType")
 
   /**
    * The attribute to store an error message for an option. The attribute can
@@ -64,13 +65,13 @@ object ParameterModel {
    * possible to generate output containing all error messages using all the
    * column generators supported.
    */
-  final val AttrErrorMessage = "errorMessage"
+  final val AttrErrorMessage = ParameterAttributeKey[String]("errorMessage")
 
   /**
    * The attribute defining the value to be assigned to a switch if it is
    * present. This is normally a boolean constant.
    */
-  final val AttrSwitchValue = "switchValue"
+  final val AttrSwitchValue = ParameterAttributeKey[String]("switchValue")
 
   /** Parameter type indicating an option. */
   final val ParameterTypeOption = "option"
@@ -156,19 +157,128 @@ object ParameterModel {
     }
   }
 
+  object ParameterAttributeKey {
+    /**
+     * Creates a new ''ParameterAttributeKey'' instance with a specific key.
+     * This is a convenience function that automatically obtains the class for
+     * the attribute's data type.
+     *
+     * @param key the actual key of the attribute
+     * @param ct  the class tag
+     * @tparam A the data type of the attribute
+     * @return the newly created ''ParameterAttributeKey''
+     */
+    def apply[A <: AnyRef](key: String)(implicit ct: ClassTag[A]): ParameterAttributeKey[A] = {
+      val attrType = ct.runtimeClass.asInstanceOf[Class[A]]
+      new ParameterAttributeKey(key, attrType)
+    }
+  }
+
+  /**
+   * A data class representing the key of a metadata attribute associated with
+   * a parameter.
+   *
+   * Attributes have a key and a data type. The information stored in an
+   * instance allows type-safe access to the values of such attributes.
+   *
+   * @param key   the key of this attribute
+   * @param clazz the class representing the attribute's data type
+   * @tparam A the type of the attribute
+   */
+  case class ParameterAttributeKey[A <: AnyRef](key: String, clazz: Class[A])
+
   /**
    * A data class storing information about a single command line parameter.
    *
-   * An instance of this class contains meta data about a parameter  that can
-   * be used for various purposes, e.g. to generate the help text of a CLI
+   * An instance of this class contains metadata about a parameter that can be
+   * used for various purposes, e.g. to generate the help text of a CLI
    * application. Some of the attributes are also used to implement specific
-   * features during command line processing. The meta data is extensible and
-   * is therefore stored as a map of attributes (whose values are strings as
-   * they are expected in many cases to be printed on the console).
+   * features during command line processing. The metadata is extensible and
+   * is therefore stored as a map of attributes. Type-safe access to attribute
+   * values is possible by using typed keys.
    *
-   * @param attributes a map with attributes for the associated parameter
+   * @param attributes stores the map with attributes
    */
-  case class ParameterAttributes(attributes: Map[String, String])
+  case class ParameterAttributes private(attributes: Map[ParameterAttributeKey[_], AnyRef]) {
+    def this() = this(Map.empty)
+
+    /**
+     * Returns a new instance with all attributes of this object plus the
+     * mapping specified.
+     *
+     * @param key   the key of the attribute to add
+     * @param value the value of the new attribute
+     * @tparam A the data type of the attribute
+     * @return the updated ''ParameterAttributes'' instance
+     */
+    def add[A <: AnyRef](key: ParameterAttributeKey[A], value: A): ParameterAttributes =
+      this.+(key -> value)
+
+    /**
+     * Alias for ''add()''.
+     *
+     * @param mapping the mapping to be added to the attributes
+     * @tparam A the data type of the attribute
+     * @return the updated ''ParameterAttributes'' instance
+     */
+    def +[A <: AnyRef](mapping: (ParameterAttributeKey[A], A)): ParameterAttributes = {
+      val map = attributes + mapping
+      ParameterAttributes(map)
+    }
+
+    /**
+     * Queries the attribute specified by the given key and returns an
+     * ''Option'' with the result.
+     *
+     * @param key the key of the desired attribute
+     * @tparam A the data type of the attribute
+     * @return an ''Option'' with the attribute value; ''None'' if the
+     *         attribute is not present
+     */
+    def get[A <: AnyRef](key: ParameterAttributeKey[A]): Option[A] =
+      attributes.get(key).map(key.clazz.cast)
+
+    /**
+     * Queries the attribute specified by the given key and returns a default
+     * value if the attribute is not present.
+     *
+     * @param key     the key of the desired attribute
+     * @param default the default value of this attribute
+     * @tparam A the data type of the attribute
+     * @tparam B the data type of the default value
+     * @return the attribute value or the default value
+     */
+    def getOrElse[A <: AnyRef, B <: A](key: ParameterAttributeKey[A], default: => B): A =
+      get(key) getOrElse default
+
+    /**
+     * Tests whether this object contains an attribute with the given key.
+     *
+     * @param key the key in question
+     * @return a flag whether an attribute with this key exists
+     */
+    def contains(key: ParameterAttributeKey[_]): Boolean =
+      attributes contains key
+
+    /**
+     * Returns a ''ParameterAttributes'' instance that contains the union of
+     * the attributes of this instance and the specified instance. Attributes
+     * in the other instance take precedence.
+     *
+     * @param other the instance to add
+     * @return a ''ParameterAttributes'' instance with the union of attributes
+     */
+    def addAll(other: ParameterAttributes): ParameterAttributes =
+      ParameterAttributes(attributes ++ other.attributes)
+
+    /**
+     * Alias for ''addAll()''.
+     *
+     * @param other the instance to add
+     * @return a ''ParameterAttributes'' instance with the union of attributes
+     */
+    def ++(other: ParameterAttributes): ParameterAttributes = addAll(other)
+  }
 
   /**
    * A data class holding information about input parameters.
@@ -272,12 +382,13 @@ object ParameterModel {
      *
      * @param attrKey the key of the attribute
      * @param value   the value of the attribute
+     * @tparam A the data type of the attribute
      * @return the updated ''ModelContext''
      */
-    def addAttribute(attrKey: String, value: String): ModelContext =
+    def addAttribute[A <: AnyRef](attrKey: ParameterAttributeKey[A], value: A): ModelContext =
       updateWithCurrentKey { key =>
         val attrs = options(key)
-        val newAttrs = ParameterAttributes(attrs.attributes + (attrKey -> value))
+        val newAttrs = attrs + (attrKey -> value)
         copy(options = options + (key -> newAttrs))
       }
 
@@ -291,8 +402,8 @@ object ParameterModel {
      * @return a flag whether this attribute is present for this option; if the
      *         option cannot be resolved, result is '''false'''
      */
-    def hasAttribute(key: ParameterKey, attrKey: String): Boolean =
-      options.get(key) exists (_.attributes contains attrKey)
+    def hasAttribute(key: ParameterKey, attrKey: ParameterAttributeKey[_]): Boolean =
+      options.get(key) exists (_ contains attrKey)
 
     /**
      * Notifies this context about the start of a new group. New options that
@@ -369,12 +480,12 @@ object ParameterModel {
      */
     private def contextWithParameter(key: ParameterKey, text: Option[String], optionType: String,
                                      inputRefs: SortedSet[InputParameterRef]): ModelContext = {
-      val existingAttrs = options.get(key).map(_.attributes) getOrElse Map.empty
+      val existingAttrs = options.getOrElse(key, new ParameterAttributes)
       val existingGroups = existingAttrs.getOrElse(AttrGroup, "")
-      val attrs = addOptionalAttribute(Map.empty, AttrHelpText, text) +
+      val attrs = addOptionalAttribute(new ParameterAttributes, AttrHelpText, text) +
         (AttrGroup -> (existingGroups + groupAttribute)) + (AttrParameterType -> optionType)
-      val help = ParameterAttributes(existingAttrs ++ attrs)
-      copy(options = options + (key -> help), inputs = inputRefs, optCurrentKey = Some(key))
+      val newAttrs = existingAttrs ++ attrs
+      copy(options = options + (key -> newAttrs), inputs = inputRefs, optCurrentKey = Some(key))
     }
 
     /**
@@ -435,11 +546,14 @@ object ParameterModel {
    * @param attributes the map with attributes
    * @param key        the attribute key
    * @param optValue   the optional value of the attribute
+   * @tparam A the data type of the attribute
+   * @tparam B the data type of the default value
    * @return the modified map with attributes if a change was necessary
    */
-  private def addOptionalAttribute(attributes: Map[String, String], key: String, optValue: Option[String]):
-  Map[String, String] =
-    optValue map (value => attributes + (key -> value)) getOrElse attributes
+  private def addOptionalAttribute[A <: AnyRef, B <: A](attributes: ParameterAttributes,
+                                                        key: ParameterAttributeKey[A],
+                                                        optValue: Option[B]): ParameterAttributes =
+    optValue.fold(attributes)(value => attributes + (key, value))
 
   /**
    * A function to determine the signum of an index which can be either

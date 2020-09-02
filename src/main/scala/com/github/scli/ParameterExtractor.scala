@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.nio.file.{Path, Paths}
 
-import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
+import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterKey}
 import com.github.scli.ParameterParser.ParametersMap
 
 import scala.collection.SortedSet
@@ -172,9 +172,10 @@ object ParameterExtractor {
      *
      * @param attr  the attribute key
      * @param value the attribute value
+     * @tparam A the data type of the attribute
      * @return the updated ''ParameterContext''
      */
-    def updateModelContext(attr: String, value: String): ParameterContext =
+    def updateModelContext[A <: AnyRef](attr: ParameterAttributeKey[A], value: A): ParameterContext =
       copy(modelContext = modelContext.addAttribute(attr, value))
 
     /**
@@ -185,9 +186,11 @@ object ParameterExtractor {
      *
      * @param attr     the attribute key
      * @param optValue an ''Option'' with the attribute value
+     * @tparam A the data type of the attribute
      * @return the updated (or same) ''ParameterContext''
      */
-    def updateModelContextConditionally(attr: String, optValue: Option[String]): ParameterContext =
+    def updateModelContextConditionally[A <: AnyRef](attr: ParameterAttributeKey[A], optValue: Option[A]):
+    ParameterContext =
       optValue map (value => updateModelContext(attr, value)) getOrElse this
   }
 

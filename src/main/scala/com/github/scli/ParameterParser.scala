@@ -16,7 +16,7 @@
 
 package com.github.scli
 
-import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
+import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterKey}
 
 import scala.annotation.tailrec
 import scala.io.Source
@@ -537,13 +537,16 @@ object ParameterParser {
    * @param attr         the desired attribute
    * @param default      the default value to use
    * @param resolverFunc function to resolve alias keys
+   * @tparam A the data type of the attribute
+   * @tparam B the data type of the default value
    * @return the value of this attribute (or the default)
    */
-  private def getModelContextAttribute(context: ModelContext, key: ParameterKey, attr: String, default: String)
-                                      (resolverFunc: AliasResolverFunc): String = {
+  private def getModelContextAttribute[A <: AnyRef, B <: A](context: ModelContext, key: ParameterKey,
+                                                            attr: ParameterAttributeKey[A], default: => B)
+                                                           (resolverFunc: AliasResolverFunc): A = {
     val resolvedKey = resolveAlias(key)(resolverFunc)
     context.options.get(resolvedKey)
-      .flatMap(_.attributes.get(attr))
+      .flatMap(_.get(attr))
       .getOrElse(default)
   }
 

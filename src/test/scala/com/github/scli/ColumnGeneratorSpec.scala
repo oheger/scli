@@ -17,7 +17,7 @@
 package com.github.scli
 
 import com.github.scli.HelpGenerator.ColumnGenerator
-import com.github.scli.ParameterModel.{ParameterAttributes, ParameterKey, ParameterMetaData}
+import com.github.scli.ParameterModel.{ParameterAttributeKey, ParameterAttributes, ParameterKey, ParameterMetaData}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -31,7 +31,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   "HelpGenerator" should "provide an attribute ColumnGenerator that handles undefined attributes" in {
     val data = testOptionMetaData(1)
-    val generator = HelpGenerator.attributeColumnGenerator(testKey(2).key)
+    val generator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     generator(data) should have size 0
   }
@@ -55,7 +55,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
     val data = testOptionMetaData(1)
     val defaults = List("These", "are", "the", "default", "values")
     val generator = HelpGenerator.defaultValueColumnGenerator(
-      HelpGenerator.attributeColumnGenerator(Key.key), defaults: _*)
+      HelpGenerator.attributeColumnGenerator(UndefinedAttribute), defaults: _*)
 
     generator(data) should be(defaults)
   }
@@ -81,16 +81,16 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a prefix generator that returns no data if the wrapped generator yields no results" in {
     val data = testOptionMetaData(42)
-    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExistingKey")
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.prefixLinesColumnGenerator(orgGenerator, List("a", "b", "c"))
     generator(data) should have size 0
   }
 
   it should "provide a prefix generator that adds a generated prefix" in {
-    val AttrPrefix = "thePrefix"
-    val attributes = Map(AttrPrefix -> "=>")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val AttrPrefix = ParameterAttributeKey[String]("thePrefix")
+    val attributes = new ParameterAttributes + (AttrPrefix -> "=>")
+    val data = ParameterMetaData(Key, attributes)
     val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
     val prefixGenerator = HelpGenerator.attributeColumnGenerator(AttrPrefix)
     val ExpResult = List("=>Line1", "=>Line2")
@@ -100,7 +100,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a generated prefix generator that handles empty output from the wrapped generator" in {
-    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
     val prefixGenerator: ColumnGenerator = _ => throw new UnsupportedOperationException("Unexpected call")
 
     val generator = HelpGenerator.prefixGeneratedColumnGenerator(orgGenerator, prefixGenerator)
@@ -109,11 +109,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a generated prefix generator that handles empty output from the prefix generator" in {
     val Value = "someValue"
-    val Attr = "DataAttribute"
-    val attributes = Map(Attr -> Value)
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val Attr = ParameterAttributeKey[String]("DataAttribute")
+    val data = ParameterMetaData(Key, new ParameterAttributes + (Attr -> Value))
     val orgGenerator = HelpGenerator.attributeColumnGenerator(Attr)
-    val prefixGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+    val prefixGenerator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.prefixGeneratedColumnGenerator(orgGenerator, prefixGenerator)
     generator(data) should contain only Value
@@ -140,16 +139,15 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a suffix generator that returns no data if the wrapped generator yields no results" in {
     val data = testOptionMetaData(42)
-    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExistingKey")
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.suffixLinesColumnGenerator(orgGenerator, List("a", "b", "c"))
     generator(data) should have size 0
   }
 
   it should "provide a suffix generator that adds a generated suffix" in {
-    val AttrSuffix = "thePrefix"
-    val attributes = Map(AttrSuffix -> "<=")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val AttrSuffix = ParameterAttributeKey[String]("theSuffix")
+    val data = ParameterMetaData(Key, new ParameterAttributes + (AttrSuffix -> "<="))
     val orgGenerator: ColumnGenerator = _ => List("Line1", "Line2")
     val suffixGenerator = HelpGenerator.attributeColumnGenerator(AttrSuffix)
     val ExpResult = List("Line1<=", "Line2<=")
@@ -159,7 +157,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a generated suffix generator that handles empty output from the wrapped generator" in {
-    val orgGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+    val orgGenerator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
     val suffixGenerator: ColumnGenerator = _ => throw new UnsupportedOperationException("Unexpected call")
 
     val generator = HelpGenerator.suffixGeneratedColumnGenerator(orgGenerator, suffixGenerator)
@@ -168,22 +166,24 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a generated suffix generator that handles empty output from the suffix generator" in {
     val Value = "someValue"
-    val Attr = "DataAttribute"
-    val attributes = Map(Attr -> Value)
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val Attr = ParameterAttributeKey[String]("DataAttribute")
+    val data = ParameterMetaData(Key, new ParameterAttributes + (Attr -> Value))
     val orgGenerator = HelpGenerator.attributeColumnGenerator(Attr)
-    val suffixGenerator = HelpGenerator.attributeColumnGenerator("nonExisting")
+    val suffixGenerator = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.suffixGeneratedColumnGenerator(orgGenerator, suffixGenerator)
     generator(data) should contain only Value
   }
 
   it should "provide a ColumnGenerator that composes the results of other generators" in {
-    val attributes = Map("a1" -> "v1", "a2" -> "v2", "a3" -> "v3")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = HelpGenerator.attributeColumnGenerator("a1")
-    val g2 = HelpGenerator.attributeColumnGenerator("a2")
-    val g3 = HelpGenerator.attributeColumnGenerator("a3")
+    val ak1 = ParameterAttributeKey[String]("a1")
+    val ak2 = ParameterAttributeKey[String]("a2")
+    val ak3 = ParameterAttributeKey[String]("a3")
+    val attributes = new ParameterAttributes + (ak1 -> "v1") + (ak2 -> "v2") + (ak3 -> "v3")
+    val data = ParameterMetaData(Key, attributes)
+    val g1 = HelpGenerator.attributeColumnGenerator(ak1)
+    val g2 = HelpGenerator.attributeColumnGenerator(ak2)
+    val g3 = HelpGenerator.attributeColumnGenerator(ak3)
 
     val generator = HelpGenerator.composeColumnGenerator(g1, g2, g3)
     val result = generator(data)
@@ -191,10 +191,12 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that composes a line from two generators" in {
-    val attributes = Map("a1" -> "v1", "a2" -> "v2")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = HelpGenerator.attributeColumnGenerator("a1")
-    val g2 = HelpGenerator.attributeColumnGenerator("a2")
+    val ak1 = ParameterAttributeKey[String]("a1")
+    val ak2 = ParameterAttributeKey[String]("a2")
+    val attributes = new ParameterAttributes + (ak1 -> "v1") + (ak2 -> "v2")
+    val data = ParameterMetaData(Key, attributes)
+    val g1 = HelpGenerator.attributeColumnGenerator(ak1)
+    val g2 = HelpGenerator.attributeColumnGenerator(ak2)
 
     val generator = HelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
     val result = generator(data)
@@ -202,10 +204,11 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that composes a line if generator 2 does not produce a result" in {
-    val attributes = Map("a1" -> "v1")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = HelpGenerator.attributeColumnGenerator("a1")
-    val g2 = HelpGenerator.attributeColumnGenerator("a2")
+    val ak = ParameterAttributeKey[String]("ak")
+    val attributes = new ParameterAttributes() + (ak -> "v1")
+    val data = ParameterMetaData(Key, attributes)
+    val g1 = HelpGenerator.attributeColumnGenerator(ak)
+    val g2 = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.composeSingleLineColumnGenerator(g1, g2, ", ")
     val result = generator(data)
@@ -213,10 +216,11 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that composes a line if generator 1 does not produce a result" in {
-    val attributes = Map("a1" -> "v1")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
-    val g1 = HelpGenerator.attributeColumnGenerator("a1")
-    val g2 = HelpGenerator.attributeColumnGenerator("a2")
+    val ak = ParameterAttributeKey[String]("ak")
+    val attributes = new ParameterAttributes + (ak -> "v1")
+    val data = ParameterMetaData(Key, attributes)
+    val g1 = HelpGenerator.attributeColumnGenerator(ak)
+    val g2 = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.composeSingleLineColumnGenerator(g2, g1, ", ")
     val result = generator(data)
@@ -224,9 +228,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that composes a line if both generators do not produce a result" in {
-    val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
-    val g1 = HelpGenerator.attributeColumnGenerator("a1")
-    val g2 = HelpGenerator.attributeColumnGenerator("a2")
+    val ak = ParameterAttributeKey[String]("ak")
+    val data = ParameterMetaData(Key, new ParameterAttributes)
+    val g1 = HelpGenerator.attributeColumnGenerator(ak)
+    val g2 = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.composeSingleLineColumnGenerator(g2, g1, "*")
     val result = generator(data)
@@ -234,8 +239,8 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that appends a separator and handles an empty result" in {
-    val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
-    val gen = HelpGenerator.attributeColumnGenerator("someKey")
+    val data = ParameterMetaData(Key, new ParameterAttributes)
+    val gen = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.separatorColumnGenerator(gen, "---")
     val result = generator(data)
@@ -243,9 +248,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that appends a separator to a single-line result" in {
-    val Attr = "testAttr"
+    val Attr = ParameterAttributeKey[String]("testAttr")
     val Value = "aValue"
-    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> Value)))
+    val attributes = new ParameterAttributes + (Attr -> Value)
+    val data = ParameterMetaData(Key, attributes)
     val gen = HelpGenerator.attributeColumnGenerator(Attr)
 
     val generator = HelpGenerator.separatorColumnGenerator(gen, "***")
@@ -254,9 +260,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that appends a separator to a multi-line result" in {
-    val Attr = "multiLineAttr"
-    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> "v1,v2,v3")))
-    val gen: ColumnGenerator = data => data.attributes.attributes(Attr).split(",").toList
+    val Attr = ParameterAttributeKey[String]("multiLineAttr")
+    val attributes = new ParameterAttributes + (Attr -> "v1,v2,v3")
+    val data = ParameterMetaData(Key, attributes)
+    val gen: ColumnGenerator = data => data.attributes.get(Attr).get.split(",").toList
 
     val generator = HelpGenerator.separatorColumnGenerator(gen, ";")
     val result = generator(data)
@@ -264,9 +271,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that converts a result to a single line" in {
-    val Attr = "multiLineAttr"
-    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> "v1,v2,v3")))
-    val gen: ColumnGenerator = data => data.attributes.attributes(Attr).split(",").toList
+    val Attr = ParameterAttributeKey[String]("multiLineAttr")
+    val attributes = new ParameterAttributes + (Attr -> "v1,v2,v3")
+    val data = ParameterMetaData(Key, attributes)
+    val gen: ColumnGenerator = data => data.attributes.get(Attr).get.split(",").toList
 
     val generator = HelpGenerator.singleLineColumnGenerator(gen, "; ")
     val result = generator(data)
@@ -274,8 +282,8 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that converts a result to a single line and handles an empty result" in {
-    val data = ParameterMetaData(Key, ParameterAttributes(Map.empty))
-    val gen = HelpGenerator.attributeColumnGenerator("undefined")
+    val data = ParameterMetaData(Key, new ParameterAttributes)
+    val gen = HelpGenerator.attributeColumnGenerator(UndefinedAttribute)
 
     val generator = HelpGenerator.singleLineColumnGenerator(gen, "~~~")
     val result = generator(data)
@@ -283,9 +291,10 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator that converts a result to a single line and handles a single line" in {
-    val Attr = "singleLineAttr"
+    val Attr = ParameterAttributeKey[String]("singleLineAttr")
     val Value = "foo"
-    val data = ParameterMetaData(Key, ParameterAttributes(Map(Attr -> Value)))
+    val attributes = new ParameterAttributes + (Attr -> Value)
+    val data = ParameterMetaData(Key, attributes)
     val gen = HelpGenerator.attributeColumnGenerator(Attr)
 
     val generator = HelpGenerator.singleLineColumnGenerator(gen, "===")
@@ -406,8 +415,8 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator for the multiplicity of command line parameters" in {
     val Multiplicity = "many"
-    val attributes = Map(ParameterModel.AttrMultiplicity -> Multiplicity)
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> Multiplicity)
+    val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.multiplicityColumnGenerator
     generator(data) should contain only Multiplicity
@@ -501,8 +510,8 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator that detects a mandatory parameter" in {
     val Output = "It's mandatory"
-    val attributes = Map(ParameterModel.AttrMultiplicity -> "1..*")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> "1..*")
+    val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some(Output),
       optOptionalText = Some("This text should not appear"))
@@ -511,9 +520,9 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator that detects a parameter with default value as optional" in {
     val Output = "No"
-    val attributes = Map(ParameterModel.AttrMultiplicity -> "1..1",
-      ParameterModel.AttrFallbackValue -> "fallback")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> "1..1") +
+      (ParameterModel.AttrFallbackValue -> "fallback")
+    val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some("yes"),
       optOptionalText = Some(Output))
@@ -522,8 +531,8 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator that detects an optional parameter" in {
     val Output = "It's optional"
-    val attributes = Map(ParameterModel.AttrMultiplicity -> "0..1")
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> "0..1")
+    val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some("to ignore"),
       optOptionalText = Some(Output))
@@ -531,8 +540,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator detecting mandatory parameters that handles empty texts" in {
-    val attributes = Map.empty[String, String]
-    val data = ParameterMetaData(Key, ParameterAttributes(attributes))
+    val data = ParameterMetaData(Key, new ParameterAttributes)
 
     val generator = HelpGenerator.mandatoryColumnGenerator()
     generator(data) should have size 0

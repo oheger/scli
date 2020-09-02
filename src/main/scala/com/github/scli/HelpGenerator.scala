@@ -76,7 +76,7 @@ object HelpGenerator {
    */
   final val UnassignedGroupFilterFunc: ParameterFilter =
     data =>
-      data.attributes.attributes.getOrElse(AttrGroup, ParameterModel.UnassignedGroup)
+      data.attributes.getOrElse(AttrGroup, ParameterModel.UnassignedGroup)
         .contains(ParameterModel.UnassignedGroup)
 
   /** The default padding string to separate columns of the help text. */
@@ -142,7 +142,7 @@ object HelpGenerator {
    * @return a flag whether this option belongs to this group
    */
   def isInGroup(attrs: ParameterAttributes, group: String): Boolean =
-    attrs.attributes.get(AttrGroup) exists (_ contains group + GroupSeparator)
+    attrs.get(AttrGroup) exists (_ contains group + GroupSeparator)
 
   /**
    * Returns a set with the names of all groups the option whose attributes
@@ -152,7 +152,7 @@ object HelpGenerator {
    * @return a set with the names of all groups
    */
   def groups(attrs: ParameterAttributes): Set[String] =
-    attrs.attributes.get(AttrGroup).map(_.split(GroupSeparator).toSet) getOrElse Set.empty
+    attrs.get(AttrGroup).map(_.split(GroupSeparator).toSet) getOrElse Set.empty
 
   /**
    * Type definition of a function that sorts the list of parameters in the
@@ -323,8 +323,8 @@ object HelpGenerator {
    * @param attrKey the key of the required attribute
    * @return the function that filters for options with this attribute
    */
-  def attributeFilterFunc(attrKey: String): ParameterFilter =
-    data => data.attributes.attributes contains attrKey
+  def attributeFilterFunc(attrKey: ParameterAttributeKey[_]): ParameterFilter =
+    data => data.attributes contains attrKey
 
   /**
    * Returns a filter function implementing AND logic. The resulting filter
@@ -425,8 +425,8 @@ object HelpGenerator {
    * @param attrKey the key of the attribute to be read
    * @return the ''ColumnGenerator'' reading this attribute
    */
-  def attributeColumnGenerator(attrKey: String): ColumnGenerator = data =>
-    data.attributes.attributes.get(attrKey) map (List(_)) getOrElse List.empty
+  def attributeColumnGenerator[A <: AnyRef](attrKey: ParameterAttributeKey[A]): ColumnGenerator = data =>
+    data.attributes.get(attrKey) map (v => List(v.toString)) getOrElse List.empty
 
   /**
    * Returns a ''ColumnGenerator'' function that generates the name of the
@@ -962,7 +962,7 @@ object HelpGenerator {
    * @return the filter function for this type
    */
   private def parameterTypeFilter(wantedType: String): ParameterFilter =
-    data => data.attributes.attributes.get(AttrParameterType) contains wantedType
+    data => data.attributes.get(AttrParameterType) contains wantedType
 
   /**
    * Generates the part of the overview of an input parameter that is
@@ -1024,7 +1024,7 @@ object HelpGenerator {
   private def inputParameterOverview(modelContext: ModelContext, parameterRef: InputParameterRef,
                                      symbols: InputParamOverviewSymbols): String = {
     val key = parameterRef.key
-    val multiplicity = modelContext.options(key).attributes.get(AttrMultiplicity)
+    val multiplicity = modelContext.options(key).get(AttrMultiplicity)
       .map(Multiplicity.parse) getOrElse Multiplicity.Unbounded
     val lowerPart = inputParameterOverviewLowerPart(key.key, multiplicity, symbols)
     val upperPart = inputParameterOverviewUpperPart(key.key, multiplicity, symbols)

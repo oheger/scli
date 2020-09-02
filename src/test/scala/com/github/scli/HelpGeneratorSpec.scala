@@ -20,7 +20,7 @@ import java.util.Locale
 
 import com.github.scli.HelpGenerator.{ColumnGenerator, HelpTable, InputParamOverviewSymbols, ParameterFilter, ParameterSortFunc}
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{AttrGroup, InputParameterRef, ModelContext, ParameterAttributes, ParameterKey, ParameterMetaData}
+import com.github.scli.ParameterModel.{AttrGroup, AttrHelpText, InputParameterRef, ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey, ParameterMetaData}
 import HelpGeneratorTestHelper._
 import org.mockito.Mockito._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -49,7 +49,7 @@ object HelpGeneratorSpec {
    * A test column generator function that returns the multi-line help text.
    */
   private val HelpColumnGenerator: ColumnGenerator =
-    data => data.attributes.attributes(ParameterModel.AttrHelpText).split(CR).toList
+    data => data.attributes.get(ParameterModel.AttrHelpText).get.split(CR).toList
 
   /**
    * Runs the given ''CliExtractor'' and returns the resulting model context.
@@ -75,8 +75,9 @@ object HelpGeneratorSpec {
    * @param attrKey      the attribute key
    * @return the value of this attribute
    */
-  private def fetchAttribute(modelContext: ModelContext, paramKey: ParameterKey, attrKey: String): String =
-    modelContext.options(paramKey).attributes(attrKey)
+  private def fetchAttribute[A <: AnyRef](modelContext: ModelContext, paramKey: ParameterKey,
+                                          attrKey: ParameterAttributeKey[A]): A =
+    modelContext.options(paramKey).get(attrKey).get
 
   /**
    * Creates a new model context with standard settings and the given options.
@@ -122,8 +123,8 @@ object HelpGeneratorSpec {
    * @return the ''ParameterMetaData'' with this information
    */
   private def parameterDataForGroup(key: ParameterKey, attrGroup: String): ParameterMetaData = {
-    val attributes = Map(AttrGroup -> (attrGroup + ","))
-    ParameterMetaData(key, ParameterAttributes(attributes))
+    val attributes = new ParameterAttributes + (AttrGroup -> (attrGroup + ","))
+    ParameterMetaData(key, attributes)
   }
 }
 
@@ -245,7 +246,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "handle an uninitialized model context gracefully" in {
     val ext = CliExtractor(context => {
-      (42, context.updateModelContext("test", "success"))
+      (42, context.updateModelContext(AttrHelpText, "success"))
     })
 
     val modelContext = generateModelContext(ext)
@@ -284,14 +285,15 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support attributes for input parameters" in {
+    val Attr = ParameterAttributeKey[String]("foo")
     val KeyInput = Key.copy(hasPrefix = false)
     val ext = inputValue(1, Some(Key.key))
     val modelContext1 = generateModelContext(ext)
 
-    val modelContext2 = modelContext1.addAttribute("foo", "bar")
+    val modelContext2 = modelContext1.addAttribute(Attr, "bar")
     modelContext2.inputs should contain only InputParameterRef(1, KeyInput)
     val attrs = modelContext2.options(KeyInput)
-    attrs.attributes("foo") should be("bar")
+    attrs.get(Attr) should be(Some("bar"))
   }
 
   it should "support input parameters with negative indices" in {
@@ -326,8 +328,10 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "merge the attributes of command line options that are added multiple times" in {
-    val Attrs1 = ParameterAttributes(Map("attr1" -> "value1", "attr2" -> "value2",
-      ParameterModel.AttrHelpText -> "old help"))
+    val ak1 = ParameterAttributeKey[String]("attr1")
+    val ak2 = ParameterAttributeKey[String]("attr2")
+    val Attrs1 = new ParameterAttributes + (ak1 -> "value1") + (ak2 -> "value2") +
+      (ParameterModel.AttrHelpText -> "old help")
     val ExpAttrs = Attrs1.attributes + (ParameterModel.AttrHelpText -> HelpText)
     val modelContext =
       new ModelContext(Map(Key -> Attrs1), SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
@@ -353,7 +357,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "support querying a boolean attribute for a non-existing option" in {
     val modelContext = new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
 
-    modelContext.hasAttribute(Key, "foo") shouldBe false
+    modelContext.hasAttribute(Key, UndefinedAttribute) shouldBe false
   }
 
   it should "set a multiplicity attribute for mandatory options" in {
@@ -427,20 +431,19 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "handle groups whose name is a prefix of another group" in {
-    val mapAttr = Map(ParameterModel.AttrGroup -> "groupSub")
-    val attr = ParameterAttributes(mapAttr)
+    val attr = new ParameterAttributes + (ParameterModel.AttrGroup -> "groupSub")
 
     HelpGenerator.isInGroup(attr, "group") shouldBe false
   }
 
   it should "correctly execute a group check if no groups are available" in {
-    val attr = ParameterAttributes(Map.empty)
+    val attr = new ParameterAttributes
 
     HelpGenerator.isInGroup(attr, "someGroup") shouldBe false
   }
 
   it should "return the groups of an option if no groups are available" in {
-    val attr = ParameterAttributes(Map.empty)
+    val attr = new ParameterAttributes
 
     HelpGenerator.groups(attr) should have size 0
   }
