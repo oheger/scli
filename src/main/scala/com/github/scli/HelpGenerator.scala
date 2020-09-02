@@ -134,27 +134,6 @@ object HelpGenerator {
   }
 
   /**
-   * Checks whether the option whose attributes are provided belongs to the
-   * given group.
-   *
-   * @param attrs the ''OptionAttributes''
-   * @param group the name of the group
-   * @return a flag whether this option belongs to this group
-   */
-  def isInGroup(attrs: ParameterAttributes, group: String): Boolean =
-    attrs.get(AttrGroup) exists (_ contains group + GroupSeparator)
-
-  /**
-   * Returns a set with the names of all groups the option whose attributes
-   * are provided belongs to.
-   *
-   * @param attrs the ''OptionAttributes''
-   * @return a set with the names of all groups
-   */
-  def groups(attrs: ParameterAttributes): Set[String] =
-    attrs.get(AttrGroup).map(_.split(GroupSeparator).toSet) getOrElse Set.empty
-
-  /**
    * Type definition of a function that sorts the list of parameters in the
    * generated help text.
    */
