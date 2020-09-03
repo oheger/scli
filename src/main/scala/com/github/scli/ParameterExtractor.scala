@@ -1148,7 +1148,7 @@ object ParameterExtractor {
             s"should have a single value, but has multiple values - $optionValue"))
         else Success(values.headOption)
       }
-      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, "0..1"))
+      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleOptional))
     })
 
   /**
@@ -1166,7 +1166,7 @@ object ParameterExtractor {
         case Some(v) => Success(v)
         case None => Failure(paramException(context, ext.key, "mandatory option has no value"))
       }
-      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, "1..1"))
+      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleValue))
     })
 
   /**
@@ -1191,8 +1191,7 @@ object ParameterExtractor {
           Failure(paramException(context, ext.key, s"option must have at most $atMost values"))
         else Success(values)
       }
-      (res, context.updateModelContext(ParameterModel.AttrMultiplicity,
-        Multiplicity(atLeast, atMost).toString))
+      (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity(atLeast, atMost)))
     })
 
   /**

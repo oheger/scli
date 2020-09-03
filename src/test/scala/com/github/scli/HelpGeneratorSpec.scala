@@ -76,7 +76,7 @@ object HelpGeneratorSpec {
    * @param index        the index of the input parameter
    * @return the updated model context
    */
-  private def addInputParameter(modelContext: ModelContext, multiplicity: String, key: String = Key.key,
+  private def addInputParameter(modelContext: ModelContext, multiplicity: Multiplicity, key: String = Key.key,
                                 index: Int = 1): ModelContext =
     modelContext.addInputParameter(index, Some(key), None)
       .addAttribute(ParameterModel.AttrMultiplicity, multiplicity)
@@ -429,14 +429,14 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "generate the overview of an input parameter with multiplicity 1..1" in {
-    val modelContext = addInputParameter(createModelContext(), "1..1")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity.SingleValue)
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
     result should contain only "<" + Key.key + ">"
   }
 
   it should "generate the overview of an input parameter if the upper bound is > than the lower bound" in {
-    val modelContext = addInputParameter(createModelContext(), "1..3")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity(1, 3))
     val ExpResult = s"<${Key.key}1> [...<${Key.key}3>]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -444,7 +444,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "generate the overview of an input parameter if the upper bound is the lower bound + 1" in {
-    val modelContext = addInputParameter(createModelContext(), "1..2")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity(1, 2))
     val ExpResult = s"<${Key.key}1> [<${Key.key}2>]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -452,7 +452,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "generate the overview of an input parameter if the upper bound is unrestricted" in {
-    val modelContext = addInputParameter(createModelContext(), "1..*")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity(1, -1))
     val ExpResult = s"<${Key.key}1> [<${Key.key}2> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -460,7 +460,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "generate the overview of an input parameter if the lower bound is > 2" in {
-    val modelContext = addInputParameter(createModelContext(), "3..*")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity(3, -1))
     val ExpResult = s"<${Key.key}1>...<${Key.key}3> [<${Key.key}4> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -468,7 +468,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "generate the overview of an input parameter if the lower bound is 2" in {
-    val modelContext = addInputParameter(createModelContext(), "2..3")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity(2, 3))
     val ExpResult = s"<${Key.key}1> <${Key.key}2> [<${Key.key}3>]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -476,7 +476,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "generate the overview of an optional input parameter" in {
-    val modelContext = addInputParameter(createModelContext(), "0..*")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity.Unbounded)
     val ExpResult = s"[<${Key.key}1> <${Key.key}2> ...]"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -486,8 +486,8 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "generate the overview for multiple input parameters" in {
     val Key2 = "source"
     val modelContext = addInputParameter(
-      addInputParameter(createModelContext(), "1..1", key = Key2),
-      "1..*", index = 2)
+      addInputParameter(createModelContext(), Multiplicity.SingleValue, key = Key2),
+      Multiplicity(1, -1), index = 2)
     val ExpResult = List(s"<$Key2>", s"<${Key.key}1> [<${Key.key}2> ...]")
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext)
@@ -506,7 +506,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "support customizing the symbols for the overview of input parameters" in {
     val symbols = InputParamOverviewSymbols(optionalPrefix = "{", optionalSuffix = "}",
       keyPrefix = "(", keySuffix = ")", ellipsis = "_")
-    val modelContext = addInputParameter(createModelContext(), "3..*")
+    val modelContext = addInputParameter(createModelContext(), Multiplicity(3, -1))
     val ExpResult = s"(${Key.key}1)_(${Key.key}3) {(${Key.key}4) _}"
 
     val result = HelpGenerator.generateInputParamsOverview(modelContext, symbols)

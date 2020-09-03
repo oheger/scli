@@ -510,8 +510,8 @@ object HelpGenerator {
   ColumnGenerator = {
     val multiplicityGenerator = multiplicityColumnGenerator
     data => {
-      val multiplicity = multiplicityGenerator(data).head
-      val optText = if (multiplicity.startsWith("0") || data.attributes.attributes.contains(AttrFallbackValue))
+      val multiplicity = data.attributes.getOrElse(AttrMultiplicity, Multiplicity.Unbounded)
+      val optText = if (multiplicity.optional || data.attributes.attributes.contains(AttrFallbackValue))
         optOptionalText
       else optMandatoryText
       optText.toList
@@ -1003,8 +1003,7 @@ object HelpGenerator {
   private def inputParameterOverview(modelContext: ModelContext, parameterRef: InputParameterRef,
                                      symbols: InputParamOverviewSymbols): String = {
     val key = parameterRef.key
-    val multiplicity = modelContext.options(key).get(AttrMultiplicity)
-      .map(Multiplicity.parse) getOrElse Multiplicity.Unbounded
+    val multiplicity = modelContext.options(key).get(AttrMultiplicity) getOrElse Multiplicity.Unbounded
     val lowerPart = inputParameterOverviewLowerPart(key.key, multiplicity, symbols)
     val upperPart = inputParameterOverviewUpperPart(key.key, multiplicity, symbols)
     val result = if (upperPart.nonEmpty) lowerPart + " " + upperPart else lowerPart

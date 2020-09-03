@@ -40,7 +40,7 @@ object ParameterModel {
   final val AttrFallbackValue = ParameterAttributeKey[String]("fallbackValue")
 
   /** The attribute defining the multiplicity of an option. */
-  final val AttrMultiplicity = ParameterAttributeKey[String]("multiplicity")
+  final val AttrMultiplicity = ParameterAttributeKey[Multiplicity]("multiplicity")
 
   /**
    * The attribute assigning a group to an option. Groups are used to handle

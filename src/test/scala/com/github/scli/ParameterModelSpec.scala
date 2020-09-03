@@ -361,7 +361,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     } yield List(v1, v2)
 
     val modelContext = generateModelContext(ext)
-    modelContext.options(Key).attributes(ParameterModel.AttrMultiplicity) shouldBe "0..1"
+    modelContext.options(Key).attributes(ParameterModel.AttrMultiplicity) should be(Multiplicity.SingleOptional)
     modelContext.hasAttribute(Key2, ParameterModel.AttrMultiplicity) shouldBe false
   }
 
@@ -381,7 +381,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     } yield List(v1, v2)
 
     val modelContext = generateModelContext(ext)
-    modelContext.options(Key).attributes(ParameterModel.AttrMultiplicity) shouldBe "1..1"
+    modelContext.options(Key).attributes(ParameterModel.AttrMultiplicity) should be(Multiplicity.SingleValue)
   }
 
   it should "support groups for conditional options" in {
@@ -493,7 +493,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
     val modelContext = generateModelContext(ext)
     val attr = modelContext.options(Key)
-    attr.attributes(ParameterModel.AttrMultiplicity) should be("1..4")
+    attr.attributes(ParameterModel.AttrMultiplicity) should be(Multiplicity(1, 4))
   }
 
   it should "handle an unrestricted multiplicity" in {
@@ -501,7 +501,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
     val modelContext = generateModelContext(ext)
     val attr = modelContext.options(Key)
-    attr.attributes(ParameterModel.AttrMultiplicity) should be("0..*")
+    attr.attributes(ParameterModel.AttrMultiplicity) should be(Multiplicity.Unbounded)
   }
 
   it should "set the parameter type attribute for a plain option" in {

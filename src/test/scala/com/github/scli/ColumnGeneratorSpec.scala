@@ -414,12 +414,12 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "provide a ColumnGenerator for the multiplicity of command line parameters" in {
-    val Multiplicity = "many"
-    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> Multiplicity)
+    val Mult = Multiplicity(7, 14)
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> Mult)
     val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.multiplicityColumnGenerator
-    generator(data) should contain only Multiplicity
+    generator(data) should contain only Mult.toString
   }
 
   it should "provide a multiplicity ColumnGenerator that uses the correct default multiplicity" in {
@@ -510,7 +510,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator that detects a mandatory parameter" in {
     val Output = "It's mandatory"
-    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> "1..*")
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> Multiplicity(1, -1))
     val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some(Output),
@@ -520,7 +520,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator that detects a parameter with default value as optional" in {
     val Output = "No"
-    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> "1..1") +
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> Multiplicity.SingleValue) +
       (ParameterModel.AttrFallbackValue -> "fallback")
     val data = ParameterMetaData(Key, attributes)
 
@@ -531,7 +531,7 @@ class ColumnGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "provide a ColumnGenerator that detects an optional parameter" in {
     val Output = "It's optional"
-    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> "0..1")
+    val attributes = new ParameterAttributes + (ParameterModel.AttrMultiplicity -> Multiplicity.SingleOptional)
     val data = ParameterMetaData(Key, attributes)
 
     val generator = HelpGenerator.mandatoryColumnGenerator(optMandatoryText = Some("to ignore"),
