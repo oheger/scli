@@ -62,8 +62,31 @@ object ParameterParser {
    * classified into options, switches, or input parameters. For this purpose,
    * a classification function is used which returns sub classes of this trait.
    * The parser needs to handle the sub classes differently.
+   *
+   * This trait also plays a role for error handling: It stores the original
+   * key and the raw value of the represented parameter. This information is
+   * useful when generating meaningful error messages.
    */
-  sealed trait CliElement
+  sealed trait CliElement {
+    /**
+     * Returns the key used for this parameter value on the command line. While
+     * values are stored under the main parameter key, this method allows
+     * determining the key the user has specified (which may be an alias).
+     *
+     * @return the key used for this ''CliElement''
+     */
+    def key: ParameterKey
+
+    /**
+     * Returns the raw value of this ''CliElement'' as specified by the user.
+     * The value may be transformed during the extraction phase. If
+     * transformation fails, it might be useful to have the original value to
+     * construct an error message.
+     *
+     * @return the value of this ''CliElement''
+     */
+    def value: String
+  }
 
   /**
    * A concrete ''CliElement'' class representing an option.
@@ -72,10 +95,12 @@ object ParameterParser {
    * but this may noe be possible, for instance if the option key was the last
    * parameter on the command line.
    *
-   * @param key   the key of the option
-   * @param value an ''Option'' with the value
+   * @param key      the key of the option
+   * @param optValue an ''Option'' with the value
    */
-  case class OptionElement(key: ParameterKey, value: Option[String]) extends CliElement
+  case class OptionElement(override val key: ParameterKey, optValue: Option[String]) extends CliElement {
+    override def value: String = optValue getOrElse ""
+  }
 
   /**
    * A concrete ''CliElement'' class representing a set of switches.
@@ -86,17 +111,26 @@ object ParameterParser {
    * its key and its value (which is derived from the default value defined in
    * the parameter model) is stored.
    *
+   * Note: The properties for key and value are dummies; during parameter
+   * parsing, for each switch in the result, a new element is created.
+   *
    * @param switches a list with switches and their values that have been
    *                 extracted
    */
-  case class SwitchesElement(switches: List[(ParameterKey, String)]) extends CliElement
+  case class SwitchesElement(switches: List[(ParameterKey, String)]) extends CliElement {
+    override def key: ParameterKey = switches.head._1
+
+    override def value: String = switches.head._2
+  }
 
   /**
    * A concrete ''CliElement'' class representing an input parameter.
    *
    * @param value the value to be added to the input parameters
    */
-  case class InputParameterElement(value: String) extends CliElement
+  case class InputParameterElement(override val value: String) extends CliElement {
+    override val key: ParameterKey = InputParameter
+  }
 
   /**
    * Definition of a function to classify parameters on the command line.

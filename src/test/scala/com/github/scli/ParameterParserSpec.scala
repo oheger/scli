@@ -355,6 +355,42 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     optExtract should be(Some(Key))
   }
 
+  "CliElement" should "report the value for options" in {
+    val elem = OptionElement(TestKey, Some(TestValue))
+
+    elem.value should be(TestValue)
+  }
+
+  it should "report the value for options if no value is defined" in {
+    val elem = OptionElement(TestKey, None)
+
+    elem.value should be("")
+  }
+
+  it should "report the key for switches" in {
+    val elem = SwitchesElement(List((TestKey, TestValue), (pk("foo"), "aValue")))
+
+    elem.key should be(TestKey)
+  }
+
+  it should "report the value for switches" in {
+    val elem = SwitchesElement(List((TestKey, TestValue), (pk("foo"), "aValue")))
+
+    elem.value should be(TestValue)
+  }
+
+  it should "report the key for input parameters" in {
+    val elem = InputParameterElement(TestValue)
+
+    elem.key should be(ParameterParser.InputParameter)
+  }
+
+  it should "report the value for input parameters" in {
+    val elem = InputParameterElement(TestValue)
+
+    elem.value should be(TestValue)
+  }
+
   "ParameterParser" should "parse an empty sequence of arguments" in {
     val cf: CliClassifierFunc = (_, _) => throw new UnsupportedOperationException("Unexpected invocation")
     val params = parseParametersSuccess(Nil)(cf)
