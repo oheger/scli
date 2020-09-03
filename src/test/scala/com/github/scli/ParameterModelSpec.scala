@@ -442,7 +442,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "handle groups whose name is a prefix of another group" in {
-    val attr = new ParameterAttributes + (ParameterModel.AttrGroup -> "groupSub")
+    val attr = new ParameterAttributes + (ParameterModel.AttrGroup -> Set("groupSub"))
 
     ParameterModel.isInGroup(attr, "group") shouldBe false
   }

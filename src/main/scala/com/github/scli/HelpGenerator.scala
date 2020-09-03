@@ -75,9 +75,10 @@ object HelpGenerator {
    * depend on a context, but are always valid.
    */
   final val UnassignedGroupFilterFunc: ParameterFilter =
-    data =>
-      data.attributes.getOrElse(AttrGroup, ParameterModel.UnassignedGroup)
-        .contains(ParameterModel.UnassignedGroup)
+    data => {
+      data.attributes.get(AttrGroup)
+        .exists(grpSet => grpSet.isEmpty || grpSet.contains(ParameterModel.UnassignedGroup))
+    }
 
   /** The default padding string to separate columns of the help text. */
   final val DefaultPadding: String = "  "
@@ -291,9 +292,13 @@ object HelpGenerator {
    * @param groups the name of the groups the options must belong to
    * @return the function that filters for any of these groups
    */
-  def groupFilterFunc(groups: String*): ParameterFilter =
-    data =>
-      groups.exists(group => isInGroup(data.attributes, group))
+  def groupFilterFunc(groups: String*): ParameterFilter = {
+    val filterGroups = groups.toSet
+    data => {
+      val currentGroups = ParameterModel.groups(data.attributes)
+      currentGroups.intersect(filterGroups).nonEmpty
+    }
+  }
 
   /**
    * Returns a filter function that accepts only options that have the given
@@ -507,8 +512,7 @@ object HelpGenerator {
    *         parameters
    */
   def mandatoryColumnGenerator(optMandatoryText: Option[String] = None, optOptionalText: Option[String] = None):
-  ColumnGenerator = {
-    val multiplicityGenerator = multiplicityColumnGenerator
+  ColumnGenerator =
     data => {
       val multiplicity = data.attributes.getOrElse(AttrMultiplicity, Multiplicity.Unbounded)
       val optText = if (multiplicity.optional || data.attributes.attributes.contains(AttrFallbackValue))
@@ -516,7 +520,6 @@ object HelpGenerator {
       else optMandatoryText
       optText.toList
     }
-  }
 
   /**
    * Returns a ''ColumnGenerator'' function that applies a default value to

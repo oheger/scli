@@ -50,7 +50,7 @@ object ParameterModel {
    * can then be indicated that the options belonging to a group are allowed
    * only if specific conditions are fulfilled.
    */
-  final val AttrGroup = ParameterAttributeKey[String]("group")
+  final val AttrGroup = ParameterAttributeKey[Set[String]]("group")
 
   /**
    * The attribute defining the type of a parameter. This attribute contains
@@ -89,9 +89,6 @@ object ParameterModel {
    */
   final val KeyInput = "input"
 
-  /** The separator string between group names. */
-  final val GroupSeparator = ","
-
   /** Constant for an initial, empty mapping for parameter aliases. */
   final val EmptyAliasMapping = AliasMapping(Map.empty, Map.empty)
 
@@ -102,6 +99,9 @@ object ParameterModel {
    * has been used at least once outside any group context.
    */
   private[scli] val UnassignedGroup = "scli:unassigned"
+
+  /** A special set containing only the unassigned group. */
+  private val UnassignedGroupSet = Set(UnassignedGroup)
 
   /**
    * A data class to represent the key of a parameter.
@@ -481,9 +481,9 @@ object ParameterModel {
     private def contextWithParameter(key: ParameterKey, text: Option[String], optionType: String,
                                      inputRefs: SortedSet[InputParameterRef]): ModelContext = {
       val existingAttrs = options.getOrElse(key, new ParameterAttributes)
-      val existingGroups = existingAttrs.getOrElse(AttrGroup, "")
+      val existingGroups = ParameterModel.groups(existingAttrs)
       val attrs = addOptionalAttribute(new ParameterAttributes, AttrHelpText, text) +
-        (AttrGroup -> (existingGroups + groupAttribute)) + (AttrParameterType -> optionType)
+        (AttrGroup -> (existingGroups ++ groupAttribute)) + (AttrParameterType -> optionType)
       val newAttrs = existingAttrs ++ attrs
       copy(options = options + (key -> newAttrs), inputs = inputRefs, optCurrentKey = Some(key))
     }
@@ -500,25 +500,15 @@ object ParameterModel {
       optCurrentKey.fold(this)(f)
 
     /**
-     * Returns a string with the concatenated names of all groups that are
-     * currently active.
-     *
-     * @return a string with the names of the active groups
-     */
-    private def activeGroupNames: String = groups.mkString(GroupSeparator) + GroupSeparator
-
-    /**
      * Returns the current value of the group attribute. If there are active
-     * groups, a concatenation of their names is returned; otherwise, the group
-     * name is the special ''unassigned'' group.
+     * groups, their names are returned as a set; otherwise, the resulting set
+     * contains only the special ''unassigned'' group.
      *
      * @return the names of the currently active groups
      */
-    private def groupAttribute: String =
-      activeGroupNames match {
-        case GroupSeparator => UnassignedGroup
-        case s => s
-      }
+    private def groupAttribute: Set[String] =
+      if(groups.isEmpty) UnassignedGroupSet
+      else groups.toSet
 
     /**
      * Convenience function to create a copy of this object with some
@@ -548,7 +538,7 @@ object ParameterModel {
    * @return a flag whether this option belongs to this group
    */
   def isInGroup(attrs: ParameterAttributes, group: String): Boolean =
-    attrs.get(AttrGroup) exists (_ contains group + GroupSeparator)
+    attrs.get(AttrGroup) exists (_ contains group)
 
   /**
    * Returns a set with the names of all groups the option whose attributes
@@ -558,7 +548,7 @@ object ParameterModel {
    * @return a set with the names of all groups
    */
   def groups(attrs: ParameterAttributes): Set[String] =
-    attrs.get(AttrGroup).map(_.split(GroupSeparator).toSet) getOrElse Set.empty
+    attrs.get(AttrGroup) getOrElse Set.empty
 
   /**
    * Adds an attribute and its value to the given map of attributes only if

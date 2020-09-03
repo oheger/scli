@@ -86,11 +86,11 @@ object HelpGeneratorSpec {
    * map that has the group attribute specified.
    *
    * @param key       the parameter key
-   * @param attrGroup the group(s) the key belongs to
+   * @param attrGroups the group(s) the key belongs to
    * @return the ''ParameterMetaData'' with this information
    */
-  private def parameterDataForGroup(key: ParameterKey, attrGroup: String): ParameterMetaData = {
-    val attributes = new ParameterAttributes + (AttrGroup -> (attrGroup + ","))
+  private def parameterDataForGroup(key: ParameterKey, attrGroups: String*): ParameterMetaData = {
+    val attributes = new ParameterAttributes + (AttrGroup -> attrGroups.toSet)
     ParameterMetaData(key, attributes)
   }
 }
@@ -553,7 +553,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
 
     val filter = HelpGenerator.contextGroupFilterForExtractors(paramCtx, List(ext1, ext2, extErr))
     filter(parameterDataForGroup(testKey(1), Group1)) shouldBe true
-    filter(parameterDataForGroup(testKey(2), "test," + Group2)) shouldBe true
+    filter(parameterDataForGroup(testKey(2), "test", Group2)) shouldBe true
     filter(parameterDataForGroup(testKey(1), "unknown-group")) shouldBe false
     filter(testOptionMetaData(1)) shouldBe true
   }

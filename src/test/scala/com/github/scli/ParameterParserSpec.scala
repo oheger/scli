@@ -605,7 +605,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "provide a key classifier for options that handles a missing attribute" in {
     val args = List("someKey", "someOtherKey", TestValue)
-    val context = createModelContext(singleAttr(ParameterModel.AttrGroup, "someGroup"))
+    val context = createModelContext(singleAttr(ParameterModel.AttrGroup, Set("someGroup")))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
     classifier(TestKey, args, 1) should be(None)
