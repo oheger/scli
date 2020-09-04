@@ -806,7 +806,7 @@ object ParameterExtractor {
   CliExtractor[OptionValue[String]] = {
     val paramKey = ParameterKey(key, shortAlias)
     CliExtractor(context => {
-      val values = context.parameters.parametersMap.getOrElse(paramKey, Nil)
+      val values = context.parameters.parametersMap.getOrElse(paramKey, Nil) map (_.value)
       val nextModelCtx = context.modelContext.addOption(paramKey, help)
       (Success(values), context.update(context.parameters keyAccessed paramKey, nextModelCtx))
     }, Some(paramKey))
@@ -884,7 +884,7 @@ object ParameterExtractor {
         for {
           firstIndex <- adjustAndCheckIndex(fromIdx)
           lastIndex <- adjustAndCheckIndex(toIdx)
-        } yield inputs.slice(firstIndex, lastIndex + 1)
+        } yield inputs.slice(firstIndex, lastIndex + 1) map (_.value)
       val modelContext = context.modelContext.addInputParameter(fromIdx, optKey, optHelp)
       (result, context.update(context.parameters keyAccessed ParameterParser.InputParameter, modelContext))
     }, optInputKey)

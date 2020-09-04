@@ -51,9 +51,11 @@ object ParameterParser {
   /**
    * Type definition for the map with resolved parameter values. The array
    * with command line options is transformed in such a map which allows
-   * direct access to the value(s) assigned to parameters.
+   * direct access to the value(s) assigned to parameters. The map stores
+   * ''CliElement'' objects, so that the original information from the command
+   * line is still available.
    */
-  type ParametersMap = Map[ParameterKey, Iterable[String]]
+  type ParametersMap = Map[ParameterKey, Iterable[CliElement]]
 
   /**
    * A trait describing an item encountered on the command line.
@@ -276,7 +278,7 @@ object ParameterParser {
    * Type definition for an internal map type used during processing of
    * command line arguments.
    */
-  private type InternalParamMap = Map[ParameterKey, List[String]]
+  private type InternalParamMap = Map[ParameterKey, List[CliElement]]
 
   /**
    * Generates a ''CliClassifierFunc'' from the given sequence extracted key
@@ -463,26 +465,25 @@ object ParameterParser {
   def parseParameters(args: Seq[String])
                      (classifierFunc: CliClassifierFunc)
                      (aliasResolverFunc: AliasResolverFunc): ParametersMap = {
-    def appendOptionValue(argMap: InternalParamMap, key: ParameterKey, value: String):
-    InternalParamMap = {
+    def appendOptionValue(argMap: InternalParamMap, key: ParameterKey, elem: CliElement): InternalParamMap = {
       val optValues = argMap.getOrElse(key, List.empty)
-      argMap + (key -> (optValues :+ value))
+      argMap + (key -> (optValues :+ elem))
     }
 
     classify(args)(classifierFunc)
       .reverse
-      .foldLeft(Map.empty[ParameterKey, List[String]]) { (argsMap, elem) =>
+      .foldLeft(Map.empty[ParameterKey, List[CliElement]]) { (argsMap, elem) =>
         elem._2 match {
-          case InputParameterElement(value) =>
-            appendOptionValue(argsMap, InputParameter, value)
+          case elem: InputParameterElement =>
+            appendOptionValue(argsMap, InputParameter, elem)
 
-          case OptionElement(key, optValue) =>
+          case elem@OptionElement(key, optValue) =>
             optValue.fold(argsMap)(value => appendOptionValue(argsMap,
-              resolveAlias(key)(aliasResolverFunc), value))
+              resolveAlias(key)(aliasResolverFunc), elem))
 
           case SwitchesElement(switches) =>
             switches.foldLeft(argsMap) { (map, t) =>
-              appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), t._2)
+              appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), OptionElement(t._1, Some(t._2)))
             }
         }
       }

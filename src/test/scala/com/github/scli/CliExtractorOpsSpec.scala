@@ -20,6 +20,7 @@ import java.io.IOException
 import java.nio.file.{Path, Paths}
 
 import com.github.scli.ParameterExtractor._
+import com.github.scli.ParameterModel.ParameterKey
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -127,6 +128,17 @@ object CliExtractorOpsSpec {
     (1 to count) map createComponent
 
   /**
+   * Creates a parameters object based on the test parameters plus an
+   * additional entry.
+   *
+   * @param key    the additional key
+   * @param values the values to assign to this key
+   * @return the ''Parameters'' object
+   */
+  private def createParametersWithValues(key: ParameterKey, values: List[String]): Parameters =
+    TestParameters.copy(parametersMap = TestParameters.parametersMap ++ toParamValues(Map(key -> values)))
+
+  /**
    * A data class that combines the test option values.
    *
    * @param numbers value for the list of numbers
@@ -228,7 +240,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "convert multiple string values to lower case" in {
     val OrgValues = List("TEST", "test", "Test", "TesT")
     val Key = "multiStringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> OrgValues))
+    val parameters = createParametersWithValues(pk(Key), OrgValues)
     val ext = multiOptionValue(Key).toLower
 
     val result = runExtractor(ext, parameters).get
@@ -238,7 +250,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   it should "convert a string value to lower case" in {
     val Key = "stringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> List("TesT")))
+    val parameters = createParametersWithValues(pk(Key), List("TesT"))
     val ext = optionValue(Key).toLower.mandatory
 
     val result = runExtractor(ext, parameters)
@@ -248,7 +260,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "convert multiple string values to upper case" in {
     val OrgValues = List("TEST", "test", "Test", "TesT")
     val Key = "multiStringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> OrgValues))
+    val parameters = createParametersWithValues(pk(Key), OrgValues)
     val ext = multiOptionValue(Key).toUpper
 
     val result = runExtractor(ext, parameters).get
@@ -258,7 +270,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   it should "convert a string value to upper case" in {
     val Key = "stringOption"
-    val parameters = TestParameters.copy(parametersMap = TestParameters.parametersMap + (pk(Key) -> List("TesT")))
+    val parameters = createParametersWithValues(pk(Key), List("TesT"))
     val ext = optionValue(Key).toUpper.mandatory
 
     val result = runExtractor(ext, parameters)
@@ -645,7 +657,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support the access to input parameters" in {
-    val parameters: Parameters = Map(ParameterParser.InputParameter -> List("1", "2", "3"))
+    val parameters: Parameters = toParamValues(Map(ParameterParser.InputParameter -> List("1", "2", "3")))
     val extractor = inputValue(-2)
       .toInt
       .mandatory

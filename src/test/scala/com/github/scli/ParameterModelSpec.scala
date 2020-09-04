@@ -19,6 +19,7 @@ package com.github.scli
 import com.github.scli.HelpGeneratorTestHelper.{HelpText, Key, UndefinedAttribute}
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterModel.{AttrHelpText, InputParameterRef, ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey}
+import com.github.scli.ParametersTestHelper.toParamValues
 import org.mockito.Mockito.verifyZeroInteractions
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -246,7 +247,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "update the model context with a fallback extractor" in {
     val paramsMap = Map(Key -> List("true"))
-    val params = Parameters(paramsMap, Set.empty)
+    val params = Parameters(toParamValues(paramsMap), Set.empty)
     val ext = multiOptionValue(Key.key)
       .toBoolean
       .fallbackValues(false)

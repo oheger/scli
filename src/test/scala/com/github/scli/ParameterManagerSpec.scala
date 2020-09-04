@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ParameterContext, ParameterExtractionException, Parameters}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
 import com.github.scli.ParameterModel.{AliasMapping, ModelContext, ParameterKey}
+import com.github.scli.ParameterParser.CliElement
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -73,7 +74,7 @@ object ParameterManagerSpec {
   private def createParameterContext(): ParameterContext = {
     val modelContext = new ModelContext(Map.empty, SortedSet.empty, AliasMapping(Map.empty, Map.empty),
       None, List("some", "groups"))
-    val params = Parameters(Map(TestOptionPk -> List(TestOptionValue)), Set.empty)
+    val params = Parameters(toParamValues(Map(TestOptionPk -> List(TestOptionValue))), Set.empty)
     ParameterContext(params, modelContext, DummyConsoleReader)
   }
 
@@ -87,7 +88,7 @@ object ParameterManagerSpec {
    * @return the test extractor
    */
   private def createTestExtractor(expReader: ConsoleReader):
-  CliExtractor[Try[Map[ParameterKey, Iterable[String]]]] =
+  CliExtractor[Try[Map[ParameterKey, Iterable[CliElement]]]] =
     ParameterManager.wrapTryExtractor(CliExtractor(context => {
       if (context.reader == expReader) {
         val nextContext = context.update(context.parameters.keyAccessed(TestOptionPk),
@@ -132,8 +133,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   "ParameterManager" should "process a simple command line with defaults" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--foo", "bar", "--foo", "baz")
-    val ExpParamsMap = Map(TestOptionPk -> List(TestOptionValue),
-      pk("foo") -> List("bar", "baz"))
+    val ExpParamsMap = toParamValues(Map(TestOptionPk -> List(TestOptionValue),
+      pk("foo") -> List("bar", "baz")))
 
     val (res, procContext) = triedResult(ParameterManager.processCommandLine(args, TestExtractor,
       checkUnconsumedParameters = false))
@@ -349,9 +350,9 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
   it should "detect a help switch on the command line" in {
     val HelpKey = ParameterKey("help", shortAlias = false)
     val args = List("--" + TestOptionKey, TestOptionValue, "--" + HelpKey.key, "--foo", "bar", "--foo", "baz")
-    val ExpParamsMap = Map(TestOptionPk -> List(TestOptionValue),
+    val ExpParamsMap = toParamValues(Map(TestOptionPk -> List(TestOptionValue),
       pk("foo") -> List("bar", "baz"),
-      HelpKey -> List("true"))
+      HelpKey -> List("true")))
     val helpExtractor = ParameterExtractor.switchValue(HelpKey.key)
     val spec = ExtractionSpec(createTestExtractor(DummyConsoleReader), optHelpExtractor = Some(helpExtractor))
 

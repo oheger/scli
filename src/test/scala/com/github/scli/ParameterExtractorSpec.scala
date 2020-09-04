@@ -18,8 +18,8 @@ package com.github.scli
 
 import java.io.IOException
 
-import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
 import com.github.scli.ParameterExtractor.{OptionValue, ParameterContext, Parameters}
+import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.ParametersMap
 import com.github.scli.ParametersTestHelper._
 import org.mockito.Mockito._
@@ -53,11 +53,12 @@ object ParameterExtractorSpec {
   private val TestParameters: Parameters = Map(Key -> ResultValues)
 
   /** A test parameters object that contains input parameters. */
-  private val TestParametersWithInputs: Parameters = TestParameters.parametersMap +
-    (ParameterParser.InputParameter -> InputValues)
+  private val TestParametersWithInputs: Parameters = TestParameters.parametersMap ++
+    toParamValues(Map(ParameterParser.InputParameter -> InputValues))
 
   /** Another test Parameters object representing updated parameters. */
-  private val NextParameters = Parameters(Map(pk("bar") -> List("v2", "v3")), Set(pk("x"), pk("y")))
+  private val NextParameters = Parameters(toParamValues(Map(pk("bar") -> List("v2", "v3"))),
+    Set(pk("x"), pk("y")))
 
   /** A test ParameterContext object. */
   private val TestContext = ParameterContext(TestParameters,
@@ -140,7 +141,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   }
 
   "Parameters" should "be creatable from a parameters map" in {
-    val paramMap = Map(pk("foo") -> List("v1", "v2"), pk("bar") -> List("v3"))
+    val paramMap = toParamValues(Map(pk("foo") -> List("v1", "v2"), pk("bar") -> List("v3")))
 
     val params: Parameters = paramMap
     params.parametersMap should be(paramMap)
@@ -860,8 +861,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   it should "check whether all parameters have been consumed" in {
     val Key2 = pk("otherKey1")
     val Key3 = pk("otherKey2")
-    val parameters = Parameters(TestParameters.parametersMap +
-      (Key2 -> List("v1", "v2")) + (Key3 -> List("v3")), Set(TestParamKey, Key2, Key3))
+    val parameters = Parameters(TestParameters.parametersMap ++
+      toParamValues(Map(Key2 -> List("v1", "v2"), Key3 -> List("v3"))), Set(TestParamKey, Key2, Key3))
     val context = TestContext.copy(parameters = parameters)
 
     val validatedContext = ParameterExtractor.checkParametersConsumed(context)
@@ -871,8 +872,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   it should "detect parameters that have not been consumed" in {
     val Key2 = pk("otherKey1")
     val Key3 = pk("otherKey2")
-    val parameters = Parameters(TestParameters.parametersMap +
-      (Key2 -> List("v1", "v2")) + (Key3 -> List("v3")), Set(TestParamKey))
+    val parameters = Parameters(TestParameters.parametersMap ++
+      toParamValues(Map(Key2 -> List("v1", "v2"), Key3 -> List("v3"))), Set(TestParamKey))
     val context = TestContext.copy(parameters = parameters)
 
     val validatedContext = ParameterExtractor.checkParametersConsumed(context)

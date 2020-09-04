@@ -22,6 +22,7 @@ import com.github.scli.HelpGenerator._
 import com.github.scli.HelpGeneratorTestHelper._
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterModel._
+import com.github.scli.ParametersTestHelper.toParamValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -546,7 +547,8 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val Group1 = "myFirstGroup"
     val Group2 = "MyOtherGroup"
     val params = Map(testKey(1) -> List(Group1), testKey(2) -> List(Group2))
-    val paramCtx = ParameterContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
+    val paramCtx = ParameterContext(Parameters(toParamValues(params), Set.empty), createModelContext(),
+      DefaultConsoleReader)
     val ext1 = optionValue(testKey(1).key).mandatory
     val ext2 = optionValue(testKey(2).key).mandatory
     val extErr = optionValue("undefined").mandatory
@@ -560,7 +562,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "create a group context filter that excludes parameters without a group" in {
     val Group = "aGroup"
-    val params = Map(Key -> List(Group))
+    val params = toParamValues(Map(Key -> List(Group)))
     val paramCtx = ParameterContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
     val ext = optionValue(Key.key).mandatory
 
@@ -571,7 +573,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "create a conditional group extractor that handles a true result" in {
     val Group = "if-group"
-    val params = Map(Key -> List("true"))
+    val params = toParamValues(Map(Key -> List("true")))
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, Group)
@@ -581,7 +583,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
 
   it should "create a conditional group extractor that handles a false result" in {
     val Group = "else-group"
-    val params = Map(Key -> List("false"))
+    val params = toParamValues(Map(Key -> List("false")))
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore", Some(Group))
@@ -590,7 +592,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "create a conditional group extractor that handles a false result if the else group is undefined" in {
-    val params = Map(Key -> List("false"))
+    val params = toParamValues(Map(Key -> List("false")))
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore")
@@ -599,7 +601,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "create a conditional group extractor that handles a failure result" in {
-    val params = Map(Key -> List("not a boolean value"))
+    val params = toParamValues(Map(Key -> List("not a boolean value")))
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore")
