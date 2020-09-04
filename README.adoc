@@ -124,12 +124,12 @@ key is not visible on the command line.
 
 In the parsing phase (refer to <<Processing phases>>), the sequence of strings
 that represents the command line is transformed into a form that allows for
-easy access to specific option values. For this purpose, the library uses a
+easy access to specific parameter values. For this purpose, the library uses a
 _Map_ of the following type:
 
 [source,scala]
 ----
-type ParametersMap = Map[ParameterKey, Iterable[String]]
+type ParametersMap = Map[ParameterKey, Iterable[CliElement]]
 ----
 
 The meaning of this type is as follows:
@@ -137,9 +137,11 @@ The meaning of this type is as follows:
 * Command line arguments have a key by which they can be accessed, as discussed
   in the previous section. To support direct access to a specific command line
   element, the _ParametersMap_ type uses the key of the element.
-* The values of command line options are strings initially - after all, this is
-  how the command line is passed to the application. In later transformation
-  steps, the value types can be changed.
+* `CliElement` is a trait that holds information about a parameter as it has
+  been passed on the command line. This includes the raw string value, but
+  also the parameter key (when using aliases the key may be different from the
+  main key of this parameter). This information is useful especially for error
+  reporting if a transformation on this parameter fails.
 * An application can support multiple input parameters, and options can appear
   repeatedly on the command line, too. Therefore, for each argument the map
   holds a collection of values.
