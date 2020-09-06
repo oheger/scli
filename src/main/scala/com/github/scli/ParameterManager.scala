@@ -345,7 +345,7 @@ object ParameterManager {
     processedArgs recoverWith {
       case e: ParameterFileException =>
         val context = gatherMetaData(extractor)
-        val failure = ExtractionFailure(e.fileOption, e.getMessage, context)
+        val failure = ExtractionFailure(e.fileOption, e, None, context)
         Failure(updateModelContextWithFailures(List(failure), context))
     }
 

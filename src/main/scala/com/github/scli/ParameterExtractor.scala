@@ -19,7 +19,7 @@ package com.github.scli
 import java.nio.file.{Path, Paths}
 
 import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterKey}
-import com.github.scli.ParameterParser.ParametersMap
+import com.github.scli.ParameterParser.{CliElement, ParametersMap}
 
 import scala.collection.SortedSet
 import scala.language.implicitConversions
@@ -201,12 +201,15 @@ object ParameterExtractor {
    * invalid parameters are detected. The properties contain all the
    * information available about the error.
    *
-   * @param key     the key of the option with the invalid parameter
-   * @param message an error message
-   * @param context the current parameter context
+   * @param key        the key of the option with the invalid parameter
+   * @param cause      the exception causing this failure
+   * @param optElement contains the original ''CliElement'' that caused the
+   *                   error if available
+   * @param context    the current parameter context
    */
   case class ExtractionFailure(key: ParameterKey,
-                               message: String,
+                               cause: Throwable,
+                               optElement: Option[CliElement],
                                context: ParameterContext)
 
   object ParameterExtractionException {
@@ -242,7 +245,7 @@ object ParameterExtractor {
      * @return the resulting message
      */
     private def generateExceptionMessage(failures: List[ExtractionFailure]): String =
-      failures.map(f => s"${f.key.key}: ${f.message}")
+      failures.map(f => s"${f.key.key}: ${f.cause.getMessage}")
         .mkString(", ")
   }
 
@@ -869,7 +872,7 @@ object ParameterExtractor {
         val adjustedIndex = if (index < 0) inputs.size + index
         else index
         if (adjustedIndex >= 0 && adjustedIndex < inputs.size) Success(adjustedIndex)
-        else Failure(paramException(context, paramKey, tooFewErrorText(adjustedIndex)))
+        else Failure(paramException(context, paramKey, causeFor(tooFewErrorText(adjustedIndex))))
       }
 
       def tooFewErrorText(index: Int): String = {
@@ -879,7 +882,7 @@ object ParameterExtractor {
 
       val result = if (last && inputs.size > toIdx + 1)
         Failure(paramException(context, paramKey,
-          s"Too many input arguments; expected at most ${toIdx + 1}"))
+          causeFor(s"Too many input arguments; expected at most ${toIdx + 1}")))
       else
         for {
           firstIndex <- adjustAndCheckIndex(fromIdx)
@@ -1079,7 +1082,7 @@ object ParameterExtractor {
         case Success(group) =>
           val modelContext = processUnselectedGroups(context2)(entry => entry._1 != group)
           groupMap.get(group).
-            fold((Try[A](throw paramException(context, groupExt.key, s"Cannot resolve group '$group''")),
+            fold((Try[A](throw paramException(context, groupExt.key, causeFor(s"Cannot resolve group '$group''"))),
               context2.copy(modelContext = modelContext))) { ext =>
               val (result, context3) = ext.run(context2.copy(modelContext = modelContext startGroup group))
               (result, context3.copy(modelContext = context3.modelContext.endGroup()))
@@ -1145,7 +1148,7 @@ object ParameterExtractor {
       val res = optionValue flatMap { values =>
         if (values.size > 1)
           Failure(paramException(context, ext.key,
-            s"should have a single value, but has multiple values - $optionValue"))
+            causeFor(s"should have a single value, but has multiple values - $optionValue")))
         else Success(values.headOption)
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleOptional))
@@ -1164,7 +1167,7 @@ object ParameterExtractor {
     ext.mapWithContext((optionValue, context) => {
       val res = optionValue.flatMap {
         case Some(v) => Success(v)
-        case None => Failure(paramException(context, ext.key, "mandatory option has no value"))
+        case None => Failure(paramException(context, ext.key, causeFor("mandatory option has no value")))
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleValue))
     })
@@ -1186,9 +1189,9 @@ object ParameterExtractor {
     ext.mapWithContext((optionValue, context) => {
       val res = optionValue.flatMap { values =>
         if (values.size < atLeast)
-          Failure(paramException(context, ext.key, s"option must have at least $atLeast values"))
+          Failure(paramException(context, ext.key, causeFor(s"option must have at least $atLeast values")))
         else if (atMost >= 0 && values.size > atMost)
-          Failure(paramException(context, ext.key, s"option must have at most $atMost values"))
+          Failure(paramException(context, ext.key, causeFor(s"option must have at most $atMost values")))
         else Success(values)
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity(atLeast, atMost)))
@@ -1230,18 +1233,21 @@ object ParameterExtractor {
   CliExtractor[OptionValue[B]] =
     ext.mapWithContext { (triedResult, context) => {
       val mappedResult = triedResult.map(o => {
-        val mappingResult = o.foldRight((context, List.empty[B], List.empty[ExtractionFailure])) { (a, t) =>
-          paramTry(t._1, ext.key)(f(a, t._1)) match {
-            case Success((b, nextCtx)) =>
-              (nextCtx, b :: t._2, t._3)
-            case f@Failure(_) =>
-              (t._1, t._2, collectErrorMessages(f) ::: t._3)
+        val orgElements = context.parameters.parametersMap.getOrElse(ext.key, Nil)
+        val elements = if (orgElements.size == o.size) orgElements map (Some(_))
+        else List.fill[Option[CliElement]](o.size)(None)
+        val mappingResult = o.zip(elements)
+          .foldRight((context, List.empty[B], List.empty[ExtractionFailure])) { (a, t) =>
+            paramTry(t._1, ext.key, a._2)(f(a._1, t._1)) match {
+              case Success((b, nextCtx)) =>
+                (nextCtx, b :: t._2, t._3)
+              case f@Failure(_) =>
+                (t._1, t._2, collectErrorMessages(f) ::: t._3)
+            }
           }
-        }
-        if (mappingResult._3.nonEmpty) {
-          val errMsg = mappingResult._3.map(_.message).mkString(", ")
-          (Failure[List[B]](ParameterExtractionException(mappingResult._3.head.copy(message = errMsg))), context)
-        } else (Success(mappingResult._2), mappingResult._1)
+        if (mappingResult._3.nonEmpty)
+          (Failure[List[B]](ParameterExtractionException(mappingResult._3)), context)
+        else (Success(mappingResult._2), mappingResult._1)
       })
 
       mappedResult match {
@@ -1310,7 +1316,7 @@ object ParameterExtractor {
     if (paramContext.parameters.allKeysAccessed) Success(paramContext)
     else {
       val failures = paramContext.parameters.notAccessedKeys map { key =>
-        ExtractionFailure(key, "Unexpected parameter", paramContext)
+        ExtractionFailure(key, causeFor("Unexpected parameter"), None, paramContext)
       }
       Failure(ParameterExtractionException(failures.toList))
     }
@@ -1816,32 +1822,34 @@ object ParameterExtractor {
    * exception to an ''IllegalArgumentException'' with a message that contains
    * the name of the parameter.
    *
-   * @param context the ''ParameterContext''
-   * @param key     the parameter key
-   * @param f       the expression
+   * @param context    the ''ParameterContext''
+   * @param key        the parameter key
+   * @param optElement the optional original ''CliElement''
+   * @param f          the expression
    * @tparam T the result type of the expression
    * @return a succeeded ''Try'' with the expression value or a failed ''Try''
    *         with a meaningful exception
    */
-  def paramTry[T](context: ParameterContext, key: ParameterKey)(f: => T): Try[T] =
+  def paramTry[T](context: ParameterContext, key: ParameterKey, optElement: Option[CliElement] = None)
+                 (f: => T): Try[T] =
     Try(f) recoverWith {
       case pex: ParameterExtractionException => Failure(pex)
-      case ex => Failure(paramException(context, key, ex.getMessage, ex))
+      case ex => Failure(paramException(context, key, ex, optElement))
     }
 
   /**
    * Generates an exception that reports a problem with a specific command
    * line option. These exceptions have a special type.
    *
-   * @param context the ''ParameterContext''
-   * @param key     the option key
-   * @param message the error message
-   * @param cause   an option cause of the error
+   * @param context    the ''ParameterContext''
+   * @param key        the option key
+   * @param cause      an option cause of the error
+   * @param optElement the optional original ''CliElement''
    * @return the resulting exception
    */
-  def paramException(context: ParameterContext, key: ParameterKey, message: String, cause: Throwable = null):
-  ParameterExtractionException = {
-    val failure = ExtractionFailure(key, generateErrorMessage(message, cause), context)
+  def paramException(context: ParameterContext, key: ParameterKey, cause: Throwable = null,
+                     optElement: Option[CliElement] = None): ParameterExtractionException = {
+    val failure = ExtractionFailure(key, cause, optElement, context)
     ParameterExtractionException(failure)
   }
 
@@ -1859,7 +1867,7 @@ object ParameterExtractor {
   def addFailuresToModelContext(modelContext: ModelContext, failures: Iterable[ExtractionFailure]): ModelContext =
     failures.foldLeft(modelContext) { (ctx, failure) =>
       ctx.addOption(failure.key, None)
-        .addAttribute(ParameterModel.AttrErrorMessage, failure.message)
+        .addAttribute(ParameterModel.AttrErrorMessage, failure.cause.getMessage)
     }
 
   /**
@@ -1911,7 +1919,19 @@ object ParameterExtractor {
    * @return the resulting ''ExtractionFailure''
    */
   private def failureFor(exception: Throwable): ExtractionFailure =
-    ExtractionFailure(message = exception.getMessage, key = UndefinedParameterKey, context = DummyParameterContext)
+    ExtractionFailure(cause = exception, key = UndefinedParameterKey, optElement = None,
+      context = DummyParameterContext)
+
+  /**
+   * Generates an exception for an error message that can be stored as the
+   * ''cause'' in an [[ExtractionFailure]].
+   * TODO Make exceptions and error messages configurable
+   *
+   * @param message the error message
+   * @return the exception
+   */
+  private def causeFor(message: String): Throwable =
+    new IllegalArgumentException(message)
 
   /**
    * Updates a model context by running some extractors against it. This
@@ -1936,21 +1956,6 @@ object ParameterExtractor {
         val nextContext = gatherMetaData(p._1, modelContext = modelCtxWithGroup)
         nextContext.modelContext.endGroupConditionally(p._2)
       }
-
-  /**
-   * Generates the error message for an exception encountered during parameter
-   * processing. If there is a cause available, the exception class name is
-   * added to the message.
-   *
-   * @param message the original error message
-   * @param cause   the causing exception
-   * @return the enhanced error message
-   */
-  private def generateErrorMessage(message: String, cause: Throwable): String = {
-    val exceptionName = if (cause == null) ""
-    else cause.getClass.getName + " - "
-    s"$exceptionName$message"
-  }
 
   /**
    * Generates a description of a constant option value based on the concrete

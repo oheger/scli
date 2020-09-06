@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ParameterContext, ParameterExtractionException, Parameters}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
 import com.github.scli.ParameterModel.{AliasMapping, ModelContext, ParameterKey}
-import com.github.scli.ParameterParser.CliElement
+import com.github.scli.ParameterParser.{CliElement, ParameterFileException}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -170,7 +170,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
     exception.failures should have size 1
     exception.failures.head.key should be(TestOptionPk)
-    exception.failures.head.message should include("NumberFormatException")
+    exception.failures.head.cause shouldBe a[NumberFormatException]
     exception.parameterContext.parameters.parametersMap.keys should contain(TestOptionPk)
     val modelContext = exception.parameterContext.modelContext
     modelContext.options.keys should contain(TestOptionPk)
@@ -325,7 +325,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures should have size 1
     val failure = exception.failures.head
     failure.key should be(FileOption)
-    failure.message should include(FileName)
+    failure.cause shouldBe a[ParameterFileException]
+    failure.cause.getMessage should include(FileName)
     val context = exception.parameterContext
     val modelContext = context.modelContext
     val testOptionAttrs = modelContext.options(TestOptionPk)
@@ -400,7 +401,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "evaluate a failed processing result" in {
     val paramCtx = createParameterContext()
-    val failure = ExtractionFailure(TestOptionPk, "failure", paramCtx)
+    val failure = ExtractionFailure(TestOptionPk, new Exception("failure"), None, paramCtx)
     val exception = ParameterExtractionException(failure)
     val processResult: ProcessingResult[String] = Failure(exception)
     val expContext = ProcessingContext(paramCtx, helpRequested = false)

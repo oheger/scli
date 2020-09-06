@@ -21,6 +21,7 @@ import java.nio.file.{Path, Paths}
 
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterModel.ParameterKey
+import com.github.scli.ParameterParser.OptionElement
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -160,6 +161,21 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   import CliExtractorOpsSpec._
 
+  /**
+   * Checks an exception that is the cause of a failure. The function tests
+   * whether the exception is of the expected type and includes the expected
+   * message.
+   *
+   * @param failure the ''ExtractionFailure''
+   * @param expMsg  a text to be included in the message
+   * @return the checked ''ExtractionFailure''
+   */
+  private def checkCause(failure: ExtractionFailure, expMsg: String): ExtractionFailure = {
+    failure.cause shouldBe a[IllegalArgumentException]
+    failure.cause.getMessage should include(expMsg)
+    failure
+  }
+
   "ParameterExtractor" should "extract multiple string values" in {
     val strValues = NumberValues.map(_.toString)
     val ext = multiOptionValue(KeyNumbers)
@@ -181,9 +197,8 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val result = runExtractor(ext)
     result match {
       case Failure(exception: ParameterExtractionException) =>
-        val failure = exception.failures.head
+        val failure = checkCause(exception.failures.head, "should have a single value")
         failure.key.key should be(KeyNumbers)
-        failure.message should include("should have a single value")
       case r => fail("Unexpected result: " + r)
     }
   }
@@ -376,9 +391,8 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val result = runExtractor(ext)
     result match {
       case Failure(exception: ParameterExtractionException) =>
-        val failure = exception.failures.head
+        val failure = checkCause(exception.failures.head, "at least 2")
         failure.key.key should be(KeyAnswer)
-        failure.message should include("at least 2")
       case r => fail("Unexpected result: " + r)
     }
   }
@@ -389,9 +403,8 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val result = runExtractor(ext)
     result match {
       case Failure(exception: ParameterExtractionException) =>
-        val failure = exception.failures.head
+        val failure = checkCause(exception.failures.head, "at most " + (NumberValues.size - 1))
         failure.key.key should be(KeyNumbers)
-        failure.message should include("at most " + (NumberValues.size - 1))
       case r => fail("Unexpected result: " + r)
     }
   }
@@ -500,8 +513,9 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val modelCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping,
       None, Nil)
     val context = ParameterContext(TestParameters, modelCtx, DummyConsoleReader)
-    val failure1 = ExtractionFailure(pk(KeyFlag), "Flag failure", context)
-    val failure2 = ExtractionFailure(pk(KeyAnswer), "Answer failure", context)
+    val failure1 = ExtractionFailure(pk(KeyFlag), new Exception("Flag failure"), None, context)
+    val failure2 = ExtractionFailure(pk(KeyAnswer), new Exception("Answer failure"),
+      Some(OptionElement(pk(KeyAnswer), None)), context)
     val exception1 = ParameterExtractionException(failure1)
     val exception2 = ParameterExtractionException(failure2)
     val c1 = Failure(exception1)
@@ -524,7 +538,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
     def checkFailure(failure: ExtractionFailure, exception: Throwable): Unit = {
       failure.key.key should be("")
-      failure.message should be(exception.getMessage)
+      failure.cause should be(exception)
       failure.context.parameters should be(Parameters(Map.empty, Set.empty))
       val modelCtx = failure.context.modelContext
       modelCtx.options should have size 0
