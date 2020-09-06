@@ -1233,8 +1233,8 @@ object ParameterExtractor {
   CliExtractor[OptionValue[B]] =
     ext.mapWithContext { (triedResult, context) => {
       val mappedResult = triedResult.map(o => {
-        val orgElements = context.parameters.parametersMap.getOrElse(ext.key, Nil)
-        val elements = if (orgElements.size == o.size) orgElements map (Some(_))
+        val orgElements = fetchCliElements(context, ext, o.size)
+        val elements = if (orgElements.nonEmpty) orgElements map (Some(_))
         else List.fill[Option[CliElement]](o.size)(None)
         val mappingResult = o.zip(elements)
           .foldRight((context, List.empty[B], List.empty[ExtractionFailure])) { (a, t) =>
@@ -1274,7 +1274,8 @@ object ParameterExtractor {
   def mappedSingle[A, B](ext: CliExtractor[SingleOptionValue[A]])(f: A => B): CliExtractor[SingleOptionValue[B]] =
     ext.mapWithContext { (triedResult, context) =>
       val mappedResult = triedResult flatMap { optResult =>
-        paramTry(context, ext.key)(optResult.map(f))
+        val optElem = fetchCliElements(context, ext, 1).headOption
+        paramTry(context, ext.key, optElem)(optResult.map(f))
       }
       (mappedResult, context)
     }
@@ -1983,4 +1984,20 @@ object ParameterExtractor {
    */
   private def contextForMetaDataRun(params: ParametersMap, modelContext: ModelContext): ParameterContext =
     ParameterContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader)
+
+  /**
+   * Obtains the collection with the original CLI elements for a specific key.
+   * The collection must have a specific size to properly match the elements to
+   * the values that are currently processed. If a different size is
+   * encountered, an empty collection is returned.
+   *
+   * @param context the parameter context
+   * @param ext     the current extractor
+   * @param expSize the expected size of the elements collection
+   * @return the collection of original elements
+   */
+  private def fetchCliElements(context: ParameterContext, ext: CliExtractor[_], expSize: Int): Iterable[CliElement] = {
+    val elements = context.parameters.parametersMap.getOrElse(ext.key, Nil)
+    if (elements.size == expSize) elements else Nil
+  }
 }

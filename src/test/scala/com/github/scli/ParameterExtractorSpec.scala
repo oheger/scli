@@ -473,13 +473,32 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
   it should "provide a single mapping extractor that handles an exception thrown by the mapping function" in {
     implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
-    val Result: SingleOptionValue[String] = Success(Some("Not a number!"))
-    val ext = testExtractor(Result)
+    val InvalidNumber = "Not a number!"
+    val Result: SingleOptionValue[String] = Success(Some(InvalidNumber))
+    val elem = OptionElement(pk("someAlternativeKey"), Some("foo"))
+    val params: Parameters = Map(TestParamKey -> List(elem))
+    val ext = testExtractor(Result, nextParameters = params)
     val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, TestParameters)
-    next.parameters should be(NextParameters)
-    checkExtractionException[NumberFormatException](expectExtractionException(res))()
+    next.parameters should be(params)
+    val failure = checkExtractionException[NumberFormatException](expectExtractionException(res),
+      expParams = params.parametersMap)(InvalidNumber)
+    failure.optElement should be(Some(elem))
+  }
+
+  it should "provide a single mapping extractor that handles exceptions and too much error information" in {
+    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val Result: SingleOptionValue[String] = Success(Some("Not a number!"))
+    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("v1")),
+      OptionElement(pk("other"), Some("v2"))))
+    val ext = testExtractor(Result, nextParameters = params)
+    val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
+
+    val (res, _) = ParameterExtractor.runExtractor(extractor, TestParameters)
+    val failure = checkExtractionException[NumberFormatException](expectExtractionException(res),
+      expParams = params.parametersMap)()
+    failure.optElement should be(None)
   }
 
   it should "provide an extractor that converts an option value to int" in {
