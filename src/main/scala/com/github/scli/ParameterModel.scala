@@ -321,6 +321,24 @@ object ParameterModel {
                                aliases: List[ParameterKey] = Nil)
 
   /**
+   * A trait providing access to metadata for parameters.
+   *
+   * This trait is extended by different context objects that store parameters
+   * and metadata attributes about them. For all of these context
+   * implementations it is then possible to iterate of the parameters and their
+   * data in a uniform way.
+   */
+  trait ParameterMetaDataSource {
+    /**
+     * Returns an ''Iterable'' with the ''ParameterMetaData'' stored in this
+     * object.
+     *
+     * @return an ''Iterable'' with the ''ParameterMetaData'' available
+     */
+    def parameterMetaData: Iterable[ParameterMetaData]
+  }
+
+  /**
    * A class for storing and updating meta information about command line
    * parameters.
    *
@@ -340,7 +358,7 @@ object ParameterModel {
                      val inputs: SortedSet[InputParameterRef],
                      val aliasMapping: AliasMapping,
                      optCurrentKey: Option[ParameterKey],
-                     groups: List[String]) {
+                     groups: List[String]) extends ParameterMetaDataSource {
 
     /**
      * Adds data about another command line option to this object. This
@@ -459,12 +477,10 @@ object ParameterModel {
       }
 
     /**
-     * Returns an ''Iterable'' with ''ParameterMetaData'' objects for the options
-     * stored in this context.
-     *
-     * @return an iterable with meta data about all options in this context
+     * @inheritdoc This implementation returns data about all the parameters
+     *             defined by the application.
      */
-    def parameterMetaData: Iterable[ParameterMetaData] =
+    override def parameterMetaData: Iterable[ParameterMetaData] =
       options.map(e => ParameterMetaData(e._1, e._2,
         aliases = aliasMapping.aliasesForKey.getOrElse(e._1, Nil)))
 
@@ -507,7 +523,7 @@ object ParameterModel {
      * @return the names of the currently active groups
      */
     private def groupAttribute: Set[String] =
-      if(groups.isEmpty) UnassignedGroupSet
+      if (groups.isEmpty) UnassignedGroupSet
       else groups.toSet
 
     /**

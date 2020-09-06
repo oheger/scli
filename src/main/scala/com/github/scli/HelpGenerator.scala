@@ -170,7 +170,7 @@ object HelpGenerator {
    * defined by a sequence of ''ColumnGenerator'' functions. This table can
    * then be rendered using other functions provided by this module.
    *
-   * @param context    the ''ModelContext'' with all meta data about options
+   * @param source     the source with all metadata about parameters
    * @param sortFunc   a function to sort the list of options; per default,
    *                   options are sorted alphabetically ignoring case
    * @param filterFunc a function to filter the options to be displayed; per
@@ -178,7 +178,7 @@ object HelpGenerator {
    * @param columns    the functions to generate the single columns
    * @return the resulting ''HelpTable''
    */
-  def generateHelpTable(context: ModelContext,
+  def generateHelpTable(source: ParameterMetaDataSource,
                         sortFunc: ParameterSortFunc = AlphabeticParameterSortFunc,
                         filterFunc: ParameterFilter = AllFilterFunc)
                        (columns: ColumnGenerator*): HelpTable = {
@@ -186,7 +186,7 @@ object HelpGenerator {
     def generateColumns(data: ParameterMetaData): Seq[List[String]] =
       columns.map(_.apply(data))
 
-    val metaData = context.parameterMetaData
+    val metaData = source.parameterMetaData
       .filter(filterFunc)
       .toSeq
     sortFunc(metaData)
@@ -243,7 +243,7 @@ object HelpGenerator {
    * application. This is a convenience function that combines the functions
    * ''generateHelpTable()'' and ''renderHelpTable()''.
    *
-   * @param context    the ''ModelContext'' with all meta data about options
+   * @param source     the source with all metadata about parameters
    * @param sortFunc   a function to sort the list of options; per default,
    *                   options are sorted alphabetically ignoring case
    * @param filterFunc a function to filter the options to be displayed; per
@@ -255,13 +255,13 @@ object HelpGenerator {
    * @param columns    the functions to generate the single columns
    * @return a string with the help for command line options
    */
-  def generateParametersHelp(context: ModelContext,
+  def generateParametersHelp(source: ParameterMetaDataSource,
                              sortFunc: ParameterSortFunc = AlphabeticParameterSortFunc,
                              filterFunc: ParameterFilter = AllFilterFunc,
                              padding: String = DefaultPadding,
                              optNewline: Option[String] = Some(""))
                             (columns: ColumnGenerator*): String = {
-    val table = generateHelpTable(context, sortFunc, filterFunc)(columns: _*)
+    val table = generateHelpTable(source, sortFunc, filterFunc)(columns: _*)
     renderHelpTable(table, padding, optNewline)
   }
 
