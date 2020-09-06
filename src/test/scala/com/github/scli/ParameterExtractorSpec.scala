@@ -196,6 +196,34 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     exception.getMessage should be(ExpMsg)
   }
 
+  "ExtractionFailure" should "return the failure key if available" in {
+    val FailureKey = ParameterKey("failureKey", shortAlias = false)
+    val element = OptionElement(FailureKey, Some("a value"))
+    val failure = ExtractionFailure(TestParamKey, new Exception, Some(element), TestContext)
+
+    failure.failureKey should be(FailureKey)
+  }
+
+  it should "return the main key as failure key if no element is available" in {
+    val failure = ExtractionFailure(TestParamKey, new Exception, None, TestContext)
+
+    failure.failureKey should be(TestParamKey)
+  }
+
+  it should "return the original value if available" in {
+    val Value = "originalValue"
+    val element = OptionElement(TestParamKey, Some(Value))
+    val failure = ExtractionFailure(TestParamKey, new Exception, Some(element), TestContext)
+
+    failure.optOriginalValue should be(Some(Value))
+  }
+
+  it should "return no original value if no element is available" in {
+    val failure = ExtractionFailure(TestParamKey, new Exception, None, TestContext)
+
+    failure.optOriginalValue should be(None)
+  }
+
   /**
    * Creates a generic test Cli extractor that checks the context passed to it
    * and returns a defined result.

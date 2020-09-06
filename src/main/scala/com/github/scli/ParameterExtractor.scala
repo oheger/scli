@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.nio.file.{Path, Paths}
 
-import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterKey}
+import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterFailure, ParameterKey}
 import com.github.scli.ParameterParser.{CliElement, ParametersMap}
 
 import scala.collection.SortedSet
@@ -207,10 +207,22 @@ object ParameterExtractor {
    *                   error if available
    * @param context    the current parameter context
    */
-  case class ExtractionFailure(key: ParameterKey,
-                               cause: Throwable,
+  case class ExtractionFailure(override val key: ParameterKey,
+                               override val cause: Throwable,
                                optElement: Option[CliElement],
-                               context: ParameterContext)
+                               context: ParameterContext) extends ParameterFailure {
+    /**
+     * @inheritdoc This implementation returns the key from the ''CliElement''
+     *             if available, and the main key otherwise.
+     */
+    override def failureKey: ParameterKey = optElement map (_.key) getOrElse key
+
+    /**
+     * @inheritdoc This implementation returns the value from the
+     *             ''CliElement'' if available and ''None'' otherwise.
+     */
+    override def optOriginalValue: Option[String] = optElement map (_.value)
+  }
 
   object ParameterExtractionException {
     /**

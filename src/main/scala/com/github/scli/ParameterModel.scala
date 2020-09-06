@@ -546,6 +546,48 @@ object ParameterModel {
   }
 
   /**
+   * A trait representing a failure during processing of a parameter.
+   *
+   * The failure can be related to a parameter as a whole, e.g. if too many or
+   * too few values are provided. It can also refer to a single parameter
+   * value; this is the case if a transformation on this value caused an
+   * exception.
+   */
+  trait ParameterFailure {
+    /**
+     * Returns the key of the parameter affected by this failure.
+     *
+     * @return the parameter key
+     */
+    def key: ParameterKey
+
+    /**
+     * Returns the key of the parameter used when this failure occurred. This
+     * can either be the main parameter key or one of its aliases.
+     *
+     * @return the key related to this failure
+     */
+    def failureKey: ParameterKey
+
+    /**
+     * Returns the exception that was the cause of this failure.
+     *
+     * @return the exception causing this failure
+     */
+    def cause: Throwable
+
+    /**
+     * Returns the original value as passed on the command line that caused
+     * this failure if available. This ''Option'' is defined only if this
+     * failure is related to a concrete value, and the value could be
+     * unambiguously identified with one of the CLI elements.
+     *
+     * @return an ''Option'' with the original parameter value
+     */
+    def optOriginalValue: Option[String]
+  }
+
+  /**
    * Checks whether the option whose attributes are provided belongs to the
    * given group.
    *
