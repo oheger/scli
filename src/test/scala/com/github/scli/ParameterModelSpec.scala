@@ -16,9 +16,12 @@
 
 package com.github.scli
 
+import java.io.IOException
+
 import com.github.scli.HelpGeneratorTestHelper.{HelpText, Key, UndefinedAttribute}
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{AttrHelpText, InputParameterRef, ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey}
+import com.github.scli.ParameterModel.{AttrErrCause, AttrErrOriginalValue, AttrHelpText, AttrMultiplicity, FailureContext, InputParameterRef, ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey}
+import com.github.scli.ParameterParser.OptionElement
 import com.github.scli.ParametersTestHelper.toParamValues
 import org.mockito.Mockito.verifyZeroInteractions
 import org.scalatest.flatspec.AnyFlatSpec
@@ -26,6 +29,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 
 import scala.collection.SortedSet
+import scala.reflect.ClassTag
 import scala.util.Success
 
 object ParameterModelSpec {
@@ -57,6 +61,17 @@ object ParameterModelSpec {
     implicit val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
     val (_, ctx) = ParameterExtractor.runExtractor(ext, params)
     ctx.modelContext
+  }
+
+  /**
+   * Generates a model context for a default test extractor.
+   *
+   * @return the model context
+   */
+  private def generateDefaultModelContext(): ModelContext = {
+    val ext = optionValue(Key.key, Some(HelpText))
+      .mandatory
+    generateModelContext(ext)
   }
 
   /**
@@ -542,5 +557,83 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val modelContext = generateModelContext(ext)
     fetchAttribute(modelContext, Key, ParameterModel.AttrFallbackValue) should be("true")
     fetchAttribute(modelContext, Key, ParameterModel.AttrSwitchValue) should be("false")
+  }
+
+  "FailureContext" should "transform each failure to a metadata structure" in {
+    val failures = (1 to 8) map { idx =>
+      ExtractionFailure(ParameterKey(s"key$idx", shortAlias = false), new Exception, None, null)
+    }
+    val failureContext = new FailureContext(generateDefaultModelContext(), failures)
+
+    val data = failureContext.parameterMetaData
+    data should have size failures.size
+    data.map(_.key).toList should contain theSameElementsInOrderAs failures.map(_.key)
+  }
+
+  it should "initialize the aliases list correctly" in {
+    val element = OptionElement(ParameterKey("e", shortAlias = true), Some("ignored"))
+    val failure = ExtractionFailure(Key, new Exception, Some(element), null)
+    val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
+
+    val data = failureContext.parameterMetaData.head
+    data.aliases should contain only element.key
+  }
+
+  it should "include the attributes from the model context" in {
+    val failure = ExtractionFailure(Key, new Exception, None, null)
+    val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
+
+    val data = failureContext.parameterMetaData.head
+    data.attributes.get(AttrMultiplicity).get should be(Multiplicity.SingleValue)
+  }
+
+  it should "include an attribute for the original value" in {
+    val OrgValue = "the original parameter value"
+    val element = OptionElement(ParameterKey("e", shortAlias = true), Some(OrgValue))
+    val failure = ExtractionFailure(Key, new Exception, Some(element), null)
+    val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
+
+    val data = failureContext.parameterMetaData.head
+    data.attributes.get(AttrErrOriginalValue) should be(Some(OrgValue))
+  }
+
+  it should "include an attribute for the causing exception" in {
+    val exception = new IOException("Something went wrong :-(")
+    val failure = ExtractionFailure(Key, exception, None, null)
+    val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
+
+    val data = failureContext.parameterMetaData.head
+    data.attributes.get(AttrErrCause) should be(Some(exception))
+  }
+
+  it should "remove duplicate errors" in {
+    val msg = "An error occurred!"
+    val msg2 = "Another error was found."
+    val element = OptionElement(ParameterKey("e", shortAlias = true), None)
+    val failure1 = ExtractionFailure(Key, new IllegalStateException(msg), None, null)
+    val failure2 = ExtractionFailure(Key, new IllegalStateException(msg), Some(element), null)
+    val failure3 = ExtractionFailure(Key, new IllegalStateException(msg), None, null)
+    val failure4 = ExtractionFailure(Key, new IllegalStateException(msg),
+      Some(OptionElement(element.key, Some("a value"))), null)
+    val failure5 = ExtractionFailure(Key, new IOException(msg), None, null)
+    val failure6 = ExtractionFailure(Key, new IllegalStateException(msg2), None, null)
+    val failureContext = new FailureContext(generateDefaultModelContext(),
+      List(failure1, failure2, failure3, failure4, failure5, failure6))
+
+    def findFailure[E](key: ParameterKey, errMsg: String = msg)(implicit ct: ClassTag[E]): Unit = {
+      val optFailure = failureContext.parameterMetaData
+        .find { data =>
+          data.key == Key && data.aliases.head == key &&
+            data.attributes.get(AttrErrCause).exists(e => e.getClass == ct.runtimeClass && e.getMessage == errMsg)
+        }
+      optFailure.isDefined shouldBe true
+    }
+
+    val failures = failureContext.parameterMetaData
+    failures should have size 4
+    findFailure[IllegalStateException](Key)
+    findFailure[IllegalStateException](element.key)
+    findFailure[IllegalStateException](Key, msg2)
+    findFailure[IOException](Key)
   }
 }
