@@ -17,7 +17,7 @@
 package com.github.scli
 
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
+import com.github.scli.ParameterModel.{FailureContext, ModelContext, ParameterKey}
 import com.github.scli.ParameterParser._
 
 import scala.util.{Failure, Success, Try}
@@ -144,15 +144,19 @@ object ParameterManager {
    *
    * This class extends the [[ParameterContext]] used by extraction operations
    * by additional metadata. It especially stores information whether a flag
-   * was found on the command line requesting help. This information is needed
-   * to correctly interpret the result of processing a command line.
+   * was found on the command line requesting help and failure information.
+   * This information is needed to correctly interpret the result of processing
+   * a command line and do proper error handling.
    *
-   * @param parameterContext the ''ParameterContext'' generated during the
-   *                         extraction phase
-   * @param helpRequested    flag whether help was requested by the user
+   * @param parameterContext  the ''ParameterContext'' generated during the
+   *                          extraction phase
+   * @param helpRequested     flag whether help was requested by the user
+   * @param optFailureContext optional context with failure information, which
+   *                          is present if failures have been detected
    */
   case class ProcessingContext(parameterContext: ParameterContext,
-                               helpRequested: Boolean)
+                               helpRequested: Boolean,
+                               optFailureContext: Option[FailureContext])
 
   /**
    * Type definition for the result of an operation to process the command
@@ -300,7 +304,7 @@ object ParameterManager {
                                 checkUnconsumedParameters: Boolean = true): ProcessingResult[A] = {
     val theParsingFunc = getOrDefault(parser, parsingFunc(spec))
     extract(theParsingFunc(args), spec.internalExtractor, checkUnconsumedParameters)
-      .map(t => (t._1._1, ProcessingContext(t._2, helpRequested = t._1._2)))
+      .map(t => (t._1._1, ProcessingContext(t._2, helpRequested = t._1._2, optFailureContext = None)))
   }
 
   /**
@@ -376,7 +380,8 @@ object ParameterManager {
       case Success((result, _)) =>
         Right(result)
       case Failure(e: ParameterExtractionException) =>
-        Left(ProcessingContext(e.parameterContext, helpRequested = false))
+        Left(ProcessingContext(e.parameterContext, helpRequested = false,
+          optFailureContext = Some(new FailureContext(e.parameterContext.modelContext, e.failures))))
       case Failure(e) =>
         throw new IllegalArgumentException("Unexpected failure in ProcessingResult", e)
     }

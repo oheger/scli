@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ParameterContext, ParameterExtractionException, Parameters}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
-import com.github.scli.ParameterModel.{AliasMapping, ModelContext, ParameterKey}
+import com.github.scli.ParameterModel.{AliasMapping, AttrErrCause, ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.{CliElement, ParameterFileException}
 import com.github.scli.ParametersTestHelper._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -386,14 +386,14 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "evaluate a successful processing result" in {
     val ExtractResult = 42
-    val context = ProcessingContext(createParameterContext(), helpRequested = false)
+    val context = ProcessingContext(createParameterContext(), helpRequested = false, optFailureContext = None)
     val processResult: ProcessingResult[Int] = Success((ExtractResult, context))
 
     ParameterManager.evaluate(processResult) should be(Right(ExtractResult))
   }
 
   it should "evaluate a successful processing result if help was requested" in {
-    val context = ProcessingContext(createParameterContext(), helpRequested = true)
+    val context = ProcessingContext(createParameterContext(), helpRequested = true, optFailureContext = None)
     val processResult: ProcessingResult[String] = Success(("ignored", context))
 
     ParameterManager.evaluate(processResult) should be(Left(context))
@@ -401,12 +401,23 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "evaluate a failed processing result" in {
     val paramCtx = createParameterContext()
-    val failure = ExtractionFailure(TestOptionPk, new Exception("failure"), None, paramCtx)
+    val cause = new Exception("failure")
+    val failure = ExtractionFailure(TestOptionPk, cause, None, paramCtx)
     val exception = ParameterExtractionException(failure)
     val processResult: ProcessingResult[String] = Failure(exception)
-    val expContext = ProcessingContext(paramCtx, helpRequested = false)
 
-    ParameterManager.evaluate(processResult) should be(Left(expContext))
+    ParameterManager.evaluate(processResult) match {
+      case Left(context) =>
+        context.parameterContext should be(paramCtx)
+        context.helpRequested shouldBe false
+        context.optFailureContext.isDefined shouldBe true
+        val failureContext = context.optFailureContext.get
+        failureContext.failures should have size 1
+        val data = failureContext.parameterMetaData.head
+        data.key should be(TestOptionPk)
+        data.attributes.get(AttrErrCause) should be(Some(cause))
+      case r => fail("Unexpected result: " + r)
+    }
   }
 
   it should "evaluate a failed processing result with an unexpected exception" in {
