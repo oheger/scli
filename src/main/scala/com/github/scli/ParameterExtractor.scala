@@ -1867,23 +1867,6 @@ object ParameterExtractor {
   }
 
   /**
-   * Updates the given model context to contain all the error messages from the
-   * failures provided. For each ''ExtractionFailure'', the error message is
-   * added to the corresponding attribute of the option affected. The modified
-   * model context can then be used to generate formatted output with all error
-   * messages.
-   *
-   * @param modelContext the model context to be used as base
-   * @param failures     a collection with failures during extraction
-   * @return the modified model context
-   */
-  def addFailuresToModelContext(modelContext: ModelContext, failures: Iterable[ExtractionFailure]): ModelContext =
-    failures.foldLeft(modelContext) { (ctx, failure) =>
-      ctx.addOption(failure.key, None)
-        .addAttribute(ParameterModel.AttrErrorMessage, failure.cause.getMessage)
-    }
-
-  /**
    * Runs the given ''CliExtractor'' against a dummy parameter context to
    * obtain metadata from it. This run will populate a ''ModelContext''
    * with information about all the options accessed by the extractor.

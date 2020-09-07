@@ -350,7 +350,7 @@ object ParameterManager {
       case e: ParameterFileException =>
         val context = gatherMetaData(extractor)
         val failure = ExtractionFailure(e.fileOption, e, None, context)
-        Failure(updateModelContextWithFailures(List(failure), context))
+        Failure(ParameterExtractionException(List(failure)))
     }
 
   /**
@@ -403,11 +403,9 @@ object ParameterManager {
   Try[(A, ParameterContext)] = {
     val (res, context) = runExtractor(extractor, params)(DefaultConsoleReader)
     val triedContext = checkParametersConsumedConditionally(context, checkUnconsumedParameters)
-    createRepresentation(res, triedContext) {
-      (_, _)
-    } recoverWith {
+    createRepresentation(res, triedContext)((_, _)) recoverWith {
       case e: ParameterExtractionException =>
-        Failure(updateModelContextWithFailures(e.failures, context))
+        Failure(updateContextInFailures(e.failures, context))
     }
   }
 
@@ -425,7 +423,8 @@ object ParameterManager {
     else Success(context)
 
   /**
-   * Generates an updated model context that contains all the failures of the
+   * Generates an updated exception with a list of failures that contain the
+   * newest  model context that contains all the failures of the
    * passed in list. Then the failures are updated to reference the
    * parameter context with the updated model context, and a new exception with
    * these failures is created.
@@ -434,11 +433,9 @@ object ParameterManager {
    * @param context  the most recent parameter context
    * @return an updated exception referencing the new model context
    */
-  private def updateModelContextWithFailures(failures: List[ExtractionFailure], context: ParameterContext):
+  private def updateContextInFailures(failures: List[ExtractionFailure], context: ParameterContext):
   ParameterExtractionException = {
-    val helpContext = addFailuresToModelContext(context.modelContext, failures)
-    val newContext = context.copy(modelContext = helpContext)
-    val newFailures = failures.map(_.copy(context = newContext))
+    val newFailures = failures.map(_.copy(context = context))
     ParameterExtractionException(newFailures)
   }
 

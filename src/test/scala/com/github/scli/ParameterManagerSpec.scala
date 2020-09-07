@@ -191,15 +191,6 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures.map(_.key) should contain only(TestOptionPk, pk("missing"), pk("unknownOption"))
   }
 
-  it should "add all failures to the model context in the resulting exception" in {
-    val args = List("--" + TestOptionKey, TestOptionValue, "--unknownOption", "shouldFail")
-    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
-
-    val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
-    val modelContext = exception.parameterContext.modelContext
-    modelContext.options(TestOptionPk).attributes.keys should contain(ParameterModel.AttrErrorMessage)
-  }
-
   it should "support options and switches per default classifier function" in {
     val KeySwitch = "flag"
     val args = List("--" + TestOptionKey, TestOptionValue, "--" + KeySwitch)
@@ -331,8 +322,6 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val modelContext = context.modelContext
     val testOptionAttrs = modelContext.options(TestOptionPk)
     testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
-    val fileOptionAttrs = modelContext.options(FileOption)
-    fileOptionAttrs.attributes.keys should contain(ParameterModel.AttrErrorMessage)
   }
 
   it should "detect a file option with a short alias if combined switches are enabled" in {
@@ -381,7 +370,6 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       checkUnconsumedParameters = false))
     exception.failures should have size 1
     exception.failures.head.key should be(HelpKey)
-    exception.parameterContext.reader should be(DummyConsoleReader)
   }
 
   it should "evaluate a successful processing result" in {

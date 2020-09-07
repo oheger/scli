@@ -966,28 +966,4 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
       case r => fail("Unexpected result: " + r)
     }
   }
-
-  it should "add failures to the model context" in {
-    val Key2 = ParameterKey("someOtherKey", shortAlias = false)
-    val Key3 = ParameterKey("oneMoreKey", shortAlias = false)
-    val Key4 = ParameterKey("additionalKey", shortAlias = false)
-    val helpContext = new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil)
-      .addOption(TestParamKey, Some("Help1"))
-      .addOption(Key2, None)
-      .addOption(Key3, Some("Help3"))
-    val failure1 = ExtractionFailure(TestParamKey, new Exception("error1"), None, TestContext)
-    val failure3 = ExtractionFailure(Key3, new Exception("error3"), None, TestContext)
-    val failure4 = ExtractionFailure(Key4, new Exception("error4"), None, TestContext)
-
-    val updHelpCtx = ParameterExtractor.addFailuresToModelContext(helpContext, List(failure1, failure3, failure4))
-    updHelpCtx.options(Key2) should be(helpContext.options(Key2))
-    val attr1 = updHelpCtx.options(TestParamKey)
-    attr1.attributes(ParameterModel.AttrHelpText) should be("Help1")
-    attr1.attributes(ParameterModel.AttrErrorMessage) should be(failure1.cause.getMessage)
-    val attr3 = updHelpCtx.options(Key3)
-    attr3.attributes(ParameterModel.AttrErrorMessage) should be(failure3.cause.getMessage)
-    val attr4 = updHelpCtx.options(Key4)
-    attr4.attributes(ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeOption)
-    attr4.attributes(ParameterModel.AttrErrorMessage) should be(failure4.cause.getMessage)
-  }
 }
