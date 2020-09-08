@@ -126,6 +126,37 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
   }
 
   /**
+   * Determines the position in the output where the usage description (the
+   * actual help text) starts.
+   *
+   * @param output the output
+   * @return the position of the start of help information
+   */
+  private def findUsageIndex(output: String): Int = {
+    val pos = output.indexOf("Usage: transfer [options]")
+    pos should be >= 0
+    pos
+  }
+
+  /**
+   * Checks whether a parameter table contains an entry for a given key that
+   * includes the given text. Via a regular expression, it is checked whether
+   * the key and the help text (which can be a fragment) appear on the same
+   * line in the output.
+   *
+   * @param output the output to check
+   * @param key    the key in question
+   * @param text   a text fragment expected for this key
+   * @return the position where the text was found
+   */
+  private def assertParameterEntry(output: String, key: String, text: String): Int = {
+    val reg = (Pattern.quote(key) + ".+" + Pattern.quote(text)).r
+    val optMatch = reg.findFirstMatchIn(output)
+    optMatch.isDefined shouldBe true
+    optMatch.get.start
+  }
+
+  /**
    * Checks whether the given output contains a help text for the key
    * specified. Via a regular expression, it is checked whether the key and the
    * help text (which can be a fragment) appear on the same line in the output.
@@ -135,11 +166,20 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
    * @param help   a help text fragment for this key
    * @return the position where the text was found
    */
-  private def assertHelpForKey(output: String, key: String, help: String): Int = {
-    val reg = (Pattern.quote(key) + ".+" + Pattern.quote(help)).r
-    val optMatch = reg.findFirstMatchIn(output)
-    optMatch.isDefined shouldBe true
-    optMatch.get.start
+  private def assertHelpForKey(output: String, key: String, help: String): Int =
+    assertParameterEntry(output.substring(findUsageIndex(output)), key, help)
+
+  /**
+   * Checks that the given output indicates invalid parameters and extracts the
+   * part with error information.
+   *
+   * @param output the output
+   * @return the part of the output that reports parameter failures
+   */
+  private def checkAndExtractErrorText(output: String): String = {
+    output should include(TransferParameterManager.ErrorHeader)
+    val posUsage = findUsageIndex(output)
+    output.substring(0, posUsage)
   }
 
   "TransferApp" should "execute a transfer upload operation for valid parameters" in {
@@ -260,5 +300,30 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
 
     val output = checkHelp(executeTransfer(args))
     output should include("--crypt-password")
+  }
+
+  it should "print error information for missing input parameters" in {
+    val output = checkAndExtractErrorText(executeTransfer(Array.empty))
+
+    assertParameterEntry(output, "transferCommand", "Too few input")
+    assertParameterEntry(output, "transferFiles", "Too few input")
+    assertParameterEntry(output, "serverUri", "Too few input")
+    output should include("argument 'serverUri'")
+  }
+
+  it should "print error information for invalid option values" in {
+    val args = withInputParameters("upload", 1, httpServer = false,
+      "--chunk-size", "invalid")
+    val output = checkAndExtractErrorText(executeTransfer(args))
+
+    assertParameterEntry(output, "--chunk-size", "NumberFormatException")
+  }
+
+  it should "show the affected aliases in error reports" in {
+    val args = withInputParameters("upload", 1, httpServer = false,
+      "-s", "invalid")
+    val output = checkAndExtractErrorText(executeTransfer(args))
+
+    assertParameterEntry(output, "-s ", "NumberFormatException")
   }
 }

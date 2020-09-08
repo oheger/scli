@@ -23,7 +23,7 @@ import com.github.scli.HelpGenerator.ParameterFilter
 import com.github.scli.ParameterExtractor._
 import com.github.scli.{HelpGenerator, ParameterManager}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext}
-import com.github.scli.ParameterModel.{AttrFallbackValue, AttrHelpText, ParameterKey}
+import com.github.scli.ParameterModel.{AttrErrCause, AttrFallbackValue, AttrHelpText, ParameterKey}
 
 import scala.concurrent.duration.{Duration, _}
 import scala.util.{Success, Try}
@@ -159,13 +159,15 @@ object TransferParameterManager {
 
   private val HelpHelp =
     """Displays a screen with help information.
-      |transfer --help shows information about the parameters commons to all commands.
+      |transfer --help shows information about the parameters common to all commands.
       |transfer <command> --help in addition shows the parameters specific to this command.
       |Some parameters are specific to the target server of transfer operations. In order to display \
       |them, a valid server URI must be provided, e.g.:
       |transfer download file.txt http://target.server.com --help
       |To include help about options related to encryption, specify a valid crypt mode, e.g.:
       |transfer --crypt-mode files --help""".stripMargin
+
+  private[transfer] val ErrorHeader = "Invalid parameters have been detected:"
 
   /**
    * An enumeration defining the usage of encryption for a transfer operation.
@@ -358,16 +360,18 @@ object TransferParameterManager {
     val tableOptions = generateHelpTable(modelContext,
       filterFunc = optionsFilter)(keyGenerator, helpGenerator)
     val helpTexts = renderHelpTables(List(tableParams, tableOptions))
-    val buf = new StringBuilder(4096)
+    val buf = generateFailureReport(context)
     buf.append("Usage: transfer [options] ")
       .append(generateInputParamsOverview(modelContext).mkString(" "))
       .append(CR)
       .append(CR)
       .append(helpTexts.head)
       .append(CR)
+      .append(CR)
       .append("The following options and switches are supported,")
       .append(CR)
       .append("(parameters marked with * are mandatory:")
+      .append(CR)
       .append(CR)
       .append(helpTexts(1))
     buf.toString()
@@ -624,4 +628,27 @@ object TransferParameterManager {
       List(commandExtractor, serverTypeExtractor, cryptGroupExtractor))
     andFilter(negate(InputParamsFilterFunc), contextFilter)
   }
+
+  /**
+   * Checks whether during parameter processing errors were encountered. If so,
+   * a corresponding report is generated. The resulting ''StringBuilder'' can
+   * be appended with other help information.
+   *
+   * @param context the ''ProcessingContext''
+   * @return a ''StringBuilder'' with error information if available
+   */
+  private def generateFailureReport(context: ProcessingContext): StringBuilder =
+    context.optFailureContext map { failureContext =>
+      import HelpGenerator._
+      val colKey = parameterAliasColumnGenerator()
+      val colErr = wrapColumnGenerator(attributeColumnGenerator(AttrErrCause), 60)
+      val buf = new StringBuilder(8192)
+      buf.append(ErrorHeader)
+        .append(CR)
+        .append(CR)
+        .append(generateParametersHelp(failureContext)(colKey, colErr))
+        .append(CR)
+        .append(CR)
+      buf
+    } getOrElse new StringBuilder(4096)
 }
