@@ -219,6 +219,10 @@ stores some properties about single arguments - such as their type, potential
 default values, or the expected multiplicity. This information can then support
 the generation of help screens or other tasks requiring information about
 parameters.
+_FailureContext_::
+If command line processing detects unknown or invalid parameters, those are
+added to a _FailureContext_, together with some metadata. Applications can use
+this information to generate a report with all errors.
 _ConsoleReader_::
 A _console reader_ is a service object that prompts the user to read in the
 value of a parameter from the console. This is typically used for secrets or

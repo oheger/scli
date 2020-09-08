@@ -2254,3 +2254,93 @@ val tableOptions = generateHelpTable(modelContext,
 
 The help screens produced by the application now contain more or less
 parameters, depending on the arguments the user has provided.
+
+=== Error handling
+
+In previous sections, we have seen how to display help information when the
+user explicitly requests help or provides incorrect parameters. If there are
+invalid parameters, the application should report them to the user - ideally
+with meaningful error messages. The following subsections deal with this topic.
+
+==== Generating an error report
+
+<<Deciding when to display help>> described the mechanism how an application
+can detect that it should display help information: this is the case if the
+function `ParameterManager.evaluate()` yields a `Left` with a
+`ProcessingContext`. The processing context contains all the information
+required to generate comprehensive help screens.
+
+In addition to the `ModelContext`, which is the primary source for the
+generation of help information, a `ProcessingContext` stores an `Option` with a
+`FailureContext`; the option is defined if there is at least one incorrect
+parameter. `FailureContext` is similar to `ModelContext` in that it can expose
+the data it stores as a collection of `ParameterMetaData` objects. Thus, it is
+accepted by the functions of `HelpGenerator` for the generation of help tables.
+So the generation of an error report works in the same way as displaying help
+information: the application defines column generator functions for the data to
+display and then generates and renders tabular structures.
+
+The _transfer_ demo application makes use of these mechanisms. It checks
+whether errors are present, and - if so - prints an error report before the
+help screen. For this purpose, `TransferParameterManager` defines a new
+function named `generateFailureReport()`, which looks as follows:
+
+[source,scala]
+----
+private def generateFailureReport(context: ProcessingContext): StringBuilder =
+context.optFailureContext map { failureContext =>
+  import HelpGenerator._
+  val colKey = parameterAliasColumnGenerator()
+  val colErr = wrapColumnGenerator(attributeColumnGenerator(AttrErrCause), 60)
+  val buf = new StringBuilder(8192)
+  buf.append(ErrorHeader)
+    .append(CR)
+    .append(CR)
+    .append(generateParametersHelp(failureContext)(colKey, colErr))
+    .append(CR)
+    .append(CR)
+  buf
+} getOrElse new StringBuilder(4096)
+----
+
+The function checks whether a `FailureContext` exists. If this is the case, it
+defines two column generator functions:
+
+* The first column shows the key of the invalid parameter. Here we want to
+  display the actual alias the user has passed. Therefore, we use the
+  `parameterAliasColumnGenerator()` function of `HelpGenerator`. (The aliases
+  in the data produced by `FailureContext` are a bit different than the ones
+  from `ModelContext`: There is always a single alias corresponding to the
+  key used by the user. This can be the main key of the parameter affected or
+  an actual alias.)
+* The second column contains an error message. All failures are associated
+  with a `Throwable`, which is the cause for the failure. This `Throwable` is
+  available under the `AttrErrCause` attribute. Displaying this attribute
+  causes the `toString()` method of the exception to be called. As the
+  resulting text may be longer, we apply line wrapping by adding a
+  `wrapColumnGenerator()` with a defined line width.
+
+NOTE: The attributes in the metadata produced by `FailureContext` contain some
+additional information related to failures. The `ParameterModel` module defines
+constants for these attributes; they start with the prefix `AttrErr`.
+
+The `generateHelp()` function of `TransferParameterManager` invokes
+`generateFailureReport()` at the beginning. It then appends help information to
+the resulting `StringBuilder`; so the error report preceeds the standard help
+screen. The fragment below shows an error report if the user calls the
+application without any parameters; it then complains that none of the
+mandatory input parameters are present:
+
+[source]
+----
+Invalid parameters have been detected:
+
+serverUri        java.lang.IllegalArgumentException: Too few input arguments;
+                 undefined argument 'serverUri''.
+
+transferCommand  java.lang.IllegalArgumentException: Too few input arguments;
+                 undefined argument 'transferCommand''.
+
+transferFiles    java.lang.IllegalArgumentException: Too few input arguments;
+                 undefined argument 'transferFiles''.
+----
