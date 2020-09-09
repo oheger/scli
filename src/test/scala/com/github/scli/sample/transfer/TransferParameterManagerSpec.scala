@@ -18,11 +18,11 @@ package com.github.scli.sample.transfer
 
 import java.nio.file.{Files, Paths}
 
-import com.github.scli.ParameterExtractor.ParameterExtractionException
+import com.github.scli.ParameterExtractor.{ParameterContext, ParameterExtractionException}
 import com.github.scli.ParameterManager.ProcessingContext
 import com.github.scli.ParametersTestHelper._
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, _}
-import com.github.scli.{ConsoleReader, ParameterExtractor}
+import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterModel}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -190,10 +190,11 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val args = Map("crypt-mode" -> List("files"),
       "crypt-alg" -> List("DES"))
     val Password = "secret_Encryption!Pwd"
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("Encryption password", password = true)).thenReturn(Password)
+    val context = ParameterContext(args, ParameterModel.EmptyModelContext, consoleReader)
 
-    val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, args)
+    val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, context)
     result.map(_.password) should be(Success(Password))
   }
 
@@ -207,10 +208,11 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
   it should "read the HTTP server password from the console if it is not specified" in {
     val args = Map("user" -> List("scott"))
     val Password = "tiger"
-    implicit val consoleReader: ConsoleReader = mock[ConsoleReader]
+    val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("HTTP server password", password = true)).thenReturn(Password)
+    val context = ParameterContext(args, ParameterModel.EmptyModelContext, consoleReader)
 
-    val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, args)
+    val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, context)
     result match {
       case Success(config: HttpServerConfig) =>
         config.password should be(Password)

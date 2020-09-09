@@ -396,7 +396,8 @@ object HelpGenerator {
   def contextGroupFilterForExtractors(context: ParameterContext, extractors: Iterable[CliExtractor[Try[String]]],
                                       includeNoGroup: Boolean = true): ParameterFilter = {
     val groupValues = extractors map { ext =>
-      ParameterExtractor.tryExtractor(ext, context.parameters)(DummyConsoleReader) map (_._1)
+      val paramCtx = context.copy(reader = DummyConsoleReader)
+      ParameterExtractor.tryExtractor(ext, paramCtx) map (_._1)
     }
     contextGroupFilterForValues(groupValues, includeNoGroup)
   }

@@ -58,8 +58,9 @@ object ParameterModelSpec {
    */
   private def generateModelContext(ext: CliExtractor[_], params: Parameters = EmptyParameters,
                                    optReader: Option[ConsoleReader] = None): ModelContext = {
-    implicit val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
-    val (_, ctx) = ParameterExtractor.runExtractor(ext, params)
+    val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
+    val context = ParameterContext(params, ParameterModel.EmptyModelContext, reader)
+    val (_, ctx) = ParameterExtractor.runExtractor(ext, context)
     ctx.modelContext
   }
 

@@ -22,12 +22,13 @@ import com.github.scli.HelpGenerator._
 import com.github.scli.HelpGeneratorTestHelper._
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterModel._
+import com.github.scli.ParameterParser.ParametersMap
 import com.github.scli.ParametersTestHelper.toParamValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.collection.SortedSet
-import scala.util.Success
+import scala.util.{Success, Try}
 
 object HelpGeneratorSpec {
   /** The platform-specific line separator. */
@@ -86,7 +87,7 @@ object HelpGeneratorSpec {
    * Returns a ''ParameterMetaData'' object for the given key with an attribute
    * map that has the group attribute specified.
    *
-   * @param key       the parameter key
+   * @param key        the parameter key
    * @param attrGroups the group(s) the key belongs to
    * @return the ''ParameterMetaData'' with this information
    */
@@ -103,6 +104,19 @@ object HelpGeneratorSpec {
 class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
 
   import HelpGeneratorSpec._
+
+  /**
+   * Runs an extractor on the parameters specified.
+   *
+   * @param params the parameters map
+   * @param ext    the extractor to execute
+   * @return the result of the execution
+   */
+  private def runExtractor(params: ParametersMap, ext: CliExtractor[Try[String]]):
+  (Try[String], ParameterContext) = {
+    val context = ParameterContext(params, ParameterModel.EmptyModelContext, DummyConsoleReader)
+    ParameterExtractor.runExtractor(ext, context)
+  }
 
   "The CLI library" should "generate option help texts with default settings" in {
     val Count = 8
@@ -577,7 +591,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, Group)
-    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    val (res, _) = runExtractor(params, extGroup)
     res should be(Success(Group))
   }
 
@@ -587,7 +601,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore", Some(Group))
-    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    val (res, _) = runExtractor(params, extGroup)
     res should be(Success(Group))
   }
 
@@ -596,7 +610,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore")
-    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    val (res, _) = runExtractor(params, extGroup)
     res.isSuccess shouldBe false
   }
 
@@ -605,7 +619,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val extCond = switchValue(Key.key)
 
     val extGroup = HelpGenerator.conditionalGroupExtractor(extCond, "ignore")
-    val (res, _) = ParameterExtractor.runExtractor(extGroup, params)(DummyConsoleReader)
+    val (res, _) = runExtractor(params, extGroup)
     res.isSuccess shouldBe false
   }
 }

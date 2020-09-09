@@ -104,6 +104,14 @@ object ParameterModel {
   final val EmptyAliasMapping = AliasMapping(Map.empty, Map.empty)
 
   /**
+   * Constant for an initial, empty model context. This context can typically
+   * be used as starting point for the extraction phase; it is then populated
+   * while extractors are executed.
+   */
+  final val EmptyModelContext = new ModelContext(Map.empty, SortedSet.empty,
+    EmptyAliasMapping, None, Nil)
+
+  /**
    * Constant for a special group name referencing an unassigned group. It can
    * happen that extractors are executed inside and outside a group context.
    * Using this special group name, it can be determined whether the extractor

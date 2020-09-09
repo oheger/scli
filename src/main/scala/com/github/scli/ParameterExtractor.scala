@@ -21,7 +21,6 @@ import java.nio.file.{Path, Paths}
 import com.github.scli.ParameterModel.{ModelContext, ParameterAttributeKey, ParameterFailure, ParameterKey}
 import com.github.scli.ParameterParser.{CliElement, ParametersMap}
 
-import scala.collection.SortedSet
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
@@ -57,16 +56,12 @@ object ParameterExtractor {
   /** A mapping storing the boolean literals for conversion. */
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
-  /** Constant for an initial, empty model context. */
-  private val EmptyModelContext = new ModelContext(Map.empty, SortedSet.empty,
-    ParameterModel.EmptyAliasMapping, None, Nil)
-
   /**
    * A dummy parameter context object that is used if no current context is
    * available. It contains only dummy values.
    */
   private val DummyParameterContext = ParameterContext(Parameters(Map.empty, Set.empty),
-    EmptyModelContext, DummyConsoleReader)
+    ParameterModel.EmptyModelContext, DummyConsoleReader)
 
   /**
    * Type definition for the base type of a command line option. The option
@@ -1792,40 +1787,32 @@ object ParameterExtractor {
       c15.get))
 
   /**
-   * Executes the given ''CliExtractor'' on the parameters specified and
-   * returns its result and the updated ''ParameterContext'' object. Notice
-   * that, thanks to an implicit conversion function, it is sufficient to
-   * only parse in a ''ParametersMap'' object.
+   * Executes the given ''CliExtractor'' on the ''ParameterContext'' specified
+   * and returns its result and the updated ''ParameterContext'' object.
    *
    * @param extractor     the extractor to be executed
-   * @param parameters    the current ''Parameters''
-   * @param consoleReader the object to read from the console
+   * @param parameterContext the ''ParameterContext''
    * @tparam T the result type of the ''CliExtractor''
    * @return a tuple with the result and the resulting ''ParameterContext''
    */
-  def runExtractor[T](extractor: CliExtractor[T], parameters: Parameters)
-                     (implicit consoleReader: ConsoleReader): (T, ParameterContext) = {
-    val context = ParameterContext(parameters, EmptyModelContext, consoleReader)
-    val (result, nextContext) = extractor.run(context)
-    (result, nextContext)
-  }
+  def runExtractor[T](extractor: CliExtractor[T], parameterContext: ParameterContext): (T, ParameterContext) =
+    extractor.run(parameterContext)
 
   /**
-   * Executes the given ''CliExtractor'' that may fail on the parameters
-   * specified. Result is a ''Try'' with the extractor's result and the
-   * updated ''ParameterContext'' object. This function is useful if a failed
-   * extractor should cause the whole operation to fail.
+   * Executes the given ''CliExtractor'' that may fail on the
+   * ''ParameterContext'' specified. Result is a ''Try'' with the extractor's
+   * result and the updated ''ParameterContext'' object. This function is
+   * useful if a failed extractor should cause the whole operation to fail.
    *
    * @param extractor     the extractor to be executed
-   * @param parameters    the current ''Parameters'' object
-   * @param consoleReader the object to read from the console
+   * @param parameterContext the ''ParameterContext''
    * @tparam T the result type of the ''CliExtractor''
    * @return a ''Try'' of a tuple with the result and the updated
    *         ''ParameterContext''
    */
-  def tryExtractor[T](extractor: CliExtractor[Try[T]], parameters: Parameters)
-                     (implicit consoleReader: ConsoleReader): Try[(T, ParameterContext)] = {
-    val (triedRes, next) = runExtractor(extractor, parameters)
+  def tryExtractor[T](extractor: CliExtractor[Try[T]], parameterContext: ParameterContext):
+  Try[(T, ParameterContext)] = {
+    val (triedRes, next) = runExtractor(extractor, parameterContext)
     triedRes map ((_, next))
   }
 
@@ -1877,7 +1864,7 @@ object ParameterExtractor {
    * @return the ''ParameterContext'' with updated metadata
    */
   def gatherMetaData(extractor: CliExtractor[_], parameters: ParametersMap = Map.empty,
-                     modelContext: ModelContext = EmptyModelContext): ParameterContext = {
+                     modelContext: ModelContext = ParameterModel.EmptyModelContext): ParameterContext = {
     val paramCtx = contextForMetaDataRun(parameters, modelContext)
     extractor.run(paramCtx)._2
   }

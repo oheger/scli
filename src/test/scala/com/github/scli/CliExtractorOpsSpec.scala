@@ -69,8 +69,10 @@ object CliExtractorOpsSpec {
    * @tparam A the result type of the extractor
    * @return the result produced by the extractor
    */
-  private def runExtractor[A](ext: CliExtractor[A], parameters: Parameters = TestParameters): A =
-    ParameterExtractor.runExtractor(ext, parameters)(DefaultConsoleReader)._1
+  private def runExtractor[A](ext: CliExtractor[A], parameters: Parameters = TestParameters): A = {
+    val context = ParameterContext(parameters, ParameterModel.EmptyModelContext, DefaultConsoleReader)
+    ParameterExtractor.runExtractor(ext, context)._1
+  }
 
   /**
    * Creates a [[ParamModel]] object from the given components.
