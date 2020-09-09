@@ -618,13 +618,13 @@ object TransferParameterManager {
    * selects only options and switches that are relevant for the parameters
    * entered by the user.
    *
-   * @param paramCtx the current ''ParameterContext''
+   * @param extrCtx the current ''ExtractionContext''
    * @return the filter for the help table for options
    */
-  private def createOptionsFilter(paramCtx: ParameterContext): ParameterFilter = {
+  private def createOptionsFilter(extrCtx: ExtractionContext): ParameterFilter = {
     import HelpGenerator._
     val cryptGroupExtractor = conditionalGroupExtractor(cryptEnabledExtractor, GroupEncryption)
-    val contextFilter = contextGroupFilterForExtractors(paramCtx,
+    val contextFilter = contextGroupFilterForExtractors(extrCtx,
       List(commandExtractor, serverTypeExtractor, cryptGroupExtractor))
     andFilter(negate(InputParamsFilterFunc), contextFilter)
   }

@@ -19,7 +19,7 @@ package com.github.scli
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ParameterContext, ParameterExtractionException, Parameters}
+import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ExtractionContext, ParameterExtractionException, Parameters}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
 import com.github.scli.ParameterModel.{AliasMapping, AttrErrCause, ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.{CliElement, ParameterFileException}
@@ -66,22 +66,22 @@ object ParameterManagerSpec {
   }
 
   /**
-   * Creates a test parameter context that does not contain any meaningful
+   * Creates a test extraction context that does not contain any meaningful
    * values.
    *
-   * @return the test parameter context
+   * @return the test extraction context
    */
-  private def createParameterContext(): ParameterContext = {
+  private def createExtractionContext(): ExtractionContext = {
     val modelContext = new ModelContext(Map.empty, SortedSet.empty, AliasMapping(Map.empty, Map.empty),
       None, List("some", "groups"))
     val params = Parameters(toParamValues(Map(TestOptionPk -> List(TestOptionValue))), Set.empty)
-    ParameterContext(params, modelContext, DummyConsoleReader)
+    ExtractionContext(params, modelContext, DummyConsoleReader)
   }
 
   /**
    * Creates a test extractor that can be used by test cases. The extractor
    * returns the current parameters map as result if the expected reader is
-   * found in the parameter context. It also adds the test option to the map of
+   * found in the extraction context. It also adds the test option to the map of
    * accessed options and to the model context.
    *
    * @param expReader the expected console reader
@@ -171,8 +171,8 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     exception.failures should have size 1
     exception.failures.head.key should be(TestOptionPk)
     exception.failures.head.cause shouldBe a[NumberFormatException]
-    exception.parameterContext.parameters.parametersMap.keys should contain(TestOptionPk)
-    val modelContext = exception.parameterContext.modelContext
+    exception.extractionContext.parameters.parametersMap.keys should contain(TestOptionPk)
+    val modelContext = exception.extractionContext.modelContext
     modelContext.options.keys should contain(TestOptionPk)
   }
 
@@ -318,7 +318,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     failure.key should be(FileOption)
     failure.cause shouldBe a[ParameterFileException]
     failure.cause.getMessage should include(FileName)
-    val context = exception.parameterContext
+    val context = exception.extractionContext
     val modelContext = context.modelContext
     val testOptionAttrs = modelContext.options(TestOptionPk)
     testOptionAttrs.attributes(ParameterModel.AttrHelpText) should be(HelpTestOption)
@@ -374,29 +374,29 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "evaluate a successful processing result" in {
     val ExtractResult = 42
-    val context = ProcessingContext(createParameterContext(), helpRequested = false, optFailureContext = None)
+    val context = ProcessingContext(createExtractionContext(), helpRequested = false, optFailureContext = None)
     val processResult: ProcessingResult[Int] = Success((ExtractResult, context))
 
     ParameterManager.evaluate(processResult) should be(Right(ExtractResult))
   }
 
   it should "evaluate a successful processing result if help was requested" in {
-    val context = ProcessingContext(createParameterContext(), helpRequested = true, optFailureContext = None)
+    val context = ProcessingContext(createExtractionContext(), helpRequested = true, optFailureContext = None)
     val processResult: ProcessingResult[String] = Success(("ignored", context))
 
     ParameterManager.evaluate(processResult) should be(Left(context))
   }
 
   it should "evaluate a failed processing result" in {
-    val paramCtx = createParameterContext()
+    val extrCtx = createExtractionContext()
     val cause = new Exception("failure")
-    val failure = ExtractionFailure(TestOptionPk, cause, None, paramCtx)
+    val failure = ExtractionFailure(TestOptionPk, cause, None, extrCtx)
     val exception = ParameterExtractionException(failure)
     val processResult: ProcessingResult[String] = Failure(exception)
 
     ParameterManager.evaluate(processResult) match {
       case Left(context) =>
-        context.parameterContext should be(paramCtx)
+        context.parameterContext should be(extrCtx)
         context.helpRequested shouldBe false
         context.optFailureContext.isDefined shouldBe true
         val failureContext = context.optFailureContext.get

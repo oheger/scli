@@ -57,10 +57,10 @@ object ParameterExtractor {
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
   /**
-   * A dummy parameter context object that is used if no current context is
+   * A dummy extraction context object that is used if no current context is
    * available. It contains only dummy values.
    */
-  private val DummyParameterContext = ParameterContext(Parameters(Map.empty, Set.empty),
+  private val DummyExtractionContext = ExtractionContext(Parameters(Map.empty, Set.empty),
     ParameterModel.EmptyModelContext, DummyConsoleReader)
 
   /**
@@ -134,8 +134,8 @@ object ParameterExtractor {
   }
 
   /**
-   * A data class storing all the information required for the processing of
-   * command line arguments.
+   * A data class storing all the information required for the execution of a
+   * ''CliExtractor'' to process command line arguments.
    *
    * An instance of this class is passed to a ''CliExtractor'' when it is
    * executed. It stores the actual [[Parameters]] plus some helper objects
@@ -146,46 +146,46 @@ object ParameterExtractor {
    * @param modelContext the context storing model information
    * @param reader       an object to read data from the console
    */
-  case class ParameterContext(parameters: Parameters,
-                              modelContext: ModelContext,
-                              reader: ConsoleReader) {
+  case class ExtractionContext(parameters: Parameters,
+                               modelContext: ModelContext,
+                               reader: ConsoleReader) {
     /**
-     * Returns a new ''ParameterContext'' object that was updated with the
+     * Returns a new ''ExtractionContext'' object that was updated with the
      * given ''Parameters'' and model context. All other properties remain
      * constant.
      *
      * @param nextParameters   the ''Parameters'' to replace the current ones
      * @param nextModelContext the updated model context
-     * @return the updated ''ParameterContext''
+     * @return the updated ''ExtractionContext''
      */
-    def update(nextParameters: Parameters, nextModelContext: ModelContext): ParameterContext =
+    def update(nextParameters: Parameters, nextModelContext: ModelContext): ExtractionContext =
       copy(parameters = nextParameters, modelContext = nextModelContext)
 
     /**
-     * Returns a new ''ParameterContext'' object with an updated
+     * Returns a new ''ExtractionContext'' object with an updated
      * ''ModelContext'', to which the given attribute has been added.
      *
      * @param attr  the attribute key
      * @param value the attribute value
      * @tparam A the data type of the attribute
-     * @return the updated ''ParameterContext''
+     * @return the updated ''ExtractionContext''
      */
-    def updateModelContext[A <: AnyRef](attr: ParameterAttributeKey[A], value: A): ParameterContext =
+    def updateModelContext[A <: AnyRef](attr: ParameterAttributeKey[A], value: A): ExtractionContext =
       copy(modelContext = modelContext.addAttribute(attr, value))
 
     /**
-     * Returns a ''ParameterContext'' for a conditional update of the
+     * Returns a ''ExtractionContext'' for a conditional update of the
      * ''ModelContext''. If the passed in attribute value is defined, the
-     * model context is replaced; otherwise, the same ''ParameterContext'' is
+     * model context is replaced; otherwise, the same ''ExtractionContext'' is
      * returned.
      *
      * @param attr     the attribute key
      * @param optValue an ''Option'' with the attribute value
      * @tparam A the data type of the attribute
-     * @return the updated (or same) ''ParameterContext''
+     * @return the updated (or same) ''ExtractionContext''
      */
     def updateModelContextConditionally[A <: AnyRef](attr: ParameterAttributeKey[A], optValue: Option[A]):
-    ParameterContext =
+    ExtractionContext =
       optValue map (value => updateModelContext(attr, value)) getOrElse this
   }
 
@@ -200,12 +200,12 @@ object ParameterExtractor {
    * @param cause      the exception causing this failure
    * @param optElement contains the original ''CliElement'' that caused the
    *                   error if available
-   * @param context    the current parameter context
+   * @param context    the current extraction context
    */
   case class ExtractionFailure(override val key: ParameterKey,
                                override val cause: Throwable,
                                optElement: Option[CliElement],
-                               context: ParameterContext) extends ParameterFailure {
+                               context: ExtractionContext) extends ParameterFailure {
     /**
      * @inheritdoc This implementation returns the key from the ''CliElement''
      *             if available, and the main key otherwise.
@@ -268,12 +268,13 @@ object ParameterExtractor {
   class ParameterExtractionException private(val failures: List[ExtractionFailure])
     extends Exception(ParameterExtractionException.generateExceptionMessage(failures)) {
     /**
-     * Returns a ''ParameterContext'' from the list of failures. (It is
+     * Returns an ''ExtractionContext'' from the list of failures. (It is
      * unspecified, from which failure the context is obtained.)
      *
-     * @return a ''ParameterContext'' from the failures managed by this object
+     * @return an ''ExtractionContext'' from the failures managed by this
+     *         object
      */
-    def parameterContext: ParameterContext =
+    def extractionContext: ExtractionContext =
       failures.head.context
   }
 
@@ -288,7 +289,7 @@ object ParameterExtractor {
    * @param optKey optional key of the option to be extracted
    * @tparam A the type of the result of the extractor
    */
-  case class CliExtractor[A](run: ParameterContext => (A, ParameterContext), optKey: Option[ParameterKey] = None) {
+  case class CliExtractor[A](run: ExtractionContext => (A, ExtractionContext), optKey: Option[ParameterKey] = None) {
     /**
      * Returns the key of the option this extractor deals with. If there is no
      * key, result is an empty string. This case should normally not occur in
@@ -309,13 +310,13 @@ object ParameterExtractor {
     /**
      * Returns a ''CliExtractor'' based on the current one that applies a
      * mapping function to the original result and also modifies the
-     * parameter context.
+     * extraction context.
      *
      * @param f the mapping function that is also passed the context
      * @tparam B the result type of the new extractor
      * @return the new ''CliExtractor''
      */
-    def mapWithContext[B](f: (A, ParameterContext) => (B, ParameterContext)): CliExtractor[B] = {
+    def mapWithContext[B](f: (A, ExtractionContext) => (B, ExtractionContext)): CliExtractor[B] = {
       val fExt: A => CliExtractor[B] = a => {
         CliExtractor(ctx => f(a, ctx))
       }
@@ -739,7 +740,7 @@ object ParameterExtractor {
 
   /**
    * Returns a ''CliExtractor'' that always returns the given constant value
-   * as result without manipulating the parameter context. This extractor is
+   * as result without manipulating the extraction context. This extractor is
    * mainly useful for building up complex extractors, e.g. together with
    * conditions or default values for optional parameters.
    *
@@ -956,7 +957,7 @@ object ParameterExtractor {
   /**
    * Returns an extractor that prompts the user for entering the value of an
    * option. This is done by delegating to the [[ConsoleReader]] in the
-   * parameter context passed to the extractor. This function can be used for
+   * extraction context passed to the extractor. This function can be used for
    * instance together with ''withFallback()'' to let the user enter a value
    * if it has not been provided on the command line.
    *
@@ -1005,7 +1006,7 @@ object ParameterExtractor {
   def conditionalValue[A](condExt: CliExtractor[Try[Boolean]], ifExt: CliExtractor[Try[A]],
                           elseExt: CliExtractor[Try[A]], ifGroup: Option[String] = None,
                           elseGroup: Option[String] = None): CliExtractor[Try[A]] = {
-    def processUnselectedExtractors(context: ParameterContext)(f: ((CliExtractor[Try[A]], Option[String])) => Boolean):
+    def processUnselectedExtractors(context: ExtractionContext)(f: ((CliExtractor[Try[A]], Option[String])) => Boolean):
     ModelContext = {
       val extractorsAndGroups = List((ifExt, ifGroup), (elseExt, elseGroup))
         .filter(f)
@@ -1076,7 +1077,7 @@ object ParameterExtractor {
    */
   def conditionalGroupValue[A](groupExt: CliExtractor[Try[String]],
                                groupMap: Map[String, CliExtractor[Try[A]]]): CliExtractor[Try[A]] = {
-    def processUnselectedGroups(context: ParameterContext)(f: ((String, CliExtractor[Try[A]])) => Boolean):
+    def processUnselectedGroups(context: ExtractionContext)(f: ((String, CliExtractor[Try[A]])) => Boolean):
     ModelContext = {
       val extractorsAndGroups = groupMap.toList.filter(f)
         .map(entry => (entry._2, Some(entry._1)))
@@ -1226,8 +1227,8 @@ object ParameterExtractor {
   /**
    * Returns an extractor that modifies the result of another extractor by
    * applying a mapping function that has access to the current
-   * ''ParameterContext''. This function is analogous to ''mapped()'', but it
-   * expects a mapping function that is passed in a ''ParameterContext'' and
+   * ''ExtractionContext''. This function is analogous to ''mapped()'', but it
+   * expects a mapping function that is passed in a ''ExtractionContext'' and
    * returns an updated one.
    *
    * @param ext the extractor to be decorated
@@ -1236,7 +1237,7 @@ object ParameterExtractor {
    * @tparam B the mapped result type
    * @return the extractor applying the mapping function
    */
-  def mappedWithContext[A, B](ext: CliExtractor[OptionValue[A]])(f: (A, ParameterContext) => (B, ParameterContext)):
+  def mappedWithContext[A, B](ext: CliExtractor[OptionValue[A]])(f: (A, ExtractionContext) => (B, ExtractionContext)):
   CliExtractor[OptionValue[B]] =
     ext.mapWithContext { (triedResult, context) => {
       val mappedResult = triedResult.map(o => {
@@ -1314,13 +1315,13 @@ object ParameterExtractor {
    * parameters, it returns a ''Failure'' with a
    * [[ParameterExtractionException]]; this exception contains failures for
    * all the unused keys found. Otherwise, result is a ''Success'' with the
-   * same ''ParameterContext''.
+   * same ''ExtractionContext''.
    *
-   * @param paramContext the ''ParameterContext'', updated by all extract
+   * @param paramContext the ''ExtractionContext'', updated by all extract
    *                     operations
-   * @return a ''Try'' with the validated ''ParameterContext''
+   * @return a ''Try'' with the validated ''ExtractionContext''
    */
-  def checkParametersConsumed(paramContext: ParameterContext): Try[ParameterContext] =
+  def checkParametersConsumed(paramContext: ExtractionContext): Try[ExtractionContext] =
     if (paramContext.parameters.allKeysAccessed) Success(paramContext)
     else {
       val failures = paramContext.parameters.notAccessedKeys map { key =>
@@ -1787,32 +1788,32 @@ object ParameterExtractor {
       c15.get))
 
   /**
-   * Executes the given ''CliExtractor'' on the ''ParameterContext'' specified
-   * and returns its result and the updated ''ParameterContext'' object.
+   * Executes the given ''CliExtractor'' on the ''ExtractionContext'' specified
+   * and returns its result and the updated ''ExtractionContext'' object.
    *
    * @param extractor     the extractor to be executed
-   * @param parameterContext the ''ParameterContext''
+   * @param ExtractionContext the ''ExtractionContext''
    * @tparam T the result type of the ''CliExtractor''
-   * @return a tuple with the result and the resulting ''ParameterContext''
+   * @return a tuple with the result and the resulting ''ExtractionContext''
    */
-  def runExtractor[T](extractor: CliExtractor[T], parameterContext: ParameterContext): (T, ParameterContext) =
-    extractor.run(parameterContext)
+  def runExtractor[T](extractor: CliExtractor[T], ExtractionContext: ExtractionContext): (T, ExtractionContext) =
+    extractor.run(ExtractionContext)
 
   /**
    * Executes the given ''CliExtractor'' that may fail on the
-   * ''ParameterContext'' specified. Result is a ''Try'' with the extractor's
-   * result and the updated ''ParameterContext'' object. This function is
+   * ''ExtractionContext'' specified. Result is a ''Try'' with the extractor's
+   * result and the updated ''ExtractionContext'' object. This function is
    * useful if a failed extractor should cause the whole operation to fail.
    *
    * @param extractor     the extractor to be executed
-   * @param parameterContext the ''ParameterContext''
+   * @param ExtractionContext the ''ExtractionContext''
    * @tparam T the result type of the ''CliExtractor''
    * @return a ''Try'' of a tuple with the result and the updated
-   *         ''ParameterContext''
+   *         ''ExtractionContext''
    */
-  def tryExtractor[T](extractor: CliExtractor[Try[T]], parameterContext: ParameterContext):
-  Try[(T, ParameterContext)] = {
-    val (triedRes, next) = runExtractor(extractor, parameterContext)
+  def tryExtractor[T](extractor: CliExtractor[Try[T]], ExtractionContext: ExtractionContext):
+  Try[(T, ExtractionContext)] = {
+    val (triedRes, next) = runExtractor(extractor, ExtractionContext)
     triedRes map ((_, next))
   }
 
@@ -1822,7 +1823,7 @@ object ParameterExtractor {
    * exception to an ''IllegalArgumentException'' with a message that contains
    * the name of the parameter.
    *
-   * @param context    the ''ParameterContext''
+   * @param context    the ''ExtractionContext''
    * @param key        the parameter key
    * @param optElement the optional original ''CliElement''
    * @param f          the expression
@@ -1830,7 +1831,7 @@ object ParameterExtractor {
    * @return a succeeded ''Try'' with the expression value or a failed ''Try''
    *         with a meaningful exception
    */
-  def paramTry[T](context: ParameterContext, key: ParameterKey, optElement: Option[CliElement] = None)
+  def paramTry[T](context: ExtractionContext, key: ParameterKey, optElement: Option[CliElement] = None)
                  (f: => T): Try[T] =
     Try(f) recoverWith {
       case pex: ParameterExtractionException => Failure(pex)
@@ -1841,32 +1842,32 @@ object ParameterExtractor {
    * Generates an exception that reports a problem with a specific command
    * line option. These exceptions have a special type.
    *
-   * @param context    the ''ParameterContext''
+   * @param context    the ''ExtractionContext''
    * @param key        the option key
    * @param cause      an option cause of the error
    * @param optElement the optional original ''CliElement''
    * @return the resulting exception
    */
-  def paramException(context: ParameterContext, key: ParameterKey, cause: Throwable = null,
+  def paramException(context: ExtractionContext, key: ParameterKey, cause: Throwable = null,
                      optElement: Option[CliElement] = None): ParameterExtractionException = {
     val failure = ExtractionFailure(key, cause, optElement, context)
     ParameterExtractionException(failure)
   }
 
   /**
-   * Runs the given ''CliExtractor'' against a dummy parameter context to
+   * Runs the given ''CliExtractor'' against a dummy extraction context to
    * obtain metadata from it. This run will populate a ''ModelContext''
    * with information about all the options accessed by the extractor.
    *
    * @param extractor    the ''CliExtractor'' in question
    * @param parameters   the parameters to store in the context
    * @param modelContext the initial model context for the context
-   * @return the ''ParameterContext'' with updated metadata
+   * @return the ''ExtractionContext'' with updated metadata
    */
   def gatherMetaData(extractor: CliExtractor[_], parameters: ParametersMap = Map.empty,
-                     modelContext: ModelContext = ParameterModel.EmptyModelContext): ParameterContext = {
-    val paramCtx = contextForMetaDataRun(parameters, modelContext)
-    extractor.run(paramCtx)._2
+                     modelContext: ModelContext = ParameterModel.EmptyModelContext): ExtractionContext = {
+    val extrCtx = contextForMetaDataRun(parameters, modelContext)
+    extractor.run(extrCtx)._2
   }
 
   /**
@@ -1903,7 +1904,7 @@ object ParameterExtractor {
    */
   private def failureFor(exception: Throwable): ExtractionFailure =
     ExtractionFailure(cause = exception, key = UndefinedParameterKey, optElement = None,
-      context = DummyParameterContext)
+      context = DummyExtractionContext)
 
   /**
    * Generates an exception for an error message that can be stored as the
@@ -1922,8 +1923,8 @@ object ParameterExtractor {
    * extractors to be executed from a larger set of extractors. The other
    * extractors that are not selected still need to be reflected by the model
    * context. This function expects a list of extractors and the optional
-   * groups they belong to. It runs them against a dummy parameter context, so
-   * that the model context is updated, but the original parameter context is
+   * groups they belong to. It runs them against a dummy extraction context, so
+   * that the model context is updated, but the original extraction context is
    * not modified.
    *
    * @param modelContext        the current ''ModelContext''
@@ -1955,17 +1956,17 @@ object ParameterExtractor {
     }
 
   /**
-   * Returns a ''ParameterContext'' to be used for the invocation of a
+   * Returns a ''ExtractionContext'' to be used for the invocation of a
    * ''CliExtractor'' if only meta data of the extractor is of interest. This
    * context has no parameter values and dummy helper objects. Only the help
    * context is set and will be updated during the run.
    *
    * @param params       the parameters for the context
    * @param modelContext the ''ModelContext''
-   * @return the ''ParameterContext'' for the meta data run
+   * @return the ''ExtractionContext'' for the meta data run
    */
-  private def contextForMetaDataRun(params: ParametersMap, modelContext: ModelContext): ParameterContext =
-    ParameterContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader)
+  private def contextForMetaDataRun(params: ParametersMap, modelContext: ModelContext): ExtractionContext =
+    ExtractionContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader)
 
   /**
    * Obtains the collection with the original CLI elements for a specific key.
@@ -1973,12 +1974,12 @@ object ParameterExtractor {
    * the values that are currently processed. If a different size is
    * encountered, an empty collection is returned.
    *
-   * @param context the parameter context
+   * @param context the extraction context
    * @param ext     the current extractor
    * @param expSize the expected size of the elements collection
    * @return the collection of original elements
    */
-  private def fetchCliElements(context: ParameterContext, ext: CliExtractor[_], expSize: Int): Iterable[CliElement] = {
+  private def fetchCliElements(context: ExtractionContext, ext: CliExtractor[_], expSize: Int): Iterable[CliElement] = {
     val elements = context.parameters.parametersMap.getOrElse(ext.key, Nil)
     if (elements.size == expSize) elements else Nil
   }

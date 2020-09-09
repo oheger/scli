@@ -18,7 +18,7 @@ package com.github.scli.sample.transfer
 
 import java.nio.file.{Files, Paths}
 
-import com.github.scli.ParameterExtractor.{ParameterContext, ParameterExtractionException}
+import com.github.scli.ParameterExtractor.{ExtractionContext, ParameterExtractionException}
 import com.github.scli.ParameterManager.ProcessingContext
 import com.github.scli.ParametersTestHelper._
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, _}
@@ -192,7 +192,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val Password = "secret_Encryption!Pwd"
     val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("Encryption password", password = true)).thenReturn(Password)
-    val context = ParameterContext(args, ParameterModel.EmptyModelContext, consoleReader)
+    val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, context)
     result.map(_.password) should be(Success(Password))
@@ -210,7 +210,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val Password = "tiger"
     val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("HTTP server password", password = true)).thenReturn(Password)
-    val context = ParameterContext(args, ParameterModel.EmptyModelContext, consoleReader)
+    val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, context)
     result match {

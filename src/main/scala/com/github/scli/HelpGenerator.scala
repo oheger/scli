@@ -16,7 +16,7 @@
 
 package com.github.scli
 
-import com.github.scli.ParameterExtractor.{CliExtractor, ParameterContext}
+import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionContext}
 import com.github.scli.ParameterModel._
 
 import scala.annotation.tailrec
@@ -388,16 +388,16 @@ object HelpGenerator {
    * the success results. With these results, it invokes
    * ''contextGroupFilterForValues()''.
    *
-   * @param context        the parameter context
+   * @param context        the extraction context
    * @param extractors     a collection with extractors for conditional groups
    * @param includeNoGroup flag whether to include parameters with no group
    * @return the ''ParameterFilter'' selecting parameters in context groups
    */
-  def contextGroupFilterForExtractors(context: ParameterContext, extractors: Iterable[CliExtractor[Try[String]]],
+  def contextGroupFilterForExtractors(context: ExtractionContext, extractors: Iterable[CliExtractor[Try[String]]],
                                       includeNoGroup: Boolean = true): ParameterFilter = {
     val groupValues = extractors map { ext =>
-      val paramCtx = context.copy(reader = DummyConsoleReader)
-      ParameterExtractor.tryExtractor(ext, paramCtx) map (_._1)
+      val extrCtx = context.copy(reader = DummyConsoleReader)
+      ParameterExtractor.tryExtractor(ext, extrCtx) map (_._1)
     }
     contextGroupFilterForValues(groupValues, includeNoGroup)
   }

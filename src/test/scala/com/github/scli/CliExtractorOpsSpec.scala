@@ -70,7 +70,7 @@ object CliExtractorOpsSpec {
    * @return the result produced by the extractor
    */
   private def runExtractor[A](ext: CliExtractor[A], parameters: Parameters = TestParameters): A = {
-    val context = ParameterContext(parameters, ParameterModel.EmptyModelContext, DefaultConsoleReader)
+    val context = ExtractionContext(parameters, ParameterModel.EmptyModelContext, DefaultConsoleReader)
     ParameterExtractor.runExtractor(ext, context)._1
   }
 
@@ -497,7 +497,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     result match {
       case Failure(exception: ParameterExtractionException) =>
         checkFailureContained(exception, KeyNumbers, KeyAnswer, KeyFlag)
-        val context = exception.parameterContext
+        val context = exception.extractionContext
         context.parameters.parametersMap should be(params.parametersMap)
       case r => fail("Unexpected result: " + r)
     }
@@ -514,7 +514,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "handle failures when creating a representation from components" in {
     val modelCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping,
       None, Nil)
-    val context = ParameterContext(TestParameters, modelCtx, DummyConsoleReader)
+    val context = ExtractionContext(TestParameters, modelCtx, DummyConsoleReader)
     val failure1 = ExtractionFailure(pk(KeyFlag), new Exception("Flag failure"), None, context)
     val failure2 = ExtractionFailure(pk(KeyAnswer), new Exception("Answer failure"),
       Some(OptionElement(pk(KeyAnswer), None)), context)
@@ -527,7 +527,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     triedValues match {
       case Failure(exception: ParameterExtractionException) =>
         exception.failures should be(List(failure1, failure2))
-        exception.parameterContext should be(context)
+        exception.extractionContext should be(context)
       case r => fail("Unexpected result: " + r)
     }
   }

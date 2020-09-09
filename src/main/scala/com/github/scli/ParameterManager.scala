@@ -91,16 +91,16 @@ object ParameterManager {
     private[scli] val internalExtractor = constructInternalExtractor()
 
     /**
-     * Stores a ''ParameterContext'' created based on the wrapped
+     * Stores a ''ExtractionContext'' created based on the wrapped
      * ''CliExtractor''. From this context, all the metadata available about
      * the extractor can be queried.
      */
-    lazy val parameterContext: ParameterContext = constructParameterContext()
+    lazy val extractionContext: ExtractionContext = constructExtractionContext()
 
     /**
      * Stores a ''ModelContext'' created based on the wrapped ''CliExtractor''.
      */
-    lazy val modelContext: ModelContext = parameterContext.modelContext
+    lazy val modelContext: ModelContext = extractionContext.modelContext
 
     /**
      * Constructs the internal extractor used by this specification. The
@@ -114,12 +114,12 @@ object ParameterManager {
         createInternalHelpExtractor(optHelpExtractor getOrElse DefaultHelpExtractor))
 
     /**
-     * Creates a ''ParameterContext'' for the ''CliExtractor'' contained in
+     * Creates an ''ExtractionContext'' for the ''CliExtractor'' contained in
      * this object.
      *
-     * @return the ''ParameterContext''
+     * @return the ''ExtractionContext''
      */
-    private def constructParameterContext(): ParameterContext =
+    private def constructExtractionContext(): ExtractionContext =
       addFileOptionsToModelContext(ParameterExtractor.gatherMetaData(internalExtractor))
 
     /**
@@ -127,14 +127,14 @@ object ParameterManager {
      * is necessary, so that they can be classified correctly under all
      * circumstances.
      *
-     * @param paramCtx the original parameter context
-     * @return the extended parameter context
+     * @param extrCtx the original extraction context
+     * @return the extended extraction context
      */
-    private def addFileOptionsToModelContext(paramCtx: ParameterContext): ParameterContext = {
-      val modelContext = fileOptions.foldLeft(paramCtx.modelContext) { (ctx, key) =>
+    private def addFileOptionsToModelContext(extrCtx: ExtractionContext): ExtractionContext = {
+      val modelContext = fileOptions.foldLeft(extrCtx.modelContext) { (ctx, key) =>
         ctx.addOption(key, None)
       }
-      paramCtx.copy(modelContext = modelContext)
+      extrCtx.copy(modelContext = modelContext)
     }
   }
 
@@ -142,19 +142,19 @@ object ParameterManager {
    * A data class storing context information about an operation to process the
    * command line.
    *
-   * This class extends the [[ParameterContext]] used by extraction operations
+   * This class extends the [[ExtractionContext]] used by extraction operations
    * by additional metadata. It especially stores information whether a flag
    * was found on the command line requesting help and failure information.
    * This information is needed to correctly interpret the result of processing
    * a command line and do proper error handling.
    *
-   * @param parameterContext  the ''ParameterContext'' generated during the
+   * @param parameterContext  the ''ExtractionContext'' generated during the
    *                          extraction phase
    * @param helpRequested     flag whether help was requested by the user
    * @param optFailureContext optional context with failure information, which
    *                          is present if failures have been detected
    */
-  case class ProcessingContext(parameterContext: ParameterContext,
+  case class ProcessingContext(parameterContext: ExtractionContext,
                                helpRequested: Boolean,
                                optFailureContext: Option[FailureContext])
 
@@ -380,8 +380,8 @@ object ParameterManager {
       case Success((result, _)) =>
         Right(result)
       case Failure(e: ParameterExtractionException) =>
-        Left(ProcessingContext(e.parameterContext, helpRequested = false,
-          optFailureContext = Some(new FailureContext(e.parameterContext.modelContext, e.failures))))
+        Left(ProcessingContext(e.extractionContext, helpRequested = false,
+          optFailureContext = Some(new FailureContext(e.extractionContext.modelContext, e.failures))))
       case Failure(e) =>
         throw new IllegalArgumentException("Unexpected failure in ProcessingResult", e)
     }
@@ -400,9 +400,9 @@ object ParameterManager {
    *         context
    */
   private def extract[A](params: ParametersMap, extractor: CliExtractor[Try[A]], checkUnconsumedParameters: Boolean):
-  Try[(A, ParameterContext)] = {
-    val paramCtx = ParameterContext(params, ParameterModel.EmptyModelContext, DefaultConsoleReader)
-    val (res, context) = runExtractor(extractor, paramCtx)
+  Try[(A, ExtractionContext)] = {
+    val extrCtx = ExtractionContext(params, ParameterModel.EmptyModelContext, DefaultConsoleReader)
+    val (res, context) = runExtractor(extractor, extrCtx)
     val triedContext = checkParametersConsumedConditionally(context, checkUnconsumedParameters)
     createRepresentation(res, triedContext)((_, _)) recoverWith {
       case e: ParameterExtractionException =>
@@ -414,12 +414,12 @@ object ParameterManager {
    * Performs a check for unconsumed parameters if this check is enabled.
    * Otherwise, a success result is returned.
    *
-   * @param context the parameter context to check
+   * @param context the extraction context to check
    * @param enabled flag whether the check is enabled
-   * @return a ''Try'' with the checked parameter context
+   * @return a ''Try'' with the checked extraction context
    */
-  private def checkParametersConsumedConditionally(context: ParameterContext, enabled: Boolean):
-  Try[ParameterContext] =
+  private def checkParametersConsumedConditionally(context: ExtractionContext, enabled: Boolean):
+  Try[ExtractionContext] =
     if (enabled) checkParametersConsumed(context)
     else Success(context)
 
@@ -427,14 +427,14 @@ object ParameterManager {
    * Generates an updated exception with a list of failures that contain the
    * newest  model context that contains all the failures of the
    * passed in list. Then the failures are updated to reference the
-   * parameter context with the updated model context, and a new exception with
+   * extraction context with the updated model context, and a new exception with
    * these failures is created.
    *
    * @param failures the original list of failures
-   * @param context  the most recent parameter context
+   * @param context  the most recent extraction context
    * @return an updated exception referencing the new model context
    */
-  private def updateContextInFailures(failures: List[ExtractionFailure], context: ParameterContext):
+  private def updateContextInFailures(failures: List[ExtractionFailure], context: ExtractionContext):
   ParameterExtractionException = {
     val newFailures = failures.map(_.copy(context = context))
     ParameterExtractionException(newFailures)

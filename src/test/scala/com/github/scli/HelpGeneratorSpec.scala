@@ -113,8 +113,8 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
    * @return the result of the execution
    */
   private def runExtractor(params: ParametersMap, ext: CliExtractor[Try[String]]):
-  (Try[String], ParameterContext) = {
-    val context = ParameterContext(params, ParameterModel.EmptyModelContext, DummyConsoleReader)
+  (Try[String], ExtractionContext) = {
+    val context = ExtractionContext(params, ParameterModel.EmptyModelContext, DummyConsoleReader)
     ParameterExtractor.runExtractor(ext, context)
   }
 
@@ -561,13 +561,13 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val Group1 = "myFirstGroup"
     val Group2 = "MyOtherGroup"
     val params = Map(testKey(1) -> List(Group1), testKey(2) -> List(Group2))
-    val paramCtx = ParameterContext(Parameters(toParamValues(params), Set.empty), createModelContext(),
+    val extrCtx = ExtractionContext(Parameters(toParamValues(params), Set.empty), createModelContext(),
       DefaultConsoleReader)
     val ext1 = optionValue(testKey(1).key).mandatory
     val ext2 = optionValue(testKey(2).key).mandatory
     val extErr = optionValue("undefined").mandatory
 
-    val filter = HelpGenerator.contextGroupFilterForExtractors(paramCtx, List(ext1, ext2, extErr))
+    val filter = HelpGenerator.contextGroupFilterForExtractors(extrCtx, List(ext1, ext2, extErr))
     filter(parameterDataForGroup(testKey(1), Group1)) shouldBe true
     filter(parameterDataForGroup(testKey(2), "test", Group2)) shouldBe true
     filter(parameterDataForGroup(testKey(1), "unknown-group")) shouldBe false
@@ -577,10 +577,10 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "create a group context filter that excludes parameters without a group" in {
     val Group = "aGroup"
     val params = toParamValues(Map(Key -> List(Group)))
-    val paramCtx = ParameterContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
+    val extrCtx = ExtractionContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
     val ext = optionValue(Key.key).mandatory
 
-    val filter = HelpGenerator.contextGroupFilterForExtractors(paramCtx, List(ext), includeNoGroup = false)
+    val filter = HelpGenerator.contextGroupFilterForExtractors(extrCtx, List(ext), includeNoGroup = false)
     filter(parameterDataForGroup(Key, Group)) shouldBe true
     filter(testOptionMetaData(1)) shouldBe false
   }
