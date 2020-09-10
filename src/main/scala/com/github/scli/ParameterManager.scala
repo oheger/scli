@@ -16,6 +16,8 @@
 
 package com.github.scli
 
+import java.text.MessageFormat
+
 import com.github.scli.ParameterExtractor._
 import com.github.scli.ParameterModel.{FailureContext, ModelContext, ParameterKey}
 import com.github.scli.ParameterParser._
@@ -40,6 +42,18 @@ object ParameterManager {
    * reports a disabled help flag.
    */
   private val DefaultHelpExtractor: CliExtractor[Try[Boolean]] = constantExtractor(Success(false))
+
+  /**
+   * A map with default failure messages for the exception generator function.
+   */
+  private val ExceptionMessages =
+    Map(FailureCodes.TooManyInputParameters -> "Too many input arguments; expected at most {0}",
+      FailureCodes.UnknownGroup -> "Invalid value \"{0}\". Expected one of {1}",
+      FailureCodes.MultipleValues -> "Single value expected, but got {0}",
+      FailureCodes.MandatoryParameterMissing -> "Mandatory parameter has no value",
+      FailureCodes.MultiplicityTooLow -> "Too few values; parameter must have at least {0} values",
+      FailureCodes.MultiplicityTooHigh -> "Too many values; parameter must have at most {0} values",
+      FailureCodes.UnsupportedParameter -> "Unsupported parameter")
 
   /**
    * Type definition for a function that does the initial parsing of the
@@ -206,6 +220,38 @@ object ParameterManager {
    */
   def defaultKeyExtractor(prefixes: OptionPrefixes = ParameterParser.DefaultOptionPrefixes): KeyExtractorFunc =
     prefixes.tryExtract
+
+  /**
+   * Returns the default exception generator function. This function handles
+   * all the standard error codes used by the [[ParameterExtractor]] module.
+   * It generates exceptions of type ''IllegalArgumentException'' with standard
+   * error messages.
+   *
+   * @return the default ''ExceptionGenerator'' function
+   */
+  def defaultExceptionGenerator: ExceptionGenerator =
+    exceptionGenerator(ExceptionMessages)
+
+  /**
+   * Returns an exception generator function that produces exceptions of type
+   * ''IllegalArgumentException'' with messages defined by the given map. The
+   * map contains messages for the failure codes supported by the
+   * [[ParameterExtractor]] module. The final messages are generated from the
+   * parameters provided using Java's ''MessageFormat'' class; so they can
+   * contain placeholders like ''{0}'' or ''{1}'' that are replaced by current
+   * parameter values.
+   *
+   * The passed in map with parameters need not contain texts for all possible
+   * failure codes; for missing codes, the default messages are used.
+   *
+   * @param messages the map with failure messages
+   * @return an ''ExceptionGenerator'' function that uses these messages
+   */
+  def exceptionGenerator(messages: Map[FailureCodes.Value, String]): ExceptionGenerator = {
+    val allMessages = ExceptionMessages ++ messages
+    (_, code, params) =>
+      new IllegalArgumentException(MessageFormat.format(allMessages(code), params: _*))
+  }
 
   /**
    * Returns a default ''CliClassifierFunc'' for the execution of the

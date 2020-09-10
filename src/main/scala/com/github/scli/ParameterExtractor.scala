@@ -80,6 +80,71 @@ object ParameterExtractor {
   type SingleOptionValue[A] = Try[Option[A]]
 
   /**
+   * An enumeration listing the failure codes used by pre-defined extractor
+   * functions.
+   *
+   * These codes correspond to the default failures that are detected by this
+   * module during the extraction phase.
+   */
+  object FailureCodes extends Enumeration {
+    /**
+     * Failure code for unexpected input parameters. Argument is the maximum
+     * number of allowed input parameters.
+     */
+    val TooManyInputParameters: FailureCodes.Value = Value
+
+    /**
+     * Failure code for a mandatory parameter that has no value.
+     */
+    val MandatoryParameterMissing: FailureCodes.Value = Value
+
+    /**
+     * Failure code for a single-valued parameter that has multiple values.
+     */
+    val MultipleValues: FailureCodes.Value = Value
+
+    /**
+     * Failure code used by ''conditionalGroupValue()'' if an unknown group is
+     * detected. Argument is the name of this group.
+     */
+    val UnknownGroup: FailureCodes.Value = Value
+
+    /**
+     * Failure code for a parameter that has too few values. Argument is the
+     * minimum number of values required by the multiplicity.
+     */
+    val MultiplicityTooLow: FailureCodes.Value = Value
+
+    /**
+     * Failure code for a parameter that has too many values. Argument is the
+     * maximum number of values allowed by the multiplicity.
+     */
+    val MultiplicityTooHigh: FailureCodes.Value = Value
+
+    /** Failure code for an unsupported parameter. */
+    val UnsupportedParameter: FailureCodes.Value = Value
+  }
+
+  /**
+   * Type definition for a function that generates the exceptions thrown by
+   * ''CliExtractor'' objects when they detect a failure.
+   *
+   * When an extractor function defined in this module detects a failure (such
+   * as a missing parameter, unexpected values, or a wrong multiplicity) it
+   * makes use of this function to construct a corresponding exception. This
+   * exception then becomes part of the [[ExtractionFailure]] representing the
+   * problem. The function expects the following parameters:
+   *  - the key of the parameter affected
+   *  - a code for the failure; this identifies the problem at hand
+   *  - a sequence with additional parameters related to the failure; these can
+   *  be integrated into the exception error message
+   *
+   * By providing a specific implementation of this function in the
+   * [[ExtractionContext]], error handling can be customized.
+   */
+  type ExceptionGenerator = (ParameterKey, FailureCodes.Value, Seq[String]) => Throwable
+
+  /**
    * A data class storing the information required for extracting command
    * line options.
    *
@@ -1820,8 +1885,8 @@ object ParameterExtractor {
   /**
    * Generates a ''Try'' for the given expression that contains a meaningful
    * exception in case of a failure. This function maps the original
-   * exception to an ''IllegalArgumentException'' with a message that contains
-   * the name of the parameter.
+   * exception to an [[ParameterExtractionException]] with a message that
+   * contains the name of the parameter.
    *
    * @param context    the ''ExtractionContext''
    * @param key        the parameter key

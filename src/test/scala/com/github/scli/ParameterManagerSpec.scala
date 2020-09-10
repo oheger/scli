@@ -19,7 +19,7 @@ package com.github.scli
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionFailure, ExtractionContext, ParameterExtractionException, Parameters}
+import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionContext, ExtractionFailure, FailureCodes, ParameterExtractionException, Parameters}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
 import com.github.scli.ParameterModel.{AliasMapping, AttrErrCause, ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.{CliElement, ParameterFileException}
@@ -416,5 +416,86 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
       ParameterManager.evaluate(processResult)
     }
     thrown.getCause should be(exception)
+  }
+
+  /**
+   * Checks an exception produced by the default exception generator function.
+   *
+   * @param ex     the exception to check
+   * @param expMsg the expected exception message
+   */
+  private def checkFailureException(ex: Throwable, expMsg: String): Unit = {
+    ex shouldBe a[IllegalArgumentException]
+    ex.getMessage should be(expMsg)
+  }
+
+  /**
+   * Helper function to check the exception generated for a specific failure
+   * code by the default exception generator function.
+   *
+   * @param code   the failure code
+   * @param params additional parameters
+   * @param expMsg the expected message
+   */
+  private def checkExceptionForCode(code: FailureCodes.Value, params: Seq[String], expMsg: String): Unit = {
+    val exFunc = ParameterManager.defaultExceptionGenerator
+    val ex = exFunc(TestOptionPk, code, params)
+    checkFailureException(ex, expMsg)
+  }
+
+  it should "handle TooManyInputParameters in the default exception generator function" in {
+    checkExceptionForCode(FailureCodes.TooManyInputParameters, Seq("5"),
+      "Too many input arguments; expected at most 5")
+  }
+
+  it should "handle UnexpectedGroup in the default exception generator function" in {
+    val GroupValue = "unknownGroup"
+    val KnownGroups = "[foo, bar, baz]"
+
+    checkExceptionForCode(FailureCodes.UnknownGroup, Seq(GroupValue, KnownGroups),
+      "Invalid value \"" + GroupValue + "\". Expected one of " + KnownGroups)
+  }
+
+  it should "handle MultipleValues in the default exception generator function" in {
+    val Values = "[foo, bar, baz]"
+
+    checkExceptionForCode(FailureCodes.MultipleValues, Seq(Values),
+      "Single value expected, but got " + Values)
+  }
+
+  it should "handle MandatoryParameterMissing in the default exception generator function" in {
+    checkExceptionForCode(FailureCodes.MandatoryParameterMissing, Seq.empty,
+      "Mandatory parameter has no value")
+  }
+
+  it should "handle MultiplicityTooLow in the default exception generator function" in {
+    checkExceptionForCode(FailureCodes.MultiplicityTooLow, Seq("2"),
+      "Too few values; parameter must have at least 2 values")
+  }
+
+  it should "handle MultiplicityTooHigh in the default exception generator function" in {
+    checkExceptionForCode(FailureCodes.MultiplicityTooHigh, Seq("5"),
+      "Too many values; parameter must have at most 5 values")
+  }
+
+  it should "handle UnsupportedParameter in the default exception generator function" in {
+    checkExceptionForCode(FailureCodes.UnsupportedParameter, Seq.empty,
+      "Unsupported parameter")
+  }
+
+  it should "support overriding default exception messages" in {
+    val Message = "I do not know this parameter?!"
+    val Messages = Map(FailureCodes.UnsupportedParameter -> Message)
+
+    val generator = ParameterManager.exceptionGenerator(Messages)
+    val ex = generator(TestOptionPk, FailureCodes.UnsupportedParameter, Seq.empty)
+    ex.getMessage should be(Message)
+  }
+
+  it should "use default exception messages for codes that are not defined" in {
+    val generator = ParameterManager.exceptionGenerator(Map.empty)
+
+    val ex = generator(TestOptionPk, FailureCodes.UnsupportedParameter, Seq.empty)
+    ex.getMessage should be("Unsupported parameter")
   }
 }
