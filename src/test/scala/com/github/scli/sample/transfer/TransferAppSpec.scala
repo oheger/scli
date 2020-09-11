@@ -305,10 +305,9 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
   it should "print error information for missing input parameters" in {
     val output = checkAndExtractErrorText(executeTransfer(Array.empty))
 
-    assertParameterEntry(output, "transferCommand", "Too few input")
-    assertParameterEntry(output, "transferFiles", "Too few input")
-    assertParameterEntry(output, "serverUri", "Too few input")
-    output should include("argument 'serverUri'")
+    assertParameterEntry(output, "transferCommand", "Mandatory parameter")
+    assertParameterEntry(output, "transferFiles", "Mandatory parameter")
+    assertParameterEntry(output, "serverUri", "Mandatory parameter")
   }
 
   it should "print error information for invalid option values" in {

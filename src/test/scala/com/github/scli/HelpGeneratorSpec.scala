@@ -114,7 +114,8 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
    */
   private def runExtractor(params: ParametersMap, ext: CliExtractor[Try[String]]):
   (Try[String], ExtractionContext) = {
-    val context = ExtractionContext(params, ParameterModel.EmptyModelContext, DummyConsoleReader)
+    val context = ExtractionContext(params, ParameterModel.EmptyModelContext, DummyConsoleReader,
+      ParameterManager.defaultExceptionGenerator)
     ParameterExtractor.runExtractor(ext, context)
   }
 
@@ -562,7 +563,7 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
     val Group2 = "MyOtherGroup"
     val params = Map(testKey(1) -> List(Group1), testKey(2) -> List(Group2))
     val extrCtx = ExtractionContext(Parameters(toParamValues(params), Set.empty), createModelContext(),
-      DefaultConsoleReader)
+      DefaultConsoleReader, ParameterManager.defaultExceptionGenerator)
     val ext1 = optionValue(testKey(1).key).mandatory
     val ext2 = optionValue(testKey(2).key).mandatory
     val extErr = optionValue("undefined").mandatory
@@ -577,7 +578,8 @@ class HelpGeneratorSpec extends AnyFlatSpec with Matchers {
   it should "create a group context filter that excludes parameters without a group" in {
     val Group = "aGroup"
     val params = toParamValues(Map(Key -> List(Group)))
-    val extrCtx = ExtractionContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader)
+    val extrCtx = ExtractionContext(Parameters(params, Set.empty), createModelContext(), DefaultConsoleReader,
+      ParameterManager.defaultExceptionGenerator)
     val ext = optionValue(Key.key).mandatory
 
     val filter = HelpGenerator.contextGroupFilterForExtractors(extrCtx, List(ext), includeNoGroup = false)

@@ -70,7 +70,8 @@ object CliExtractorOpsSpec {
    * @return the result produced by the extractor
    */
   private def runExtractor[A](ext: CliExtractor[A], parameters: Parameters = TestParameters): A = {
-    val context = ExtractionContext(parameters, ParameterModel.EmptyModelContext, DefaultConsoleReader)
+    val context = ExtractionContext(parameters, ParameterModel.EmptyModelContext, DefaultConsoleReader,
+      ParameterManager.defaultExceptionGenerator)
     ParameterExtractor.runExtractor(ext, context)._1
   }
 
@@ -199,7 +200,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val result = runExtractor(ext)
     result match {
       case Failure(exception: ParameterExtractionException) =>
-        val failure = checkCause(exception.failures.head, "should have a single value")
+        val failure = checkCause(exception.failures.head, "Single value expected")
         failure.key.key should be(KeyNumbers)
       case r => fail("Unexpected result: " + r)
     }
@@ -514,7 +515,8 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "handle failures when creating a representation from components" in {
     val modelCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping,
       None, Nil)
-    val context = ExtractionContext(TestParameters, modelCtx, DummyConsoleReader)
+    val context = ExtractionContext(TestParameters, modelCtx, DummyConsoleReader,
+      ParameterManager.defaultExceptionGenerator)
     val failure1 = ExtractionFailure(pk(KeyFlag), new Exception("Flag failure"), None, context)
     val failure2 = ExtractionFailure(pk(KeyAnswer), new Exception("Answer failure"),
       Some(OptionElement(pk(KeyAnswer), None)), context)

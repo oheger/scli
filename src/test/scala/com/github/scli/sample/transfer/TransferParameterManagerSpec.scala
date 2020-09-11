@@ -22,7 +22,7 @@ import com.github.scli.ParameterExtractor.{ExtractionContext, ParameterExtractio
 import com.github.scli.ParameterManager.ProcessingContext
 import com.github.scli.ParametersTestHelper._
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, _}
-import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterModel}
+import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterManager, ParameterModel}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -192,7 +192,8 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val Password = "secret_Encryption!Pwd"
     val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("Encryption password", password = true)).thenReturn(Password)
-    val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader)
+    val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader,
+      ParameterManager.defaultExceptionGenerator)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, context)
     result.map(_.password) should be(Success(Password))
@@ -210,7 +211,8 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val Password = "tiger"
     val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("HTTP server password", password = true)).thenReturn(Password)
-    val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader)
+    val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader,
+      ParameterManager.defaultExceptionGenerator)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, context)
     result match {

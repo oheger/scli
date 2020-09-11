@@ -57,11 +57,17 @@ object ParameterExtractor {
   private final val BooleanMapping = Map("true" -> true, "false" -> false)
 
   /**
+   * A dummy ''ExceptionGenerator'' function that does not produce any real
+   * exception messages. This function is used when extractors need to be
+   * executed just to gather metadata.
+   */
+  private val DummyExceptionGenerator: ExceptionGenerator = (_, _, _) => new IllegalArgumentException
+
+  /**
    * A dummy extraction context object that is used if no current context is
    * available. It contains only dummy values.
    */
-  private val DummyExtractionContext = ExtractionContext(Parameters(Map.empty, Set.empty),
-    ParameterModel.EmptyModelContext, DummyConsoleReader)
+  private val DummyExtractionContext = contextForMetaDataRun(Map.empty, ParameterModel.EmptyModelContext)
 
   /**
    * Type definition for the base type of a command line option. The option
@@ -100,12 +106,14 @@ object ParameterExtractor {
 
     /**
      * Failure code for a single-valued parameter that has multiple values.
+     * Argument is the collection of values.
      */
     val MultipleValues: FailureCodes.Value = Value
 
     /**
      * Failure code used by ''conditionalGroupValue()'' if an unknown group is
-     * detected. Argument is the name of this group.
+     * detected. Argument are the name of this group and the set of supported
+     * groups.
      */
     val UnknownGroup: FailureCodes.Value = Value
 
@@ -137,7 +145,7 @@ object ParameterExtractor {
    *  - the key of the parameter affected
    *  - a code for the failure; this identifies the problem at hand
    *  - a sequence with additional parameters related to the failure; these can
-   *  be integrated into the exception error message
+   *    be integrated into the exception error message
    *
    * By providing a specific implementation of this function in the
    * [[ExtractionContext]], error handling can be customized.
@@ -207,13 +215,15 @@ object ParameterExtractor {
    * that may be needed to extract meaningful data or provide information
    * about the extractor.
    *
-   * @param parameters   the parameters to be processed
-   * @param modelContext the context storing model information
-   * @param reader       an object to read data from the console
+   * @param parameters         the parameters to be processed
+   * @param modelContext       the context storing model information
+   * @param reader             an object to read data from the console
+   * @param exceptionGenerator the exception generator function
    */
   case class ExtractionContext(parameters: Parameters,
                                modelContext: ModelContext,
-                               reader: ConsoleReader) {
+                               reader: ConsoleReader,
+                               exceptionGenerator: ExceptionGenerator) {
     /**
      * Returns a new ''ExtractionContext'' object that was updated with the
      * given ''Parameters'' and model context. All other properties remain
@@ -945,17 +955,13 @@ object ParameterExtractor {
         val adjustedIndex = if (index < 0) inputs.size + index
         else index
         if (adjustedIndex >= 0 && adjustedIndex < inputs.size) Success(adjustedIndex)
-        else Failure(paramException(context, paramKey, causeFor(tooFewErrorText(adjustedIndex))))
-      }
-
-      def tooFewErrorText(index: Int): String = {
-        val details = optKey map (k => s"'$k''") getOrElse s"for index $index"
-        s"Too few input arguments; undefined argument $details."
+        else Failure(paramException(context, paramKey,
+          context.exceptionGenerator(paramKey, FailureCodes.MandatoryParameterMissing, Seq.empty)))
       }
 
       val result = if (last && inputs.size > toIdx + 1)
         Failure(paramException(context, paramKey,
-          causeFor(s"Too many input arguments; expected at most ${toIdx + 1}")))
+          context.exceptionGenerator(paramKey, FailureCodes.TooManyInputParameters, Seq((toIdx + 1).toString))))
       else
         for {
           firstIndex <- adjustAndCheckIndex(fromIdx)
@@ -1155,7 +1161,9 @@ object ParameterExtractor {
         case Success(group) =>
           val modelContext = processUnselectedGroups(context2)(entry => entry._1 != group)
           groupMap.get(group).
-            fold((Try[A](throw paramException(context, groupExt.key, causeFor(s"Cannot resolve group '$group''"))),
+            fold((Try[A](throw paramException(context, groupExt.key,
+              context.exceptionGenerator(groupExt.key, FailureCodes.UnknownGroup,
+                Seq(group, groupMap.keys.mkString(", "))))),
               context2.copy(modelContext = modelContext))) { ext =>
               val (result, context3) = ext.run(context2.copy(modelContext = modelContext startGroup group))
               (result, context3.copy(modelContext = context3.modelContext.endGroup()))
@@ -1221,7 +1229,7 @@ object ParameterExtractor {
       val res = optionValue flatMap { values =>
         if (values.size > 1)
           Failure(paramException(context, ext.key,
-            causeFor(s"should have a single value, but has multiple values - $optionValue")))
+            context.exceptionGenerator(ext.key, FailureCodes.MultipleValues, Seq(values.mkString(", ")))))
         else Success(values.headOption)
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleOptional))
@@ -1240,7 +1248,8 @@ object ParameterExtractor {
     ext.mapWithContext((optionValue, context) => {
       val res = optionValue.flatMap {
         case Some(v) => Success(v)
-        case None => Failure(paramException(context, ext.key, causeFor("mandatory option has no value")))
+        case None => Failure(paramException(context, ext.key,
+          context.exceptionGenerator(ext.key, FailureCodes.MandatoryParameterMissing, Seq.empty)))
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleValue))
     })
@@ -1262,9 +1271,11 @@ object ParameterExtractor {
     ext.mapWithContext((optionValue, context) => {
       val res = optionValue.flatMap { values =>
         if (values.size < atLeast)
-          Failure(paramException(context, ext.key, causeFor(s"option must have at least $atLeast values")))
+          Failure(paramException(context, ext.key,
+            context.exceptionGenerator(ext.key, FailureCodes.MultiplicityTooLow, Seq(atLeast.toString))))
         else if (atMost >= 0 && values.size > atMost)
-          Failure(paramException(context, ext.key, causeFor(s"option must have at most $atMost values")))
+          Failure(paramException(context, ext.key,
+            context.exceptionGenerator(ext.key, FailureCodes.MultiplicityTooHigh, Seq(atMost.toString))))
         else Success(values)
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity(atLeast, atMost)))
@@ -1382,15 +1393,16 @@ object ParameterExtractor {
    * all the unused keys found. Otherwise, result is a ''Success'' with the
    * same ''ExtractionContext''.
    *
-   * @param paramContext the ''ExtractionContext'', updated by all extract
-   *                     operations
+   * @param extrContext the ''ExtractionContext'', updated by all extract
+   *                    operations
    * @return a ''Try'' with the validated ''ExtractionContext''
    */
-  def checkParametersConsumed(paramContext: ExtractionContext): Try[ExtractionContext] =
-    if (paramContext.parameters.allKeysAccessed) Success(paramContext)
+  def checkParametersConsumed(extrContext: ExtractionContext): Try[ExtractionContext] =
+    if (extrContext.parameters.allKeysAccessed) Success(extrContext)
     else {
-      val failures = paramContext.parameters.notAccessedKeys map { key =>
-        ExtractionFailure(key, causeFor("Unexpected parameter"), None, paramContext)
+      val failures = extrContext.parameters.notAccessedKeys map { key =>
+        ExtractionFailure(key, extrContext.exceptionGenerator(key, FailureCodes.UnsupportedParameter, Seq.empty),
+          None, extrContext)
       }
       Failure(ParameterExtractionException(failures.toList))
     }
@@ -1856,7 +1868,7 @@ object ParameterExtractor {
    * Executes the given ''CliExtractor'' on the ''ExtractionContext'' specified
    * and returns its result and the updated ''ExtractionContext'' object.
    *
-   * @param extractor     the extractor to be executed
+   * @param extractor         the extractor to be executed
    * @param ExtractionContext the ''ExtractionContext''
    * @tparam T the result type of the ''CliExtractor''
    * @return a tuple with the result and the resulting ''ExtractionContext''
@@ -1870,7 +1882,7 @@ object ParameterExtractor {
    * result and the updated ''ExtractionContext'' object. This function is
    * useful if a failed extractor should cause the whole operation to fail.
    *
-   * @param extractor     the extractor to be executed
+   * @param extractor         the extractor to be executed
    * @param ExtractionContext the ''ExtractionContext''
    * @tparam T the result type of the ''CliExtractor''
    * @return a ''Try'' of a tuple with the result and the updated
@@ -1972,17 +1984,6 @@ object ParameterExtractor {
       context = DummyExtractionContext)
 
   /**
-   * Generates an exception for an error message that can be stored as the
-   * ''cause'' in an [[ExtractionFailure]].
-   * TODO Make exceptions and error messages configurable
-   *
-   * @param message the error message
-   * @return the exception
-   */
-  private def causeFor(message: String): Throwable =
-    new IllegalArgumentException(message)
-
-  /**
    * Updates a model context by running some extractors against it. This
    * function is typically used by conditional extractors that select some
    * extractors to be executed from a larger set of extractors. The other
@@ -2031,7 +2032,7 @@ object ParameterExtractor {
    * @return the ''ExtractionContext'' for the meta data run
    */
   private def contextForMetaDataRun(params: ParametersMap, modelContext: ModelContext): ExtractionContext =
-    ExtractionContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader)
+    ExtractionContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader, DummyExceptionGenerator)
 
   /**
    * Obtains the collection with the original CLI elements for a specific key.

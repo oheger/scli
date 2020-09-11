@@ -18,7 +18,7 @@ package com.github.scli
 
 import java.io.IOException
 
-import com.github.scli.ParameterExtractor.{OptionValue, ExtractionContext, Parameters}
+import com.github.scli.ParameterExtractor.{ExceptionGenerator, ExtractionContext, FailureCodes, OptionValue, Parameters}
 import com.github.scli.ParameterModel.{ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.{OptionElement, ParametersMap}
 import com.github.scli.ParametersTestHelper._
@@ -61,10 +61,26 @@ object ParameterExtractorSpec {
   private val NextParameters = Parameters(toParamValues(Map(pk("bar") -> List("v2", "v3"))),
     Set(pk("x"), pk("y")))
 
+  /** A test exception generator function. */
+  private val TestExceptionGenerator: ExceptionGenerator =
+    (key, code, params) => new IllegalArgumentException(exceptionMessage(key, code, params))
+
   /** A test ExtractionContext object. */
   private val TestContext = ExtractionContext(TestParameters,
     new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil),
-    DummyConsoleReader)
+    DummyConsoleReader, TestExceptionGenerator)
+
+  /**
+   * Generates an exception message for the parameters specified. This function
+   * is used by the test exception generator function.
+   *
+   * @param key    the parameter key
+   * @param code   the failure code
+   * @param params additional parameters
+   * @return an exception message derived from these parameters
+   */
+  private def exceptionMessage(key: ParameterKey, code: FailureCodes.Value, params: Seq[String]): String =
+    s"$key:$code:$params"
 }
 
 /**
@@ -85,7 +101,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    */
   private def extractionContext(params: Parameters = TestParameters,
                                 reader: ConsoleReader = mock[ConsoleReader]): ExtractionContext =
-    ExtractionContext(params, ParameterModel.EmptyModelContext, reader)
+    ExtractionContext(params, ParameterModel.EmptyModelContext, reader, TestExceptionGenerator)
 
   /**
    * Expects that the given ''Try'' is a failure wrapping a
@@ -241,7 +257,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    * and returns a defined result.
    *
    * @param value          the value to be returned by the extractor
-   * @param expExtrCtx    the expected extraction context
+   * @param expExtrCtx     the expected extraction context
    * @param nextParameters the updated parameters
    * @tparam A the type of the value
    * @return the test extractor
@@ -363,7 +379,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val (res, next) = ParameterExtractor.runExtractor(extractor, context)
     next.parameters should be(NextParameters)
     val paramEx = expectExtractionException(res)
-    checkExtractionException[IllegalArgumentException](paramEx)("multiple values", MultiValue.toString)
+    checkExtractionException[IllegalArgumentException](paramEx)(exceptionMessage(TestParamKey,
+      FailureCodes.MultipleValues, Seq("v1, v2")))
   }
 
   it should "provide a mapping extractor that handles a failed result" in {
@@ -664,7 +681,32 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, context)
     next.parameters should be(NextParameters)
-    checkExtractionException[IllegalArgumentException](expectExtractionException(res))("no value")
+    checkExtractionException[IllegalArgumentException](expectExtractionException(res))(exceptionMessage(TestParamKey,
+      FailureCodes.MandatoryParameterMissing, Seq.empty))
+  }
+
+  it should "provide an extractor that fails if the multiplicity of a parameter is too low" in {
+    val context = extractionContext()
+    val Values: OptionValue[Int] = Success(List(1))
+    val ext = testExtractor(Values, context)
+    val extractor = ParameterExtractor.withMultiplicity(ext, 2, -1)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, context)
+    next.parameters should be(NextParameters)
+    checkExtractionException[IllegalArgumentException](expectExtractionException(res))(exceptionMessage(TestParamKey,
+      FailureCodes.MultiplicityTooLow, Seq("2")))
+  }
+
+  it should "provide an extractor that fails if the multiplicity of a parameter is too high" in {
+    val context = extractionContext()
+    val Values: OptionValue[Int] = Success(List(1, 2, 3))
+    val ext = testExtractor(Values, context)
+    val extractor = ParameterExtractor.withMultiplicity(ext, 1, 2)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, context)
+    next.parameters should be(NextParameters)
+    checkExtractionException[IllegalArgumentException](expectExtractionException(res))(exceptionMessage(TestParamKey,
+      FailureCodes.MultiplicityTooHigh, Seq("2")))
   }
 
   it should "provide an extractor that reads from the console" in {
@@ -785,14 +827,15 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val context = extractionContext()
     val GroupName = "foo"
     val groupExt: CliExtractor[Try[String]] = testExtractor(Success(GroupName), context)
-    val groupMap = Map("bar" -> optionValue(Key))
+    val groupMap = Map("bar" -> optionValue(Key), "baz" -> optionValue("other"))
     val extractor = conditionalGroupValue(groupExt, groupMap)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, context)
     next.parameters should be(NextParameters)
     next.modelContext.options.keys should contain(TestParamKey)
     checkExtractionException[IllegalArgumentException](expectExtractionException(res),
-      expParams = TestParameters.parametersMap)(s"'$GroupName''")
+      expParams = TestParameters.parametersMap)(exceptionMessage(TestParamKey, FailureCodes.UnknownGroup,
+      Seq(GroupName, "bar, baz")))
   }
 
   it should "provide an extractor that checks whether an option is defined if the option has a value" in {
@@ -862,7 +905,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val (res, _) = ParameterExtractor.runExtractor(extractor, context)
     checkExtractionException[IllegalArgumentException](expectExtractionException(res),
       expKey = ParameterParser.InputParameter,
-      expParams = TestParametersWithInputs.parametersMap)("-1")
+      expParams = TestParametersWithInputs.parametersMap)(exceptionMessage(ParameterParser.InputParameter,
+      FailureCodes.MandatoryParameterMissing, Seq.empty))
   }
 
   it should "yield a failure if the index of an input value is too big" in {
@@ -872,7 +916,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
     val (res, _) = ParameterExtractor.runExtractor(extractor, context)
     checkExtractionException[IllegalArgumentException](expectExtractionException(res), expKey = paramKey,
-      expParams = TestParametersWithInputs.parametersMap)("few input arguments")
+      expParams = TestParametersWithInputs.parametersMap)(exceptionMessage(paramKey,
+      FailureCodes.MandatoryParameterMissing, Seq.empty))
   }
 
   it should "yield a failure if too many input parameters have been specified" in {
@@ -882,7 +927,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val res = ParameterExtractor.tryExtractor(extractor, context)
     checkExtractionException[IllegalArgumentException](expectExtractionException(res),
       expKey = ParameterParser.InputParameter,
-      expParams = TestParametersWithInputs.parametersMap)("at most 2")
+      expParams = TestParametersWithInputs.parametersMap)(exceptionMessage(ParameterParser.InputParameter,
+      FailureCodes.TooManyInputParameters, Seq("2")))
     ParameterParser.InputParameter.hasPrefix shouldBe false
   }
 
@@ -893,7 +939,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
     val res = ParameterExtractor.tryExtractor(extractor, context)
     checkExtractionException[IllegalArgumentException](expectExtractionException(res), expKey = paramKey,
-      expParams = TestParametersWithInputs.parametersMap)("at most 2")
+      expParams = TestParametersWithInputs.parametersMap)(exceptionMessage(paramKey,
+      FailureCodes.TooManyInputParameters, Seq("2")))
   }
 
   it should "store the key for input parameters" in {
@@ -966,7 +1013,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
         exception.failures.foreach { failure =>
           failure.optElement should be(None)
           failure.cause shouldBe a[IllegalArgumentException]
-          failure.cause.getMessage should include("Unexpected")
+          failure.cause.getMessage should include(exceptionMessage(failure.key,
+            FailureCodes.UnsupportedParameter, Seq.empty))
         }
       case r => fail("Unexpected result: " + r)
     }
