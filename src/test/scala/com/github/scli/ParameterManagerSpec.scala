@@ -498,4 +498,15 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val ex = generator(TestOptionPk, FailureCodes.UnsupportedParameter, Seq.empty)
     ex.getMessage should be("Unsupported parameter")
   }
+
+  it should "support a custom exception generator function" in {
+    val args = List("--" + TestOptionKey, TestOptionValue, "--foo", "value")
+    val Message = "What?"
+    val Messages = Map(FailureCodes.UnsupportedParameter -> Message)
+    val exGen = ParameterManager.exceptionGenerator(Messages)
+    val spec = ExtractionSpec(TestExtractor, exceptionGenerator = exGen)
+
+    val exception = failedResult(ParameterManager.processCommandLineSpec(args, spec))
+    exception.failures.head.cause.getMessage should include(Message)
+  }
 }

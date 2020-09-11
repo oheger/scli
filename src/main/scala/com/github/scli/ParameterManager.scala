@@ -89,6 +89,7 @@ object ParameterManager {
    * @param optHelpExtractor        optional ''CliExtractor'' to determine
    *                                whether the user has requested help; this
    *                                could be for instance a ''--help'' switch
+   * @param exceptionGenerator      the exception generator function
    * @tparam A the result type of the ''CliExtractor''
    */
   case class ExtractionSpec[A](extractor: CliExtractor[Try[A]],
@@ -96,7 +97,8 @@ object ParameterManager {
                                supportCombinedSwitches: Boolean = false,
                                keyExtractor: KeyExtractorFunc = null,
                                fileOptions: Seq[ParameterKey] = Nil,
-                               optHelpExtractor: Option[CliExtractor[Try[Boolean]]] = None) {
+                               optHelpExtractor: Option[CliExtractor[Try[Boolean]]] = None,
+                               exceptionGenerator: ExceptionGenerator = ParameterManager.defaultExceptionGenerator) {
     /**
      * Stores an internal extractor, which gets executed for this
      * ''ExtractionSpec''. This extractor not only extracts the actual result
@@ -349,7 +351,7 @@ object ParameterManager {
   def processCommandLineSpec[A](args: Seq[String], spec: ExtractionSpec[A], parser: ParsingFunc = null,
                                 checkUnconsumedParameters: Boolean = true): ProcessingResult[A] = {
     val theParsingFunc = getOrDefault(parser, parsingFunc(spec))
-    extract(theParsingFunc(args), spec.internalExtractor, checkUnconsumedParameters)
+    extract(theParsingFunc(args), spec, checkUnconsumedParameters)
       .map(t => (t._1._1, ProcessingContext(t._2, helpRequested = t._1._2, optFailureContext = None)))
   }
 
@@ -438,18 +440,18 @@ object ParameterManager {
    * ensured that all messages are contained in the resulting exception.
    *
    * @param params                    the map with parameters
-   * @param extractor                 the extractor
+   * @param spec                      the extractor
    * @param checkUnconsumedParameters flag whether a check for unexpected
    *                                  parameters should be performed
    * @tparam A the result type of the ''CliExtractor''
    * @return a ''Try'' with the result of the extractor and the parameter
    *         context
    */
-  private def extract[A](params: ParametersMap, extractor: CliExtractor[Try[A]], checkUnconsumedParameters: Boolean):
-  Try[(A, ExtractionContext)] = {
+  private def extract[A](params: ParametersMap, spec: ExtractionSpec[A], checkUnconsumedParameters: Boolean):
+  Try[((A, Boolean), ExtractionContext)] = {
     val extrCtx = ExtractionContext(params, ParameterModel.EmptyModelContext, DefaultConsoleReader,
-    ParameterManager.defaultExceptionGenerator)
-    val (res, context) = runExtractor(extractor, extrCtx)
+      spec.exceptionGenerator)
+    val (res, context) = runExtractor(spec.internalExtractor, extrCtx)
     val triedContext = checkParametersConsumedConditionally(context, checkUnconsumedParameters)
     createRepresentation(res, triedContext)((_, _)) recoverWith {
       case e: ParameterExtractionException =>
