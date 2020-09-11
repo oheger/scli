@@ -20,7 +20,7 @@ import java.io.IOException
 
 import com.github.scli.HelpGeneratorTestHelper.{HelpText, Key, UndefinedAttribute}
 import com.github.scli.ParameterExtractor._
-import com.github.scli.ParameterModel.{AttrErrCause, AttrErrOriginalValue, AttrHelpText, AttrMultiplicity, FailureContext, InputParameterRef, ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey}
+import com.github.scli.ParameterModel.{AttrErrMessage, AttrErrCause, AttrErrOriginalValue, AttrHelpText, AttrMultiplicity, FailureContext, InputParameterRef, ModelContext, ParameterAttributeKey, ParameterAttributes, ParameterKey}
 import com.github.scli.ParameterParser.OptionElement
 import com.github.scli.ParametersTestHelper.toParamValues
 import org.mockito.Mockito.verifyZeroInteractions
@@ -606,6 +606,15 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
     val data = failureContext.parameterMetaData.head
     data.attributes.get(AttrErrCause) should be(Some(exception))
+  }
+
+  it should "include an attribute for the message of the causing exception" in {
+    val exception = new IllegalStateException("This is not good...")
+    val failure = ExtractionFailure(Key, exception, None, null)
+    val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
+
+    val data = failureContext.parameterMetaData.head
+    data.attributes.get(AttrErrMessage) should be(Some(exception.getMessage))
   }
 
   it should "remove duplicate errors" in {

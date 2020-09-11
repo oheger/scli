@@ -60,14 +60,6 @@ object ParameterModel {
   final val AttrParameterType = ParameterAttributeKey[String]("parameterType")
 
   /**
-   * The attribute to store an error message for an option. The attribute can
-   * be set if parameter extraction has failed for an option. It is then
-   * possible to generate output containing all error messages using all the
-   * column generators supported.
-   */
-  final val AttrErrorMessage = ParameterAttributeKey[String]("errorMessage")
-
-  /**
    * The attribute defining the value to be assigned to a switch if it is
    * present. This is normally a boolean constant.
    */
@@ -83,6 +75,13 @@ object ParameterModel {
 
   /** The attribute containing the exception that caused a failure. */
   final val AttrErrCause = ParameterAttributeKey[Throwable]("errCause")
+
+  /**
+   * The attribute containing the exception message. This is equivalent to the
+   * message of the exception, which is returned by the [[AttrErrCause]]
+   * attribute.
+   */
+  final val AttrErrMessage = ParameterAttributeKey[String]("errMessage")
 
   /** Parameter type indicating an option. */
   final val ParameterTypeOption = "option"
@@ -661,7 +660,7 @@ object ParameterModel {
       val attributes = modelContext.options.getOrElse(failure.key, new ParameterAttributes)
       val failureAttributes = failure.optOriginalValue.fold(attributes) { value =>
         attributes + (AttrErrOriginalValue -> value)
-      } + (AttrErrCause -> failure.cause)
+      } + (AttrErrCause -> failure.cause) + (AttrErrMessage -> failure.cause.getMessage)
       ParameterMetaData(failure.key, failureAttributes, aliases)
     }
   }
