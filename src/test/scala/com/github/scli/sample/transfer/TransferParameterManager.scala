@@ -21,9 +21,9 @@ import java.util.Locale
 
 import com.github.scli.HelpGenerator.ParameterFilter
 import com.github.scli.ParameterExtractor._
-import com.github.scli.{HelpGenerator, ParameterManager}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext}
-import com.github.scli.ParameterModel.{AttrErrCause, AttrFallbackValue, AttrHelpText, ParameterKey}
+import com.github.scli.ParameterModel.{AttrErrMessage, AttrFallbackValue, AttrHelpText, ParameterKey}
+import com.github.scli.{HelpGenerator, ParameterManager}
 
 import scala.concurrent.duration.{Duration, _}
 import scala.util.{Success, Try}
@@ -314,7 +314,8 @@ object TransferParameterManager {
       .alias("h")
     val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
       supportCombinedSwitches = true, optHelpExtractor = Some(helpSwitch),
-      fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)))
+      fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)),
+      exceptionGenerator = exceptionGenerator)
     val classifierFunc = ParameterManager.classifierFunc(spec)
     val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
 
@@ -641,7 +642,7 @@ object TransferParameterManager {
     context.optFailureContext map { failureContext =>
       import HelpGenerator._
       val colKey = parameterAliasColumnGenerator()
-      val colErr = wrapColumnGenerator(attributeColumnGenerator(AttrErrCause), 60)
+      val colErr = wrapColumnGenerator(attributeColumnGenerator(AttrErrMessage), 60)
       val buf = new StringBuilder(8192)
       buf.append(ErrorHeader)
         .append(CR)
@@ -651,4 +652,23 @@ object TransferParameterManager {
         .append(CR)
       buf
     } getOrElse new StringBuilder(4096)
+
+  /**
+   * Returns the exception generator function used by this application.
+   *
+   * @return the custom exception handler function
+   */
+  private def exceptionGenerator: ExceptionGenerator = {
+    val Messages = Map(FailureCodes.UnsupportedParameter -> "This parameter is not supported.",
+      FailureCodes.MultipleValues -> ("For this parameter only a single value is permitted. " +
+        "You entered: \"{0}\""))
+    val defExGen = ParameterManager.exceptionGenerator(Messages)
+    (key, code, params) =>
+      key match {
+        case ParameterKey("transferCommand", _, _) if code == FailureCodes.UnknownGroup =>
+          new IllegalArgumentException(s"Unknown transfer command: '${params.head}. Valid commands are <${params(1)}>")
+        case _ =>
+          defExGen(key, code, params)
+      }
+  }
 }

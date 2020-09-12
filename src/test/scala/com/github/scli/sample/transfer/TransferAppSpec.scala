@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 
+import com.github.scli.HelpGenerator
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -82,6 +83,18 @@ object TransferAppSpec {
       TransferApp.main(args)
     }
     stdOut.toString(StandardCharsets.UTF_8)
+  }
+
+  /**
+   * Removes line breaks from the given string. This is used to simplify string
+   * matches in texts that are line-wrapped.
+   *
+   * @param s the string with line breaks
+   * @return the unwrapped string
+   */
+  private def unwrap(s: String): String = {
+    val lines = s.split(HelpGenerator.CR)
+    lines.map(_.trim).mkString(" ")
   }
 }
 
@@ -315,7 +328,7 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
       "--chunk-size", "invalid")
     val output = checkAndExtractErrorText(executeTransfer(args))
 
-    assertParameterEntry(output, "--chunk-size", "NumberFormatException")
+    assertParameterEntry(output, "--chunk-size", "invalid")
   }
 
   it should "show the affected aliases in error reports" in {
@@ -323,6 +336,34 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
       "-s", "invalid")
     val output = checkAndExtractErrorText(executeTransfer(args))
 
-    assertParameterEntry(output, "-s ", "NumberFormatException")
+    assertParameterEntry(output, "-s ", "invalid")
+  }
+
+  it should "generate a meaningful error message for an unsupported command" in {
+    val Command = "unsupported"
+    val args = withInputParameters(Command, 1, httpServer = false)
+    val output = unwrap(checkAndExtractErrorText(executeTransfer(args)))
+
+    output should include("Unknown transfer command")
+    output should include(Command)
+    output should include("Valid commands are <upload, download>")
+  }
+
+  it should "generate a meaningful error message for an unknown parameter" in {
+    val key = "--unknown"
+    val args = withInputParameters("upload", 1, httpServer = false, key)
+    val output = unwrap(checkAndExtractErrorText(executeTransfer(args)))
+
+    output should include(key)
+    output should include("This parameter is not supported.")
+  }
+
+  it should "generate a meaningful error message if a single-value parameter has multiple values" in {
+    val args = withInputParameters("upload", 1, httpServer = true,
+      "--user", "user1", "--password", "secret", "--user", "user2")
+    val output = checkAndExtractErrorText(executeTransfer(args))
+
+    assertParameterEntry(output, "--user", "For this parameter only")
+    unwrap(output) should include("You entered: \"user1, user2\"")
   }
 }

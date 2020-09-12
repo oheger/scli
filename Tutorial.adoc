@@ -2335,12 +2335,124 @@ mandatory input parameters are present:
 ----
 Invalid parameters have been detected:
 
-serverUri        java.lang.IllegalArgumentException: Too few input arguments;
-                 undefined argument 'serverUri''.
+serverUri        Mandatory parameter has no value
 
-transferCommand  java.lang.IllegalArgumentException: Too few input arguments;
-                 undefined argument 'transferCommand''.
+transferCommand  Mandatory parameter has no value
 
-transferFiles    java.lang.IllegalArgumentException: Too few input arguments;
-                 undefined argument 'transferFiles''.
+transferFiles    Mandatory parameter has no value
 ----
+
+==== Customizing standard error messages
+
+The `ParameterExtractor` module defines some default error messages for the
+extractor functions it provides. The example output from the last section is
+an example of such a message for an undefined mandatory parameter. These
+default messages should correctly describe the problem that was detected; but
+if you like, you can customize the error messages shown in an error report.
+
+`ParameterExtractor` defines an enumeration class `FailureCodes`, which lists
+constants for the standard errors detected by the module. These are problems
+like a missing mandatory parameter, unknown parameters, or parameters with too
+many or too few values. Have a look at this enumeration class to get the full
+list of failure codes defined.
+
+When the `ParameterExtractor` module detects one of these failures during
+command line processing, it generates an exception describing the cause and
+adds a failure entry to the failure context. The actual generation of the
+exception is done by an `ExceptionGenerator` function, which is defined as
+follows:
+
+[source,scala]
+----
+type ExceptionGenerator = (ParameterKey, FailureCodes.Value, Seq[String]) => Throwable
+----
+
+The function expects the key of the parameter affected, one of the failure code
+constants, and a sequence with parameters depending on the failure code. It
+returns the exception to be stored in the failure context. There is a default
+exception generator function, which creates exceptions of type
+`IllegalArgumentException` with the standard error messages.
+
+An application can replace this `ExceptionGenerator` function by a custom one.
+The easiest way to create a custom exception generator function is by using the
+`exceptionGenerator()` function of `ParameterManager`. The function takes a map
+that assigns messages to failure codes. The resulting exception generator
+function still produces `IllegalArgumentException` exceptions, but initializes
+them with the custom exception messages. The map with custom messages does not
+need to contain messages for all the failure codes supported; for the missing
+failure codes, the standard messages are used. So you can just override a
+subset of messages.
+
+For some failure codes, additional information is available that can be added
+to the error messages. This information is provided in the sequence parameter
+passed to the exception generator function. For instance, for the failure codes
+related to a wrong multiplicity - a parameter has too many or too few values -,
+the sequence contains a single element with the correct value of the boundary
+that is violated. When constructing the messages for the resulting exceptions
+the default exception handler function uses Java's `MessageFormat` class to
+integrate those additional parameters with the text of the message. Therefore,
+the messages can contain placeholders like _{0}_, _{1}_ and so on that
+reference the elements in the sequence. Again refer to the documentation of the
+`FailureCodes` class for information about the concrete parameters available to
+the single codes.
+
+To demonstrate this customization of failure messages, the _transfer_ demo
+application changes the standard texts for two failure codes.
+`TransferParameterManager` has a function that creates a custom exception
+generator based on the standard function and a map with custom failure
+messages:
+
+[source,scala]
+----
+private def exceptionGenerator: ExceptionGenerator = {
+  val Messages = Map(FailureCodes.UnsupportedParameter -> "This parameter is not supported.",
+    FailureCodes.MultipleValues -> ("For this parameter only a single value is permitted. " +
+      "You entered: \"{0}\""))
+  ParameterManager.exceptionGenerator(Messages)
+}
+----
+
+To enable this custom exception generator function, it has to be specified as a
+property when creating the `ExtractionSpec` that controls the whole parameter
+processing process (refer to <<Running an extractor with custom settings>>).
+
+ val spec = ExtractionSpec(transferCommandConfigExtractor,
+   ...
+   exceptionGenerator = exceptionGenerator)
+
+The standard exception messages only depend on the failure code and do not take
+the key of the parameter affected by the failure into account. The key of this
+parameter is, however, available to the exception generator function; so if you
+define your own function, you can evaluate it.
+
+The _transfer_ demo application wants to show a more detailed failure message
+if the user has entered an unsupported transfer command. The failure code that
+reports this problem is `UnknownGroup` (because the implementation of commands
+uses the `conditionalGroupValue()` function); but the modified message should
+show up only if the _transferCommand_ parameter is affected. The following code
+fragment shows the extended `exceptionGenerator` function of
+`TransferParameterManager` that implements this special customization:
+
+[source,scala]
+----
+private def exceptionGenerator: ExceptionGenerator = {
+  val Messages = Map(FailureCodes.UnsupportedParameter -> "This parameter is not supported.",
+    FailureCodes.MultipleValues -> ("For this parameter only a single value is permitted. " +
+      "You entered: \"{0}\""))
+  val defExGen = ParameterManager.exceptionGenerator(Messages)
+  (key, code, params) =>
+    key match {
+      case ParameterKey("transferCommand", _, _) if code == FailureCodes.UnknownGroup =>
+        new IllegalArgumentException(s"Unknown transfer command: '${params.head}. Valid commands are <${params(1)}>")
+      case _ =>
+        defExGen(key, code, params)
+    }
+}
+----
+
+The function first obtains a default exception generator function that
+overrides some standard failure messages; this part is already known. Then it
+defines a new exception generator function that evaluates the parameter key. If
+the key points to the transfer command, and the code equals `UnknownGroup`, the
+function returns a special exception. In all cases it delegates to the standard
+exception generator function.
