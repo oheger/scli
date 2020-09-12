@@ -60,7 +60,7 @@ object ParameterModelSpec {
                                    optReader: Option[ConsoleReader] = None): ModelContext = {
     val reader: ConsoleReader = optReader getOrElse DefaultConsoleReader
     val context = ExtractionContext(params, ParameterModel.EmptyModelContext, reader,
-      ParameterManager.defaultExceptionGenerator)
+      ParameterManager.defaultExceptionGenerator, None)
     val (_, ctx) = ParameterExtractor.runExtractor(ext, context)
     ctx.modelContext
   }

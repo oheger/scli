@@ -71,7 +71,7 @@ object CliExtractorOpsSpec {
    */
   private def runExtractor[A](ext: CliExtractor[A], parameters: Parameters = TestParameters): A = {
     val context = ExtractionContext(parameters, ParameterModel.EmptyModelContext, DefaultConsoleReader,
-      ParameterManager.defaultExceptionGenerator)
+      ParameterManager.defaultExceptionGenerator, None)
     ParameterExtractor.runExtractor(ext, context)._1
   }
 
@@ -516,7 +516,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val modelCtx = new ParameterModel.ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping,
       None, Nil)
     val context = ExtractionContext(TestParameters, modelCtx, DummyConsoleReader,
-      ParameterManager.defaultExceptionGenerator)
+      ParameterManager.defaultExceptionGenerator, None)
     val failure1 = ExtractionFailure(pk(KeyFlag), new Exception("Flag failure"), None, context)
     val failure2 = ExtractionFailure(pk(KeyAnswer), new Exception("Answer failure"),
       Some(OptionElement(pk(KeyAnswer), None)), context)

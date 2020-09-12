@@ -193,7 +193,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("Encryption password", password = true)).thenReturn(Password)
     val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader,
-      ParameterManager.defaultExceptionGenerator)
+      ParameterManager.defaultExceptionGenerator, None)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.cryptConfigExtractor, context)
     result.map(_.password) should be(Success(Password))
@@ -212,7 +212,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val consoleReader = mock[ConsoleReader]
     Mockito.when(consoleReader.readOption("HTTP server password", password = true)).thenReturn(Password)
     val context = ExtractionContext(args, ParameterModel.EmptyModelContext, consoleReader,
-      ParameterManager.defaultExceptionGenerator)
+      ParameterManager.defaultExceptionGenerator, None)
 
     val (result, _) = ParameterExtractor.runExtractor(TransferParameterManager.httpServerConfigExtractor, context)
     result match {

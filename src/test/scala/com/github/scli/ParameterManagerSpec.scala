@@ -75,7 +75,7 @@ object ParameterManagerSpec {
     val modelContext = new ModelContext(Map.empty, SortedSet.empty, AliasMapping(Map.empty, Map.empty),
       None, List("some", "groups"))
     val params = Parameters(toParamValues(Map(TestOptionPk -> List(TestOptionValue))), Set.empty)
-    ExtractionContext(params, modelContext, DummyConsoleReader, ParameterManager.defaultExceptionGenerator)
+    ExtractionContext(params, modelContext, DummyConsoleReader, ParameterManager.defaultExceptionGenerator, None)
   }
 
   /**

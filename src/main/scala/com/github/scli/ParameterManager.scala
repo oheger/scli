@@ -450,7 +450,7 @@ object ParameterManager {
   private def extract[A](params: ParametersMap, spec: ExtractionSpec[A], checkUnconsumedParameters: Boolean):
   Try[((A, Boolean), ExtractionContext)] = {
     val extrCtx = ExtractionContext(params, ParameterModel.EmptyModelContext, DefaultConsoleReader,
-      spec.exceptionGenerator)
+      spec.exceptionGenerator, None)
     val (res, context) = runExtractor(spec.internalExtractor, extrCtx)
     val triedContext = checkParametersConsumedConditionally(context, checkUnconsumedParameters)
     createRepresentation(res, triedContext)((_, _)) recoverWith {

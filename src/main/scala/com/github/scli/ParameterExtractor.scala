@@ -153,6 +153,29 @@ object ParameterExtractor {
   type ExceptionGenerator = (ParameterKey, FailureCodes.Value, Seq[String]) => Throwable
 
   /**
+   * Type definition of a function for mapping exceptions that occur while
+   * transforming a ''CliExtractor''.
+   *
+   * When using functions from the ''map'' family on a ''CliExtractor''
+   * exceptions that are thrown by the mapping function normally cause the
+   * extractor's result to fail with this exception. Thus, these exceptions can
+   * also show up in error reports. This may not always be desired, especially
+   * if the exception message is rather technical. This type describe a
+   * function to map exceptions to another exception type; so exceptions and
+   * their messages can be customized. The function expects the following
+   * parameters:
+   *  - the key of the parameter affected
+   *  - an ''Option'' with the original value of this parameter that was passed
+   *    on the command line (this value may not be available under all
+   *    circumstances)
+   *
+   * The function returns a partial function that does the actual exception
+   * mapping. So you can map specific exceptions of specific parameters in a
+   * different way.
+   */
+  type ExceptionMapper = (ParameterKey, Option[CliElement]) => PartialFunction[Throwable, Throwable]
+
+  /**
    * A data class storing the information required for extracting command
    * line options.
    *
@@ -219,11 +242,13 @@ object ParameterExtractor {
    * @param modelContext       the context storing model information
    * @param reader             an object to read data from the console
    * @param exceptionGenerator the exception generator function
+   * @param exceptionMapper    an optional exception mapper function
    */
   case class ExtractionContext(parameters: Parameters,
                                modelContext: ModelContext,
                                reader: ConsoleReader,
-                               exceptionGenerator: ExceptionGenerator) {
+                               exceptionGenerator: ExceptionGenerator,
+                               exceptionMapper: Option[ExceptionMapper]) {
     /**
      * Returns a new ''ExtractionContext'' object that was updated with the
      * given ''Parameters'' and model context. All other properties remain
@@ -2032,7 +2057,7 @@ object ParameterExtractor {
    * @return the ''ExtractionContext'' for the meta data run
    */
   private def contextForMetaDataRun(params: ParametersMap, modelContext: ModelContext): ExtractionContext =
-    ExtractionContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader, DummyExceptionGenerator)
+    ExtractionContext(Parameters(params, Set.empty), modelContext, DummyConsoleReader, DummyExceptionGenerator, None)
 
   /**
    * Obtains the collection with the original CLI elements for a specific key.

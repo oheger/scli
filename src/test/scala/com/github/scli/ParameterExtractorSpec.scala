@@ -68,7 +68,7 @@ object ParameterExtractorSpec {
   /** A test ExtractionContext object. */
   private val TestContext = ExtractionContext(TestParameters,
     new ModelContext(Map.empty, SortedSet.empty, ParameterModel.EmptyAliasMapping, None, Nil),
-    DummyConsoleReader, TestExceptionGenerator)
+    DummyConsoleReader, TestExceptionGenerator, None)
 
   /**
    * Generates an exception message for the parameters specified. This function
@@ -101,7 +101,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    */
   private def extractionContext(params: Parameters = TestParameters,
                                 reader: ConsoleReader = mock[ConsoleReader]): ExtractionContext =
-    ExtractionContext(params, ParameterModel.EmptyModelContext, reader, TestExceptionGenerator)
+    ExtractionContext(params, ParameterModel.EmptyModelContext, reader, TestExceptionGenerator, None)
 
   /**
    * Expects that the given ''Try'' is a failure wrapping a
