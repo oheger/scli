@@ -1935,7 +1935,7 @@ object ParameterExtractor {
    */
   def paramTry[T](context: ExtractionContext, key: ParameterKey, optElement: Option[CliElement] = None)
                  (f: => T): Try[T] =
-    Try(f) recoverWith {
+    applyExceptionMapper(Try(f), context, key, optElement) recoverWith {
       case pex: ParameterExtractionException => Failure(pex)
       case ex => Failure(paramException(context, key, ex, optElement))
     }
@@ -2074,4 +2074,23 @@ object ParameterExtractor {
     val elements = context.parameters.parametersMap.getOrElse(ext.key, Nil)
     if (elements.size == expSize) elements else Nil
   }
+
+  /**
+   * Applies the exception mapping function to the given tried value if it is
+   * defined. If the tried value is a failure, the exception may be customized
+   * that way.
+   *
+   * @param triedValue the ''Try'' with the current value
+   * @param context    the extraction context
+   * @param key        the parameter key
+   * @param optElem    the optional original ''CliElement''
+   * @tparam A the type of the value
+   * @return the ''Try'' with the mapped exception
+   */
+  private def applyExceptionMapper[A](triedValue: Try[A], context: ExtractionContext, key: ParameterKey,
+                                      optElem: Option[CliElement]): Try[A] =
+    context.exceptionMapper.map(f => f(key, optElem))
+      .map(pf => pf andThen (t => Failure[A](t)))
+      .map(pf => triedValue recoverWith pf)
+      .getOrElse(triedValue)
 }

@@ -97,11 +97,13 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    *
    * @param params the map with parameters
    * @param reader the console reader
+   * @param mapper the optional exception mapper function
    * @return the ''ExtractionContext''
    */
   private def extractionContext(params: Parameters = TestParameters,
-                                reader: ConsoleReader = mock[ConsoleReader]): ExtractionContext =
-    ExtractionContext(params, ParameterModel.EmptyModelContext, reader, TestExceptionGenerator, None)
+                                reader: ConsoleReader = mock[ConsoleReader],
+                                mapper: Option[ExceptionMapper] = None): ExtractionContext =
+    ExtractionContext(params, ParameterModel.EmptyModelContext, reader, TestExceptionGenerator, mapper)
 
   /**
    * Expects that the given ''Try'' is a failure wrapping a
@@ -490,6 +492,38 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     failure.optElement should be(None)
   }
 
+  it should "provide a mapping extractor that invokes the exception mapper function" in {
+    val mapper: ExceptionMapper = (key, optElem) => {
+      case _: NumberFormatException =>
+        new IllegalArgumentException(exceptionMessage(key, FailureCodes.UnsupportedParameter, Seq(optElem.get.value)))
+    }
+    val Value = "notANumber"
+    val context = extractionContext(mapper = Some(mapper))
+    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("1")),
+      OptionElement(TestParamKey, Some(Value)), OptionElement(TestParamKey, Some("2"))))
+    val Result: OptionValue[String] = Success(List("1", Value, "2"))
+    val ext = testExtractor(Result, context, nextParameters = params)
+    val extractor = ParameterExtractor.mapped(ext)(_.toInt)
+
+    val (res, _) = ParameterExtractor.runExtractor(extractor, context)
+    checkExtractionException[IllegalArgumentException](expectExtractionException(res),
+      expParams = params.parametersMap)(exceptionMessage(TestParamKey, FailureCodes.UnsupportedParameter, Seq(Value)))
+  }
+
+  it should "provide a mapping extractor that correctly invokes the partial exception mapper function" in {
+    val mapper: ExceptionMapper = (_, _) => {
+      case _: IllegalStateException => new UnsupportedOperationException
+    }
+    val Value = "strangeNumber"
+    val context = extractionContext(mapper = Some(mapper))
+    val Result: OptionValue[String] = Success(List(Value))
+    val ext = testExtractor(Result, context)
+    val extractor = ParameterExtractor.mapped(ext)(_.toInt)
+
+    val (res, _) = ParameterExtractor.runExtractor(extractor, context)
+    checkExtractionException[NumberFormatException](expectExtractionException(res))(Value)
+  }
+
   it should "provide a single value mapping extractor that handles a failed result" in {
     val context = extractionContext()
     val FailedValue: SingleOptionValue[String] = Failure(new Exception("Failed"))
@@ -551,6 +585,28 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val failure = checkExtractionException[NumberFormatException](expectExtractionException(res),
       expParams = params.parametersMap)()
     failure.optElement should be(None)
+  }
+
+  it should "provide a single mapping extractor that invokes the exception mapper function" in {
+    val mapper: ExceptionMapper = (key, optElem) => {
+      case e: NumberFormatException =>
+        new IllegalArgumentException(exceptionMessage(key, FailureCodes.UnsupportedParameter,
+          Seq(optElem.get.value)), e)
+    }
+    val context = extractionContext(mapper = Some(mapper))
+    val InvalidNumber = "Not a number!"
+    val Result: SingleOptionValue[String] = Success(Some(InvalidNumber))
+    val elem = OptionElement(pk("someAlternativeKey"), Some(InvalidNumber))
+    val params: Parameters = Map(TestParamKey -> List(elem))
+    val ext = testExtractor(Result, context, nextParameters = params)
+    val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, context)
+    next.parameters should be(params)
+    val failure = checkExtractionException[IllegalArgumentException](expectExtractionException(res),
+      expParams = params.parametersMap)(exceptionMessage(TestParamKey, FailureCodes.UnsupportedParameter,
+      Seq(InvalidNumber)))
+    failure.cause.getCause shouldBe a[NumberFormatException]
   }
 
   it should "provide an extractor that converts an option value to int" in {
