@@ -90,6 +90,7 @@ object ParameterManager {
    *                                whether the user has requested help; this
    *                                could be for instance a ''--help'' switch
    * @param exceptionGenerator      the exception generator function
+   * @param optExceptionMapper      optional exception mapper function
    * @tparam A the result type of the ''CliExtractor''
    */
   case class ExtractionSpec[A](extractor: CliExtractor[Try[A]],
@@ -98,7 +99,8 @@ object ParameterManager {
                                keyExtractor: KeyExtractorFunc = null,
                                fileOptions: Seq[ParameterKey] = Nil,
                                optHelpExtractor: Option[CliExtractor[Try[Boolean]]] = None,
-                               exceptionGenerator: ExceptionGenerator = ParameterManager.defaultExceptionGenerator) {
+                               exceptionGenerator: ExceptionGenerator = ParameterManager.defaultExceptionGenerator,
+                               optExceptionMapper: Option[ExceptionMapper] = None) {
     /**
      * Stores an internal extractor, which gets executed for this
      * ''ExtractionSpec''. This extractor not only extracts the actual result
@@ -450,7 +452,7 @@ object ParameterManager {
   private def extract[A](params: ParametersMap, spec: ExtractionSpec[A], checkUnconsumedParameters: Boolean):
   Try[((A, Boolean), ExtractionContext)] = {
     val extrCtx = ExtractionContext(params, ParameterModel.EmptyModelContext, DefaultConsoleReader,
-      spec.exceptionGenerator, None)
+      spec.exceptionGenerator, spec.optExceptionMapper)
     val (res, context) = runExtractor(spec.internalExtractor, extrCtx)
     val triedContext = checkParametersConsumedConditionally(context, checkUnconsumedParameters)
     createRepresentation(res, triedContext)((_, _)) recoverWith {

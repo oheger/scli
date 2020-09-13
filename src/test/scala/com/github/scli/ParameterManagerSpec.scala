@@ -19,7 +19,7 @@ package com.github.scli
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
-import com.github.scli.ParameterExtractor.{CliExtractor, ExtractionContext, ExtractionFailure, FailureCodes, ParameterExtractionException, Parameters}
+import com.github.scli.ParameterExtractor.{CliExtractor, ExceptionMapper, ExtractionContext, ExtractionFailure, FailureCodes, ParameterExtractionException, Parameters, optionValue}
 import com.github.scli.ParameterManager.{ExtractionSpec, ProcessingContext, ProcessingResult}
 import com.github.scli.ParameterModel.{AliasMapping, AttrErrCause, ModelContext, ParameterKey}
 import com.github.scli.ParameterParser.{CliElement, ParameterFileException}
@@ -508,5 +508,24 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
     val exception = failedResult(ParameterManager.processCommandLineSpec(args, spec))
     exception.failures.head.cause.getMessage should include(Message)
+  }
+
+  it should "support a custom exception mapper function" in {
+    val args = List("--" + TestOptionKey, TestOptionValue)
+    val extractor = optionValue(TestOptionKey)
+      .toInt
+      .mandatory
+    val exMapper: ExceptionMapper = (key, optElem) => {
+      case e: NumberFormatException =>
+        new IllegalArgumentException(s"${key.key} - Not a number: ${optElem.map(_.value).getOrElse("?")}", e)
+    }
+    val spec = ExtractionSpec(extractor, optExceptionMapper = Some(exMapper))
+
+    val exception = failedResult(ParameterManager.processCommandLineSpec(args, spec))
+    exception.failures should have size 1
+    val cause = exception.failures.head.cause
+    cause shouldBe a[IllegalArgumentException]
+    cause.getCause shouldBe a[NumberFormatException]
+    cause.getMessage should be(s"$TestOptionKey - Not a number: $TestOptionValue")
   }
 }
