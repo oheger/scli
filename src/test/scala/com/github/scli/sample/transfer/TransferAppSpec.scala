@@ -366,4 +366,20 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
     assertParameterEntry(output, "--user", "For this parameter only")
     unwrap(output) should include("You entered: \"user1, user2\"")
   }
+
+  it should "generate better failure messages if numbers cannot be parsed" in {
+    val args = withInputParameters("upload", 1, httpServer = false,
+      "--chunk-size", "large")
+    val output = unwrap(checkAndExtractErrorText(executeTransfer(args)))
+
+    output should include("Input cannot be converted to a number: \"large\"")
+  }
+
+  it should "generate a better failure message for an invalid crypt mode" in {
+    val args = withInputParameters("upload", 1, httpServer = false,
+      "--crypt-mode", "invalid")
+    val output = unwrap(checkAndExtractErrorText(executeTransfer(args)))
+
+    output should include("This is not a valid encryption mode: \"invalid\"")
+  }
 }

@@ -315,7 +315,8 @@ object TransferParameterManager {
     val spec = ExtractionSpec(transferCommandConfigExtractor, keyExtractor = keyExtractor,
       supportCombinedSwitches = true, optHelpExtractor = Some(helpSwitch),
       fileOptions = List(ParameterKey("param-file", shortAlias = false), ParameterKey("f", shortAlias = true)),
-      exceptionGenerator = exceptionGenerator)
+      exceptionGenerator = exceptionGenerator,
+      optExceptionMapper = Some(exceptionMapper))
     val classifierFunc = ParameterManager.classifierFunc(spec)
     val parseFunc = ParameterManager.parsingFuncForClassifier(spec)(classifierFunc)
 
@@ -670,5 +671,19 @@ object TransferParameterManager {
         case _ =>
           defExGen(key, code, params)
       }
+  }
+
+  /**
+   * Returns the exception mapper function used by this application. This
+   * function aims to produce better error messages for some standard
+   * exceptions.
+   *
+   * @return the exception mapper function
+   */
+  private def exceptionMapper: ExceptionMapper = (key, optElem) => {
+    case e: NumberFormatException =>
+      new IllegalArgumentException("Input cannot be converted to a number: \"" + optElem.get.value + "\"", e)
+    case e: IllegalArgumentException if key.key == "crypt-mode" =>
+      new IllegalArgumentException("This is not a valid encryption mode: \"" + optElem.get.value + "\"", e)
   }
 }

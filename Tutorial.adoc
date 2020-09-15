@@ -2456,3 +2456,100 @@ defines a new exception generator function that evaluates the parameter key. If
 the key points to the transfer command, and the code equals `UnknownGroup`, the
 function returns a special exception. In all cases it delegates to the standard
 exception generator function.
+
+==== Customizing transformation exceptions
+
+In addition to the problems detected by the `ParameterExtractor` module - as
+discussed in the previous subsection -, there is another source of potential
+errors: transformations on extracted values. Take for instance the `toInt()`
+modifier. The function tries to convert the value entered by the user to a
+number. If this is not possible, the transformation causes a
+`NumberFormatException` (which is a standard Java exception describing this
+conversion problem). Other converter functions behave similarly; they use
+standard Java functionality to do their specific conversion, and thus can
+produce standard Java exceptions. Developers can write custom mapping functions
+to do custom conversions; those functions may throw arbitrary exceptions.
+
+The `ParameterExtractor` module deals with such cases by wrapping invocations
+of mapping functions into `Try` instances. If an invocation fails, the causing
+exception can be extracted from the `Try` and stored in the failure context.
+The error report then shows the messages of these exceptions.
+
+This is a working approach, but sometimes the exception messages are rather
+technical or do not describe the actual problem in a way that can be understood
+by the target audience. The message of a `NumberFormatException` is an example
+of such a case; in Java 11 it just contains the text _For input XXX_, where
+_XXX_ is replaced by the invalid value entered by the user. This message is
+meaningful only if the error report shows the exception type; but then it
+already becomes pretty technical.
+
+SCLI addresses the problem by supporting an `ExceptionMapper` function. Its
+definition looks like this:
+
+[source,scala]
+----
+type ExceptionMapper = (ParameterKey, Option[CliElement]) => PartialFunction[Throwable, Throwable]
+----
+
+The function expects the key of the parameter affected by the exception and an
+`Option` with a `CliElement`. `CliElement` holds information about the
+parameter value as it has been entered by the user; namely the parameter key
+and the original value. The function returns a `PartialFunction`, which does
+the actual exception mapping; here you can match for specific exceptions and
+return alternative ones.
+
+The _transfer_ demo application defines a custom exception mapper function,
+which implements the following mappings:
+
+* `NumberFormatException` exceptions are mapped to `IllegalArgumentException`
+  exceptions with a better exception message. (As the error report of the
+  application does not display the exception type, the actual exception class
+  is rather irrelevant; only the message is important.)
+* If the user enters an invalid encryption mode, the mapping function generates
+  a more concrete error message. This conversion shows how to evaluate the
+  parameter key in the mapping function.
+
+The code fragment, which defines the exception mapper function, is shown below:
+
+[source,scala]
+----
+private def exceptionMapper: ExceptionMapper = (key, optElem) => {
+  case e: NumberFormatException =>
+    new IllegalArgumentException("Input cannot be converted to a number: \"" + optElem.get.value + "\"", e)
+  case e: IllegalArgumentException if key.key == "crypt-mode" =>
+    new IllegalArgumentException("This is not a valid encryption mode: \"" + optElem.get.value + "\"", e)
+}
+----
+
+NOTE: The `CliElement` passed as second parameter to the mapping function is an
+`Option` because there is no absolute guarantee that the problematic parameter
+value can be associated with a specific element on the command line under all
+circumstances. For instance, an application may apply a mapping function to an
+extractor that filters out some values entered for a parameter. In such cases,
+the `Option` parameter is undefined. As the demo application does not do such
+things, it relies on the presence of this information and just calls `get` on
+the `Option` instance, although this is certainly no good practice in general.
+
+The exception mapper function is activated in the same way as a custom
+exception generator function: by setting a property of the `ExtractionSpec`
+object passed to `ParameterManager`:
+
+ val spec = ExtractionSpec(transferCommandConfigExtractor,
+   ...
+   exceptionMapper = exceptionMapper)
+
+We can test the special exception mapper function by passing invalid values to
+the numeric `chunk-size` and the `crypt-mode` parameters:
+
+ transfer upload test.txt /data --chunk-size large --crypt-mode secret
+
+This is the error report generated for this input:
+
+[source]
+----
+Invalid parameters have been detected:
+
+--chunk-size  Input cannot be converted to a number: "large"
+
+--crypt-mode  This is not a valid encryption mode: "secret"
+----
