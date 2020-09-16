@@ -2553,3 +2553,73 @@ Invalid parameters have been detected:
 
 --crypt-mode  This is not a valid encryption mode: "secret"
 ----
+
+==== Error handling in transformation functions
+
+The previous subsection already gave an explanation how SCLI deals with
+exceptions thrown by transformations on `CliExtractor` objects. Basically, such
+exceptions are caught and added to the failure context, which is the source for
+error reports.
+
+This is applicable to custom mapping functions as well. Your mapping logic can
+throw arbitrary exceptions. In this scenario, you have typically control over
+the concrete exceptions; so you can directly generate messages suitable for the
+error report to the end user - and thus can skip an additional step with an
+exception mapper function.
+
+Let us have a look at an example from the _transfer_ demo application. The
+application supports an option `--attribute` (which can be abbreviated using
+the alias `-A`) to add a metadata attribute to the current transfer operation.
+The option can occur multiple times to set arbitrary attributes. The value of
+the option needs to be of the form _<key>=<value>_. The corresponding extractor
+therefore checks whether the value conforms to this pattern. If this is the
+case, it can transform the value to an `Attribute` object; otherwise, an
+exception is thrown to report the invalid option value. Here are the pieces of
+code related to this transformation:
+
+[source,scala]
+----
+case class Attribute(key: String, value: String)
+
+private val RegAttribute = "(.+)=(.+)".r
+
+private def toAttribute(input: String): Attribute =
+  input match {
+    case RegAttribute(key, value) => Attribute(key, value)
+    case _ => throw new IllegalArgumentException("Invalid attribute value: \"" + input +
+      "\" - attributes must have the form <key>=<value>.")
+  }
+
+val extAttributes = multiOptionValue("attribute", Some(HelpAttribute))
+  .alias("A")
+  .mapTo(toAttribute)
+----
+
+The declaration of the `CliExtractor` for the `attribute` option uses the
+`mapTo()` modifier to apply a transformation function - here `toAttribute()` -
+to the original string value. `toAttribute()` checks the string against a
+regular expression that splits it into a key/value pair. With this information,
+the `Attribute` instance can be constructed. If the regular expression does not
+match, however, the function throws an exception with a meaningful message. As
+has already been mentioned, the concrete exception type does not really matter
+for the demo application because it is not shown in the error report. If you
+prefer, you can of course use specialized exception types.
+
+An invocation of the demo application with invalid attribute options like the
+following one:
+
+ transfer upload test.txt /data --attribute stage=qa \
+   --attribute invalid1 -A invalid2
+
+produces this error report:
+
+[source]
+----
+Invalid parameters have been detected:
+
+--attribute  Invalid attribute value: "invalid1" - attributes must have
+             the form <key>=<value>.
+
+-A           Invalid attribute value: "invalid2" - attributes must have
+             the form <key>=<value>.
+----

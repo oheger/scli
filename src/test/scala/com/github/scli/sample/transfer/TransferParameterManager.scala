@@ -113,6 +113,11 @@ object TransferParameterManager {
   private val HelpDryRun =
     """Allows enabling a dry-run or test mode, in which no actual files are transferred."""
 
+  private val HelpAttribute =
+    """Defines an attribute for the current transfer operation, which is stored in the metadata. \
+      |The value of this option must be in the form <key>=<value>. By repeating this parameter,
+      |multiple attributes can be set.""".stripMargin
+
   private val HelpCryptMode =
     """Determines what kind of encryption is used during the transfer process. This parameter \
       |can have the following values (case does not matter):
@@ -167,6 +172,9 @@ object TransferParameterManager {
       |To include help about options related to encryption, specify a valid crypt mode, e.g.:
       |transfer --crypt-mode files --help""".stripMargin
 
+  /** Regular expression to match attribute parameters. */
+  private val RegAttribute = "(.+)=(.+)".r
+
   private[transfer] val ErrorHeader = "Invalid parameters have been detected:"
 
   /**
@@ -201,6 +209,17 @@ object TransferParameterManager {
                          algorithm: String)
 
   /**
+   * A data class representing a metadata attribute for a transfer operation.
+   *
+   * It is possible to specify an arbitrary number of key-value pairs that are
+   * stored as attributes for the current transfer operation.
+   *
+   * @param key   the key of the attribute
+   * @param value the value of the attribute
+   */
+  case class Attribute(key: String, value: String)
+
+  /**
    * A class for storing some general properties for a transfer operation.
    *
    * These properties are common to all supported commands and do not fit into
@@ -220,7 +239,8 @@ object TransferParameterManager {
                             timeout: Option[Duration],
                             dryRun: Boolean,
                             logs: Iterable[String],
-                            tag: Option[String])
+                            tag: Option[String],
+                            attributes: Iterable[Attribute])
 
   /**
    * A trait to represent the command line options to extract depending on the
@@ -451,6 +471,9 @@ object TransferParameterManager {
       .alias("T")
     val extDryRun = switchValue("dry-run", Some(HelpDryRun))
       .alias("d")
+    val extAttributes = multiOptionValue("attribute", Some(HelpAttribute))
+      .alias("A")
+      .mapTo(toAttribute)
 
     for {
       srcFiles <- extSrcFiles
@@ -460,9 +483,9 @@ object TransferParameterManager {
       chunkSize <- extChunkSize
       timeout <- extTimeout
       dryRun <- extDryRun
-    } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, dryRun, logs, tag) {
-      TransferConfig(_, _, _, _, _, _, _)
-    }
+      attributes <- extAttributes
+    } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, dryRun, logs, tag,
+      attributes)(TransferConfig)
   }
 
   /**
@@ -686,4 +709,19 @@ object TransferParameterManager {
     case e: IllegalArgumentException if key.key == "crypt-mode" =>
       new IllegalArgumentException("This is not a valid encryption mode: \"" + optElem.get.value + "\"", e)
   }
+
+  /**
+   * Transforms a parameter value to an ''Attribute''. The parameter value
+   * must contain a key and a value separated by ''=''. If this is not the
+   * case, this mapping function throws an exception.
+   *
+   * @param input the original parameter value
+   * @return the resulting ''Attribute''
+   */
+  private def toAttribute(input: String): Attribute =
+    input match {
+      case RegAttribute(key, value) => Attribute(key, value)
+      case _ => throw new IllegalArgumentException("Invalid attribute value: \"" + input +
+        "\" - attributes must have the form <key>=<value>.")
+    }
 }

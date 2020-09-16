@@ -222,6 +222,14 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     }
   }
 
+  it should "extract attributes for the transfer operation" in {
+    val args = inputParameters(http = false) ::: List("--attribute", "a1=v1", "-A", "a2=v2")
+    val expAttributes = List(Attribute("a1", "v1"), Attribute("a2", "v2"))
+
+    val config = extractResult(args)
+    config.transferConfig.attributes.toList should contain theSameElementsInOrderAs expAttributes
+  }
+
   it should "extract a command config for uploads and a file server" in {
     val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes",
       "--remove-uploaded", "--root-path", "/data", "--umask", "660",

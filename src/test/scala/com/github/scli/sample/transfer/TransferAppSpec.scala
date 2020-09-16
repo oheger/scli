@@ -382,4 +382,13 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
 
     output should include("This is not a valid encryption mode: \"invalid\"")
   }
+
+  it should "display error messages for invalid attributes" in {
+    val args = withInputParameters("UPLOAD", 1, httpServer = false,
+      "--attribute", "noKeyValuePair1", "-A", "noKeyValuePair2")
+    val output = checkAndExtractErrorText(executeTransfer(args))
+
+    assertParameterEntry(output, "--attribute", "value: \"noKeyValuePair1")
+    assertParameterEntry(output, "-A", "value: \"noKeyValuePair2")
+  }
 }
