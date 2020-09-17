@@ -902,7 +902,7 @@ object ParameterExtractor {
    */
   def optionValue(key: String, help: Option[String] = None, shortAlias: Boolean = false):
   CliExtractor[SingleOptionValue[String]] =
-    asSingleOptionValue(multiOptionValue(key, help, shortAlias))
+    asSingleOptionValue(optionValues(key, help, shortAlias))
 
   /**
    * Returns an extractor that extracts all values of the specified option key
@@ -913,7 +913,7 @@ object ParameterExtractor {
    * @param shortAlias flag whether the key is a short alias
    * @return the extractor to extract the option values
    */
-  def multiOptionValue(key: String, help: Option[String] = None, shortAlias: Boolean = false):
+  def optionValues(key: String, help: Option[String] = None, shortAlias: Boolean = false):
   CliExtractor[OptionValue[String]] = {
     val paramKey = ParameterKey(key, shortAlias)
     CliExtractor(context => {
@@ -1239,7 +1239,7 @@ object ParameterExtractor {
    * @return an extractor checking whether this option is defined
    */
   def isDefinedExtractor(key: String): CliExtractor[Try[Boolean]] =
-    isOptionDefined(multiOptionValue(key))
+    isOptionDefined(optionValues(key))
 
   /**
    * Returns an extractor that extracts a single option value from the result

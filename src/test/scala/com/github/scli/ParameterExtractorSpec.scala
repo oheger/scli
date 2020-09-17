@@ -841,8 +841,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val Key2 = pk("keyElse")
     val exception = new Exception("failed")
     val condExt: CliExtractor[Try[Boolean]] = testExtractor(Failure(exception), context)
-    val ifExt = multiOptionValue(Key)
-    val elseExt = multiOptionValue(Key2.key)
+    val ifExt = optionValues(Key)
+    val elseExt = optionValues(Key2.key)
     val extractor = ParameterExtractor.conditionalOptionValue(condExt, ifExt = ifExt, elseExt = elseExt)
 
     val (res, next) = ParameterExtractor.runExtractor(extractor, context)

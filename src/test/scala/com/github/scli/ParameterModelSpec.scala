@@ -166,7 +166,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   "ModelContext" should "store a help text for an option" in {
-    val ext = multiOptionValue(Key.key, help = Some(HelpText))
+    val ext = optionValues(Key.key, help = Some(HelpText))
 
     val modelContext = generateModelContext(ext)
     modelContext.options.keys should contain only Key
@@ -199,7 +199,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
     val FallbackDesc = "This is the fallback value."
     val constExtValue: OptionValue[String] = Success(List("foo"))
     val fallbackExt = constantExtractor(constExtValue, Some(FallbackDesc))
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .fallback(fallbackExt)
 
     val modelContext = generateModelContext(ext)
@@ -209,7 +209,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "support a description for constant values" in {
     val ValueDesc = "This is a meaningful default value."
     val valueExt = constantOptionValueWithDesc(Some(ValueDesc), "foo", "bar")
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .fallback(valueExt)
 
     val modelContext = generateModelContext(ext)
@@ -218,7 +218,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "support skipping a description for a constant value" in {
     val valueExt = constantOptionValueWithDesc(None, "foo", "bar")
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .fallback(valueExt)
 
     val modelContext = generateModelContext(ext)
@@ -227,7 +227,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "support a description for multi fallback values" in {
     val ValueDesc = "Description of these values."
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .fallbackValuesWithDesc(Some(ValueDesc), "foo", "bar", "baz")
 
     val modelContext = generateModelContext(ext)
@@ -246,7 +246,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "generate a description for constant values" in {
     val Values = List("val1", "val2", "val3")
     val ValueDesc = s"<${Values.head}, ${Values(1)}, ${Values(2)}>"
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .fallbackValues(Values.head, Values.tail: _*)
 
     val modelContext = generateModelContext(ext)
@@ -255,7 +255,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "generate a description for a single constant value" in {
     val Value = "test"
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .fallbackValues(Value)
 
     val modelContext = generateModelContext(ext)
@@ -265,7 +265,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "update the model context with a fallback extractor" in {
     val paramsMap = Map(Key -> List("true"))
     val params = Parameters(toParamValues(paramsMap), Set.empty)
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
       .toBoolean
       .fallbackValues(false)
 
@@ -372,7 +372,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "set a multiplicity attribute for options with a single value" in {
     val Key2 = ParameterKey(Key.key + "_other", shortAlias = false)
     val ext1 = optionValue(Key.key)
-    val ext2 = multiOptionValue(Key2.key)
+    val ext2 = optionValues(Key2.key)
     val ext = for {
       v1 <- ext1
       v2 <- ext2
@@ -392,7 +392,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "set a multiplicity attribute for mandatory options" in {
     val Key2 = Key.key + "_optional"
     val ext1 = optionValue(Key.key).mandatory
-    val ext2 = multiOptionValue(Key2).single
+    val ext2 = optionValues(Key2).single
     val ext = for {
       v1 <- ext1
       v2 <- ext2
@@ -403,10 +403,10 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support groups for conditional options" in {
-    val extCond = multiOptionValue("condition").isDefined
-    val extIf = multiOptionValue("if", Some("help-if"))
-    val extElse = multiOptionValue("else", Some("help-else"))
-    val extOther = multiOptionValue(Key.key, Some(HelpText))
+    val extCond = optionValues("condition").isDefined
+    val extIf = optionValues("if", Some("help-if"))
+    val extElse = optionValues("else", Some("help-else"))
+    val extOther = optionValues(Key.key, Some(HelpText))
     val extCase = conditionalOptionValue(extCond, extIf, extElse, Some("grp-if"), Some("grp-else"))
     val ext = for {
       v1 <- extCase
@@ -424,11 +424,11 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "support nested conditional groups" in {
-    val extCond1 = multiOptionValue("condition1").isDefined
-    val extCond2 = multiOptionValue("condition2").isDefined
-    val extIfNested = multiOptionValue("if-nested", Some("help-if-nested"))
-    val extElseNested = multiOptionValue("else-nested", Some("help-else-nested"))
-    val extElse = multiOptionValue("else", Some("help-else"))
+    val extCond1 = optionValues("condition1").isDefined
+    val extCond2 = optionValues("condition2").isDefined
+    val extIfNested = optionValues("if-nested", Some("help-if-nested"))
+    val extElseNested = optionValues("else-nested", Some("help-else-nested"))
+    val extElse = optionValues("else", Some("help-else"))
     val extCaseNested = conditionalOptionValue(extCond2, extIfNested, extElseNested,
       ifGroup = Some("grp-if-nested"), elseGroup = Some("grp-else-nested"))
     val extCase = conditionalOptionValue(extCond1, extCaseNested, extElse,
@@ -448,9 +448,9 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "merge the values of group attributes" in {
-    val extCond = multiOptionValue("condition").isDefined
-    val extIf = multiOptionValue(Key.key)
-    val extElse = multiOptionValue(Key.key)
+    val extCond = optionValues("condition").isDefined
+    val extIf = optionValues(Key.key)
+    val extElse = optionValues(Key.key)
     val extCase = conditionalOptionValue(extCond, ifExt = extIf, ifGroup = Some("g1"),
       elseExt = extElse, elseGroup = Some("g2"))
 
@@ -494,8 +494,8 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "correctly handle the groups of a conditional group extractor" in {
     val Key2 = ParameterKey("OtherKey", shortAlias = false)
-    val extG1 = multiOptionValue(Key.key)
-    val extG2 = multiOptionValue(Key2.key)
+    val extG1 = optionValues(Key.key)
+    val extG2 = optionValues(Key2.key)
     val extGroupSel = constantOptionValue("g1").single.mandatory
     val groupMap = Map("g1" -> extG1, "g2" -> extG2)
     val extCondGroup = conditionalGroupValue(extGroupSel, groupMap)
@@ -507,7 +507,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "set the multiplicity attribute if it is defined" in {
-    val ext = multiOptionValue(Key.key).multiplicity(1, 4)
+    val ext = optionValues(Key.key).multiplicity(1, 4)
 
     val modelContext = generateModelContext(ext)
     val attr = modelContext.options(Key)
@@ -515,7 +515,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "handle an unrestricted multiplicity" in {
-    val ext = multiOptionValue(Key.key).multiplicity()
+    val ext = optionValues(Key.key).multiplicity()
 
     val modelContext = generateModelContext(ext)
     val attr = modelContext.options(Key)
@@ -523,7 +523,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "set the parameter type attribute for a plain option" in {
-    val ext = multiOptionValue(Key.key)
+    val ext = optionValues(Key.key)
 
     val modelContext = generateModelContext(ext)
     fetchAttribute(modelContext, Key, ParameterModel.AttrParameterType) should be(ParameterModel.ParameterTypeOption)

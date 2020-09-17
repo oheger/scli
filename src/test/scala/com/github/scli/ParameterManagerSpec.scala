@@ -164,7 +164,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "handle a failed extractor" in {
     val args = List("--" + TestOptionKey, TestOptionValue)
-    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey)
+    val extractor = ParameterExtractor.optionValues(TestOptionKey)
       .toInt
 
     val exception = failedResult(ParameterManager.processCommandLine(args, extractor))
@@ -178,7 +178,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "combine failures of the extractor with failures for unconsumed parameters" in {
     val args = List("--" + TestOptionKey, TestOptionValue, "--unknownOption", "shouldFail")
-    val ext1 = ParameterExtractor.multiOptionValue(TestOptionKey).toInt
+    val ext1 = ParameterExtractor.optionValues(TestOptionKey).toInt
     val ext2 = ParameterExtractor.optionValue("missing").mandatory
     val extractor = for {
       v1 <- ext1
@@ -257,7 +257,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
     val AliasLong = "alternative-option-key"
     val AliasValue = "anotherValue"
     val args = List("-" + AliasShort, TestOptionValue, "--" + AliasLong, AliasValue)
-    val extractor = ParameterExtractor.multiOptionValue(TestOptionKey)
+    val extractor = ParameterExtractor.optionValues(TestOptionKey)
       .alias(AliasShort)
       .alias(AliasLong, shortAlias = false)
 

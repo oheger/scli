@@ -97,10 +97,10 @@ object CliExtractorOpsSpec {
    */
   private def paramModelExtractor(): CliExtractor[Try[ParamModel]] =
     for {
-      extNumbers <- multiOptionValue(KeyNumbers).toInt
-      extAnswer <- multiOptionValue(KeyAnswer).toInt.single.mandatory
-      extFlag <- multiOptionValue(KeyFlag).toBoolean.single.mandatory
-      extPath <- multiOptionValue(KeyPath).toPath.single
+      extNumbers <- optionValues(KeyNumbers).toInt
+      extAnswer <- optionValues(KeyAnswer).toInt.single.mandatory
+      extFlag <- optionValues(KeyFlag).toBoolean.single.mandatory
+      extPath <- optionValues(KeyPath).toPath.single
     } yield createModel(extNumbers, extAnswer, extFlag, extPath)
 
   /**
@@ -181,7 +181,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   "ParameterExtractor" should "extract multiple string values" in {
     val strValues = NumberValues.map(_.toString)
-    val ext = multiOptionValue(KeyNumbers)
+    val ext = optionValues(KeyNumbers)
 
     val result = runExtractor(ext)
     result should be(Success(strValues))
@@ -207,7 +207,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "extract numeric values" in {
-    val ext = multiOptionValue(KeyNumbers).toInt
+    val ext = optionValues(KeyNumbers).toInt
 
     val result = runExtractor(ext)
     result should be(Success(NumberValues))
@@ -235,7 +235,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "extract multiple flag values" in {
-    val ext = multiOptionValue(KeyFlag).toBoolean
+    val ext = optionValues(KeyFlag).toBoolean
 
     val result = runExtractor(ext)
     result.get should contain only true
@@ -249,7 +249,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "extract multiple path values" in {
-    val ext = multiOptionValue(KeyPath).toPath
+    val ext = optionValues(KeyPath).toPath
 
     val result = runExtractor(ext)
     result.get should contain only PathValue
@@ -259,7 +259,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val OrgValues = List("TEST", "test", "Test", "TesT")
     val Key = "multiStringOption"
     val parameters = createParametersWithValues(pk(Key), OrgValues)
-    val ext = multiOptionValue(Key).toLower
+    val ext = optionValues(Key).toLower
 
     val result = runExtractor(ext, parameters).get
     result should have size OrgValues.size
@@ -279,7 +279,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     val OrgValues = List("TEST", "test", "Test", "TesT")
     val Key = "multiStringOption"
     val parameters = createParametersWithValues(pk(Key), OrgValues)
-    val ext = multiOptionValue(Key).toUpper
+    val ext = optionValues(Key).toUpper
 
     val result = runExtractor(ext, parameters).get
     result should have size OrgValues.size
@@ -297,7 +297,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
 
   it should "support mapping the values extracted by an extractor" in {
     val mapFunc: Int => Int = _ + 1
-    val intExt = multiOptionValue(KeyNumbers).toInt
+    val intExt = optionValues(KeyNumbers).toInt
     val ext = intExt mapTo mapFunc
     val expectedValues = NumberValues map mapFunc
 
@@ -318,7 +318,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "convert values to an enum" in {
     val EnumValues = List("larry", "curly", "moe")
     val mapping = NumberValues.map(_.toString).zip(EnumValues).toMap
-    val ext = multiOptionValue(KeyNumbers)
+    val ext = optionValues(KeyNumbers)
       .toEnum(mapping.get)
 
     val result = runExtractor(ext)
@@ -336,14 +336,14 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support checking whether a multi option is defined" in {
-    val ext = multiOptionValue(KeyAnswer).isDefined
+    val ext = optionValues(KeyAnswer).isDefined
 
     val result = runExtractor(ext)
     result should be(Success(true))
   }
 
   it should "support checking whether a multi option is defined if it is not" in {
-    val ext = multiOptionValue(UndefinedKey).isDefined
+    val ext = optionValues(UndefinedKey).isDefined
 
     val result = runExtractor(ext)
     result should be(Success(false))
@@ -364,7 +364,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "report a failure for an undefined mandatory option" in {
-    val ext = multiOptionValue(UndefinedKey).single.mandatory
+    val ext = optionValues(UndefinedKey).single.mandatory
 
     val result = runExtractor(ext)
     result match {
@@ -375,21 +375,21 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support checking for the multiplicity of an extractor" in {
-    val ext = multiOptionValue(KeyNumbers).toInt.multiplicity(atMost = NumberValues.size)
+    val ext = optionValues(KeyNumbers).toInt.multiplicity(atMost = NumberValues.size)
 
     val result = runExtractor(ext)
     result should be(Success(NumberValues))
   }
 
   it should "handle an unbounded multiplicity for an extractor" in {
-    val ext = multiOptionValue(KeyNumbers).toInt.multiplicity(atLeast = 1)
+    val ext = optionValues(KeyNumbers).toInt.multiplicity(atLeast = 1)
 
     val result = runExtractor(ext)
     result should be(Success(NumberValues))
   }
 
   it should "report a failure if not enough values are present" in {
-    val ext = multiOptionValue(KeyAnswer).multiplicity(atLeast = 2)
+    val ext = optionValues(KeyAnswer).multiplicity(atLeast = 2)
 
     val result = runExtractor(ext)
     result match {
@@ -401,7 +401,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "report a failure if too many values are present" in {
-    val ext = multiOptionValue(KeyNumbers).multiplicity(atMost = NumberValues.size - 1)
+    val ext = optionValues(KeyNumbers).multiplicity(atMost = NumberValues.size - 1)
 
     val result = runExtractor(ext)
     result match {
@@ -413,7 +413,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support setting a fallback value for a multi option if the extractor yields a value" in {
-    val ext = multiOptionValue(KeyAnswer).fallbackValues("fallback")
+    val ext = optionValues(KeyAnswer).fallbackValues("fallback")
       .toInt.single.mandatory
 
     val result = runExtractor(ext)
@@ -421,7 +421,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support setting a fallback value for a multi option" in {
-    val ext = multiOptionValue(UndefinedKey).fallback(constantOptionValue(NumberValue.toString))
+    val ext = optionValues(UndefinedKey).fallback(constantOptionValue(NumberValue.toString))
       .toInt.single.mandatory
 
     val result = runExtractor(ext)
@@ -429,7 +429,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "support setting fallback values for a multi option" in {
-    val ext = multiOptionValue(UndefinedKey)
+    val ext = optionValues(UndefinedKey)
       .toInt
       .fallbackValues(NumberValues.head, NumberValues.tail: _*)
 
@@ -438,7 +438,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "ignore fallback values in case of a failure" in {
-    val ext = multiOptionValue(KeyPath)
+    val ext = optionValues(KeyPath)
       .toInt
       .fallbackValues(NumberValue)
 

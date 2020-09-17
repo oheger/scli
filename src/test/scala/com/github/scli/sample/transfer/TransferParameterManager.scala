@@ -465,13 +465,13 @@ object TransferParameterManager {
       .alias("t")
       .toInt
       .mapTo(t => t.seconds)
-    val extLogs = multiOptionValue("log", Some(HelpLog))
+    val extLogs = optionValues("log", Some(HelpLog))
       .alias("l")
     val extTag = optionValue("tag", Some(HelpTag))
       .alias("T")
     val extDryRun = switchValue("dry-run", Some(HelpDryRun))
       .alias("d")
-    val extAttributes = multiOptionValue("attribute", Some(HelpAttribute))
+    val extAttributes = optionValues("attribute", Some(HelpAttribute))
       .alias("A")
       .mapTo(toAttribute)
 
