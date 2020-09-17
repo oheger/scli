@@ -478,7 +478,7 @@ object ParameterParser {
             appendOptionValue(argsMap, InputParameter, elem)
 
           case elem@OptionElement(key, optValue) =>
-            optValue.fold(argsMap)(value => appendOptionValue(argsMap,
+            optValue.fold(argsMap)(_ => appendOptionValue(argsMap,
               resolveAlias(key)(aliasResolverFunc), elem))
 
           case SwitchesElement(switches) =>
