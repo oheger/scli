@@ -16,13 +16,14 @@
 
 package com.github.scli.sample.transfer
 
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
 import com.github.scli.ParameterExtractor.{ExtractionContext, ParameterExtractionException}
 import com.github.scli.ParameterManager.ProcessingContext
 import com.github.scli.ParametersTestHelper._
 import com.github.scli.sample.transfer.TransferParameterManager.{CryptMode, _}
-import com.github.scli.{ConsoleReader, ParameterExtractor, ParameterManager, ParameterModel}
+import com.github.scli.{ConsoleReader, HelpGenerator, ParameterExtractor, ParameterManager, ParameterModel}
 import org.mockito.Mockito
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -341,9 +342,9 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val serverConfig = HttpServerConfig("scott", "tiger")
     val fileContent = List("--timeout", "15", "--chunk-size", "8192", "--user", serverConfig.user,
       "--password", serverConfig.password)
-    import scala.jdk.CollectionConverters._
+    val contentBinary = fileContent.mkString(HelpGenerator.CR).getBytes(StandardCharsets.UTF_8)
     val path = Files.createTempFile("scliTest", ".tmp")
-    val paramFile = Files.write(path, fileContent.asJava)
+    val paramFile = Files.write(path, contentBinary)
     try {
       val args = inputParameters(http = true) ::: List(key, paramFile.toAbsolutePath.toString)
       val config = extractResult(args)

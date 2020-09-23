@@ -15,7 +15,10 @@
  */
 
 /** Definition of versions. */
-lazy val VersionScala = "2.13.2"
+lazy val VersionScala213 = "2.13.3"
+lazy val VersionScala212 = "2.12.12"
+lazy val VersionScala211 = "2.11.12"
+lazy val supportedScalaVersions = List(VersionScala213, VersionScala212, VersionScala211)
 lazy val VersionScalaTest = "3.1.1"
 lazy val VersionMockito = "1.9.5"
 lazy val VersionScalaTestMockito = "1.0.0-M2"
@@ -33,7 +36,8 @@ lazy val testDependencies = Seq(
 lazy val SCli = (project in file("."))
   .settings(
     version := "0.1-SNAPSHOT",
-    scalaVersion := VersionScala,
+    scalaVersion := VersionScala213,
+    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= testDependencies,
     organization := "com.github.oheger",
     homepage := Some(url("https://github.com/oheger/scli")),
