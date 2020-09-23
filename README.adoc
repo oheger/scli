@@ -32,6 +32,20 @@ restricted to a subset of arguments, which are relevant in the current context.
 The information to be displayed for the arguments in the help screen can be
 customized.
 
+== Reference in your project
+
+SCLI is available in the Maven central repository in cross-built versions for
+Scala 2.11, 2.12, and 2.13. The coordinates are:
+
+* GroupId: _com.github.oheger_
+* ArtifactId: _scli_
+* Version: 1.0.0
+
+When using link:https://www.scala-sbt.org/[Sbt] as build tool, you would add
+the dependency as follows:
+
+ libraryDependencies += "com.github.oheger" %% "scli" % "1.0.0"
+
 == Concepts
 
 Before we come to practical examples in the link:Tutorial.adoc[Tutorial]
