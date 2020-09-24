@@ -68,3 +68,21 @@ lazy val SCli = (project in file("."))
         Some("releases" at nexus + "service/local/staging/deploy/maven2")
     }
   )
+
+Compile / packageBin / mappings += {
+  (baseDirectory.value / "LICENSE.txt") -> "META-INF/LICENSE.txt"
+}
+
+Compile / packageSrc / mappings ++= Seq({
+  (baseDirectory.value / "LICENSE.txt") -> "META-INF/LICENSE.txt"
+},
+  {
+    (baseDirectory.value / "README.adoc") -> "README.adoc"
+  },
+  {
+    (baseDirectory.value / "Tutorial.adoc") -> "Tutorial.adoc"
+  })
+
+Compile / packageDoc / mappings += {
+  (baseDirectory.value / "LICENSE.txt") -> "META-INF/LICENSE.txt"
+}
