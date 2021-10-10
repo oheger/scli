@@ -19,10 +19,10 @@ lazy val VersionScala213 = "2.13.6"
 lazy val VersionScala212 = "2.12.15"
 lazy val VersionScala211 = "2.11.12"
 lazy val supportedScalaVersions = List(VersionScala213, VersionScala212, VersionScala211)
-lazy val VersionScalaTest = "3.1.1"
+lazy val VersionScalaTest = "3.2.9"
 lazy val VersionMockito = "1.9.5"
 lazy val VersionScalaTestMockito = "1.0.0-M2"
-lazy val VersionJunit = "4.13" // needed by mockito
+lazy val VersionJunit = "4.13.2" // needed by mockito
 
 scalacOptions ++= Seq("-deprecation", "-feature")
 
