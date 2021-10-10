@@ -15,8 +15,8 @@
  */
 
 /** Definition of versions. */
-lazy val VersionScala213 = "2.13.3"
-lazy val VersionScala212 = "2.12.12"
+lazy val VersionScala213 = "2.13.6"
+lazy val VersionScala212 = "2.12.15"
 lazy val VersionScala211 = "2.11.12"
 lazy val supportedScalaVersions = List(VersionScala213, VersionScala212, VersionScala211)
 lazy val VersionScalaTest = "3.1.1"
