@@ -58,8 +58,7 @@ object ParameterExtractorSpec {
     toParamValues(Map(ParameterParser.InputParameter -> InputValues))
 
   /** Another test Parameters object representing updated parameters. */
-  private val NextParameters = Parameters(toParamValues(Map(pk("bar") -> List("v2", "v3"))),
-    Set(pk("x"), pk("y")))
+  private val NextParameters = generateParameters(1)
 
   /** A test exception generator function. */
   private val TestExceptionGenerator: ExceptionGenerator =
@@ -81,6 +80,16 @@ object ParameterExtractorSpec {
    */
   private def exceptionMessage(key: ParameterKey, code: FailureCodes.Value, params: Seq[String]): String =
     s"$key:$code:$params"
+
+  /**
+   * Returns a test ''Parameters'' instance based on the given index.
+   *
+   * @param index the index to generate dynamic parameters
+   * @return the test ''Parameters'' with this index
+   */
+  private def generateParameters(index: Int): Parameters =
+    Parameters(toParamValues(Map(pk(s"bar$index") -> List(s"v$index", s"v${index + 1}"))),
+      Set(pk(s"x$index"), pk("y")))
 }
 
 /**
@@ -261,15 +270,16 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
    * @param value          the value to be returned by the extractor
    * @param expExtrCtx     the expected extraction context
    * @param nextParameters the updated parameters
+   * @param key            the parameter key of the test extractor
    * @tparam A the type of the value
    * @return the test extractor
    */
-  private def testExtractor[A](value: A, expExtrCtx: ExtractionContext, nextParameters: Parameters = NextParameters):
-  CliExtractor[A] = CliExtractor(context => {
+  private def testExtractor[A](value: A, expExtrCtx: ExtractionContext, nextParameters: Parameters = NextParameters,
+                               key: ParameterKey = TestParamKey): CliExtractor[A] = CliExtractor(context => {
     context.parameters should be(expExtrCtx.parameters)
     context.reader should be(expExtrCtx.reader)
     (value, context.update(nextParameters, context.modelContext))
-  }, Some(TestParamKey))
+  }, Some(key))
 
   "ParameterExtractor" should "support running a CliExtractor" in {
     val context = extractionContext()
@@ -1040,6 +1050,93 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val (_, ctx) = ParameterExtractor.runExtractor(extractor, extractionContext())
     ctx.modelContext.aliasMapping.aliasesForKey(TestParamKey) should contain only(pk(AliasLong),
       ParameterKey(AliasShort, shortAlias = true))
+  }
+
+  it should "provide an extractor defining excluding options that handles the case that no option is defined" in {
+    val context1 = extractionContext()
+    val context2 = extractionContext(NextParameters, reader = context1.reader)
+    val finalParameters = generateParameters(2)
+    val value: SingleOptionValue[String] = Success(None)
+    val ext1 = testExtractor(value, context1)
+    val ext2 = testExtractor(value, context2, finalParameters)
+    val extractor = excluding(ext1, ext2) { optDefined =>
+      optDefined should be(None)
+      optDefined
+    }
+
+    val (result, ctx) = ParameterExtractor.runExtractor(extractor, context1)
+    ctx.parameters should be(finalParameters)
+    result should be(Success(None))
+  }
+
+  it should "provide an extractor defining excluding options that returns the single defined value" in {
+    val context1 = extractionContext()
+    val context2 = extractionContext(NextParameters, reader = context1.reader)
+    val finalParameters = generateParameters(2)
+    val valueNone: SingleOptionValue[String] = Success(None)
+    val valueDefined: SingleOptionValue[String] = Success(Some("definedValue"))
+    val ext1 = testExtractor(valueNone, context1)
+    val ext2 = testExtractor(valueDefined, context2, finalParameters)
+    val extractor = excluding(ext1, ext2)(_.map(_._2))
+
+    val (result, ctx) = ParameterExtractor.runExtractor(extractor, context1)
+    ctx.parameters should be(finalParameters)
+    result should be(valueDefined)
+  }
+
+  it should "provide an extractor defining excluding options that handles failures in the child extractors" in {
+    val nextParams2 = generateParameters(2)
+    val nextParams3 = generateParameters(3)
+    val context1 = extractionContext()
+    val context2 = extractionContext(NextParameters, reader = context1.reader)
+    val context3 = extractionContext(nextParams2, reader = context1.reader)
+    val failure1 = ExtractionFailure(TestParamKey, new IllegalArgumentException("Test exception 1"), None, context1)
+    val failure2 = ExtractionFailure(ParameterKey("k3", shortAlias = false),
+      new IllegalStateException("Test exception 2"), None, context3)
+    val exception1 = ParameterExtractionException(failure1)
+    val exception2 = ParameterExtractionException(failure2)
+    val valueErr1: SingleOptionValue[String] = Failure(exception1)
+    val valueErr2: SingleOptionValue[String] = Failure(exception2)
+    val valueDefined: SingleOptionValue[String] = Success(Some("successful and defined"))
+    val ext1 = testExtractor(valueErr1, context1)
+    val ext2 = testExtractor(valueDefined, context2, nextParams2, key = ParameterKey("k2", shortAlias = false))
+    val ext3 = testExtractor(valueErr2, context3, nextParams3, key = failure2.key)
+    val extractor = excluding(ext1, ext2, ext3)(_.map(_._2))
+
+    val exception = expectExtractionException(ParameterExtractor.tryExtractor(extractor, context1))
+    exception.failures should contain only(failure1, failure2)
+  }
+
+  it should "provide an extractor defining excluding options that detects multiple defined options" in {
+    val nextParams2 = generateParameters(2)
+    val nextParams3 = generateParameters(3)
+    val nextParams4 = generateParameters(4)
+    val context1 = extractionContext()
+    val context2 = extractionContext(NextParameters, reader = context1.reader)
+    val context3 = extractionContext(nextParams2, reader = context1.reader)
+    val context4 = extractionContext(nextParams3, reader = context1.reader)
+    val valueUndefined: SingleOptionValue[String] = Success(None)
+    val valueDefined1: SingleOptionValue[String] = Success(Some("v1"))
+    val valueDefined2: SingleOptionValue[String] = Success(Some("v2"))
+    val valueDefined3: SingleOptionValue[String] = Success(Some("v3"))
+    val ext1 = testExtractor(valueUndefined, context1)
+    val ext2 = testExtractor(valueDefined1, context2, nextParams2, key = ParameterKey("k2", shortAlias = false))
+    val ext3 = testExtractor(valueDefined2, context3, nextParams3, key = ParameterKey("k3", shortAlias = false))
+    val ext4 = testExtractor(valueDefined3, context4, nextParams4, key = nextParams4.parametersMap.head._1)
+
+    val mappedKeys = collection.mutable.Set.empty[ParameterKey]
+    val extractor = excluding(ext1, ext2, ext3, ext4) {
+      case Some(value) =>
+        mappedKeys += value._1
+        value._2
+      case None => fail("Unexpected undefined option.")
+    }
+
+    val exception = expectExtractionException(ParameterExtractor.tryExtractor(extractor, context1))
+    exception.failures should have size 1
+    checkExtractionFailure[IllegalArgumentException](exception.failures.head, expKey = ext4.key)(ext2.key.key,
+      ext3.key.key)
+    exception.failures.head.optElement should be(nextParams4.parametersMap.get(ext4.key).map(_.head))
   }
 
   it should "check whether all parameters have been consumed" in {

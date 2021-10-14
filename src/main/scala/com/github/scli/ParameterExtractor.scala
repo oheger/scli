@@ -1307,6 +1307,46 @@ object ParameterExtractor {
     })
 
   /**
+   * Returns an extractor that checks that from a given number of options only
+   * at most one has a defined value. A mapping function is called on the
+   * optional value that produces the final result.
+   *
+   * @param options the options to be checked to be excluding
+   * @param fMap    the mapping function
+   * @tparam A the result type of the excluding options
+   * @tparam B the result type of this extractor
+   * @return the extractor checking for excluding options
+   */
+  def excluding[A, B](options: CliExtractor[SingleOptionValue[A]]*)
+                     (fMap: Option[(ParameterKey, A)] => B): CliExtractor[Try[B]] =
+    CliExtractor(context => {
+      val init = (List.empty[SingleOptionValue[A]], context)
+      val processed = options.foldLeft(init) { (s, ext) =>
+        val (value, nextCtx) = ext.run(s._2)
+        (value :: s._1, nextCtx)
+      }
+
+      collectErrorMessages(processed._1: _*) match {
+        case Nil =>
+          val definedValues = options.reverse.zip(processed._1)
+            .map(t => (t._1.key, t._2.get))
+            .filter(t => t._2.isDefined)
+            .map(t => (t._1, t._2.get))
+          if (definedValues.size > 1) {
+            val excludingKeys = definedValues.tail.map(t => s"'${t._1.key}'").mkString(", ")
+            val msg = s"This option must not be used together with $excludingKeys."
+            val failure = ExtractionFailure(definedValues.head._1, new IllegalArgumentException(msg),
+              processed._2.parameters.parametersMap.get(definedValues.head._1).map(_.head), context)
+            (Failure(ParameterExtractionException(failure)), processed._2)
+          } else {
+            (Try(fMap(definedValues.headOption)), processed._2)
+          }
+        case failures =>
+          (Failure(ParameterExtractionException(failures)), processed._2)
+      }
+    })
+
+  /**
    * Returns an extractor that modifies the result of another extractor by
    * applying a mapping function. While mapping is supported by extractors in
    * general, this function simplifies this for ''OptionValue'' objects.
