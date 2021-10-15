@@ -235,6 +235,7 @@ class TransferAppSpec extends AnyFlatSpec with Matchers {
     assertHelpForKey(output, "chunk-size", "Defines the chunk size")
     assertHelpForKey(output, "dry-run", "Allows enabling a dry-run")
     assertHelpForKey(output, "crypt-mode", "Determines what kind of encryption")
+    assertHelpForKey(output, "info", "Sets the log level")
   }
 
   it should "display input parameters before options in the help text" in {

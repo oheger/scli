@@ -162,6 +162,21 @@ object TransferParameterManager {
     """Determines whether files already existing on the local hard drive should not be overridden by \
       |files downloaded from the server.""".stripMargin
 
+  private val HelpLogDebug =
+    """Sets the log level to 'DEBUG'. This causes the most verbose output with lots of diagnostic information."""
+
+  private val HelpLogInfo =
+    """Sets the log level to 'INFO'. This causes some important information to be printed during a transfer \
+      |operation.""".stripMargin
+
+  private val HelpLogWarn =
+    """Sets the log level to 'WARN'. In this mode, only warnings and errors are displayed during a transfer \
+      |operation.""".stripMargin
+
+  private val HelpLogError =
+    """Sets the log level to 'ERROR'. This mode produces the least output; only errors occurring during a transfer \
+      |operation are reported.""".stripMargin
+
   private val HelpHelp =
     """Displays a screen with help information.
       |transfer --help shows information about the parameters common to all commands.
@@ -232,6 +247,8 @@ object TransferParameterManager {
    * @param dryRun      a flag whether only a test run should be made
    * @param logs        a list of log messages to describe the transfer
    * @param tag         an optional identifier to tag the files on the server
+   * @param attributes  a number of attributes describing the transfer
+   * @param logLevel    the log level for generating log messages
    */
   case class TransferConfig(sourceFiles: List[Path],
                             serverUrl: String,
@@ -240,7 +257,8 @@ object TransferParameterManager {
                             dryRun: Boolean,
                             logs: Iterable[String],
                             tag: Option[String],
-                            attributes: Iterable[Attribute])
+                            attributes: Iterable[Attribute],
+                            logLevel: String)
 
   /**
    * A trait to represent the command line options to extract depending on the
@@ -475,6 +493,15 @@ object TransferParameterManager {
       .alias("A")
       .mapTo(toAttribute)
 
+    // log level
+    val extLogDebug = switchValue("debug", optHelp = Some(HelpLogDebug))
+    val extLogInfo = switchValue("info", optHelp = Some(HelpLogInfo))
+    val extLogWarn = switchValue("warn", optHelp = Some(HelpLogWarn))
+    val extLogError = switchValue("error", optHelp = Some(HelpLogError))
+    val extLogLevel = excludingSwitches(extLogDebug, extLogInfo, extLogWarn, extLogError)
+      .fallbackValue("warn")
+      .mandatory
+
     for {
       srcFiles <- extSrcFiles
       serverUri <- extServerUri
@@ -484,8 +511,9 @@ object TransferParameterManager {
       timeout <- extTimeout
       dryRun <- extDryRun
       attributes <- extAttributes
+      logLevel <- extLogLevel
     } yield createRepresentation(srcFiles, serverUri, chunkSize, timeout, dryRun, logs, tag,
-      attributes)(TransferConfig)
+      attributes, logLevel)(TransferConfig)
   }
 
   /**

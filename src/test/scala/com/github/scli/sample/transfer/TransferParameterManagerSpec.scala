@@ -231,6 +231,27 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     config.transferConfig.attributes.toList should contain theSameElementsInOrderAs expAttributes
   }
 
+  it should "extract a log level for the transfer operation" in {
+    def checkExtractLogLevel(level: String): Unit = {
+      val args = inputParameters(http = false) ::: List(s"--$level")
+
+      val config = extractResult(args)
+      config.transferConfig.logLevel should be(level)
+    }
+
+    val LogLevels = List("debug", "info", "warn", "error")
+
+    LogLevels foreach { level =>
+      checkExtractLogLevel(level)
+    }
+  }
+
+  it should "use a default log level if none is specified" in {
+    val config = extractResult(inputParameters(http = false))
+
+    config.transferConfig.logLevel should be("warn")
+  }
+
   it should "extract a command config for uploads and a file server" in {
     val args = List("upload", "file1", "file2", "/file/server", "--upload-hashes",
       "--remove-uploaded", "--root-path", "/data", "--umask", "660",
