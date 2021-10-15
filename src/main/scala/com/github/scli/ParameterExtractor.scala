@@ -1347,6 +1347,27 @@ object ParameterExtractor {
     })
 
   /**
+   * Returns an extractor that checks that from the given options - which are
+   * supposed to be switches - only a single one yields a value of '''true'''.
+   * The extractor yields the optional key of the option that was set. If one
+   * of the passed in extractors yields a ''Failure'', the resulting extractor
+   * fails accordingly; also if multiple of these extractors produce a
+   * '''true''' result.
+   *
+   * @param switches the switches to be checked to be excluding
+   * @return the extractor checking for excluding switches
+   */
+  def excludingSwitches(switches: CliExtractor[Try[Boolean]]*): CliExtractor[SingleOptionValue[String]] = {
+    val optionalSwitches = switches.map { switch =>
+      switch.map { result =>
+        result.map(flag => if (flag) Some(true) else None)
+      }
+    }
+
+    excluding(optionalSwitches: _*) { opt => opt.map(_._1.key) }
+  }
+
+  /**
    * Returns an extractor that modifies the result of another extractor by
    * applying a mapping function. While mapping is supported by extractors in
    * general, this function simplifies this for ''OptionValue'' objects.
