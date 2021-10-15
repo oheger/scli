@@ -1034,7 +1034,7 @@ object ParameterExtractor {
    */
   def withFallback[A](ext: CliExtractor[OptionValue[A]], fallbackExt: CliExtractor[OptionValue[A]]):
   CliExtractor[OptionValue[A]] =
-    conditionalValue(ext.isDefined, ext, fallbackExt)
+    conditionalValue(ext.isDefined, ext, fallbackExt, optKey = ext.optKey)
 
   /**
    * Returns an extractor that can apply a fallback (or default) value to
@@ -1048,7 +1048,7 @@ object ParameterExtractor {
    */
   def withFallbackSingle[A](ext: CliExtractor[SingleOptionValue[A]], fallbackExt: CliExtractor[SingleOptionValue[A]]):
   CliExtractor[SingleOptionValue[A]] =
-    conditionalValue(ext.isDefined, ext, fallbackExt)
+    conditionalValue(ext.isDefined, ext, fallbackExt, optKey = ext.optKey)
 
   /**
    * Returns an extractor that prompts the user for entering the value of an
@@ -1096,12 +1096,14 @@ object ParameterExtractor {
    * @param elseExt   the extractor to run if the condition is not fulfilled
    * @param ifGroup   name of the group for the if extractor
    * @param elseGroup name of the group for the else extractor
+   * @param optKey    an optional key for the resulting extractor
    * @return the conditional extractor
    * @tparam A the type of the option values
    */
   def conditionalValue[A](condExt: CliExtractor[Try[Boolean]], ifExt: CliExtractor[Try[A]],
                           elseExt: CliExtractor[Try[A]], ifGroup: Option[String] = None,
-                          elseGroup: Option[String] = None): CliExtractor[Try[A]] = {
+                          elseGroup: Option[String] = None,
+                          optKey: Option[ParameterKey] = None): CliExtractor[Try[A]] = {
     def processUnselectedExtractors(context: ExtractionContext)(f: ((CliExtractor[Try[A]], Option[String])) => Boolean):
     ModelContext = {
       val extractorsAndGroups = List((ifExt, ifGroup), (elseExt, elseGroup))
@@ -1123,7 +1125,7 @@ object ParameterExtractor {
           val modelContext = processUnselectedExtractors(context2)(_ => true)
           (Failure(exception), context2.copy(modelContext = modelContext))
       }
-    })
+    }, optKey)
   }
 
   /**

@@ -1026,6 +1026,12 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     res should be(Success(true))
   }
 
+  it should "record the key in the extractor for switches" in {
+    val extractor = switchValue(Key)
+
+    extractor.key.key should be(Key)
+  }
+
   it should "provide an extractor for switches that defines a fallback value" in {
     val extractor = ParameterExtractor.switchValue("flag")
 

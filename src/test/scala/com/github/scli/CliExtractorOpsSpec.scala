@@ -423,6 +423,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
   it should "support setting a fallback value for a multi option" in {
     val ext = optionValues(UndefinedKey).fallback(constantOptionValue(NumberValue.toString))
       .toInt.single.mandatory
+    ext.key.key should be(UndefinedKey)
 
     val result = runExtractor(ext)
     result should be(Success(NumberValue))
