@@ -1471,6 +1471,70 @@ private def serverUriExtractor: CliExtractor[SingleOptionValue[String]] =
 Note that by extending the selection logic, it is pretty easy to add support
 for configuration options for other types of servers.
 
+==== Switches excluding each other
+
+Related to extractors executed under certain conditional logic, are extractors
+that exclude each other. This can be viewed as a kind of condition, too: A
+specific option can only be specified on the command line if a certain other
+option is absent, as they contradict each other.
+
+One example for such a constellation can be switches that define the log level
+of an application. The application may be able to produce logging output in the
+levels _debug_, _info_, _warn_, and _error_. It may offer the user
+corresponding switches to select a specific log level. So, for instance, by
+specifying the `--info` switch, the log level would be set to _info_. In this
+context, it would make no sense to specify multiple of these switches; what
+should be printed if the user specified both the `--error` and `--debug`
+switches?
+
+SCLI offers a function named `excludingSwitches()` to address exactly this use
+case. The function expects an arbitrary number of extractors of type
+`Try[Boolean]`, i.e. the data type used by switches. It returns an extractor of
+type `SingleOptionValue[String]`. This can take the following values:
+
+* If the user has specified exactly one of the switch options configured for
+  `excludingSwitches()`, result is a `Success` with a defined `Option` with the
+  key of the selected switch. (In the example with the switches for log levels,
+  this could be for instance `Success(Some("info"))`, or
+  `Success(Some("debug"))`.)
+* If none of the configured switches is present on the command line, result is
+  `Success(None)`.
+* If the user specified multiple of the switches that exclude each other,
+  result is a `Failure`; the failure message points to the keys of switches
+  that are not allowed together.
+
+The _transfer_ demo application implements exactly this use case with switches
+for log levels. Here is the code that defines the different switches and
+applies the exclusion criteria:
+
+[source,scala]
+----
+val extLogDebug = switchValue("debug", optHelp = Some(HelpLogDebug))
+val extLogInfo = switchValue("info", optHelp = Some(HelpLogInfo))
+val extLogWarn = switchValue("warn", optHelp = Some(HelpLogWarn))
+val extLogError = switchValue("error", optHelp = Some(HelpLogError))
+val extLogLevel = excludingSwitches(extLogDebug, extLogInfo, extLogWarn, extLogError)
+  .fallbackValue("warn")
+  .mandatory
+----
+
+When extracting a `TransferConfig` from the command line options, the
+_extLogLevel_ extractor is used, rather than the actual log level switches. It
+yields the selected log level as a string - one of "debug", "info", "warn", or
+"error". If the user has not explicitly set a log level, it uses "warn" as a
+fallback value.
+
+Switches contradicting each other is only one example for excluding command
+line options. SCLI therefore offers a generic function, `excluding()` to deal
+with this topic. (In fact, `excludingSwitches()` is implemented on top of this
+function.) `excluding()` expects an arbitrary number of extractors of type
+`SingleOptionValue[A]` for a generic type `A`. In addition, it requires a
+mapping function to produce the final result type. The function checks whether
+at most one of the configured extractors yields a defined value. If so, it
+invokes the mapping function with the value and the key of the producing
+extractor (or `None` if no value at all is found). If there are multiple
+values, however, it produces a failure.
+
 === Generating help
 
 This section describes the functionality provided by SCLI related to the
