@@ -360,18 +360,20 @@ object ParameterManager {
   /**
    * Processes options referring to parameter files and returns the resulting,
    * augmented command line. This function can be called before processing of
-   * the command if the CLI should support reading parameters from files. It
-   * searches for options referencing such files as defined by the
+   * the command line if the CLI should support reading parameters from files.
+   * It searches for options referencing such files as defined by the
    * ''ExtractionSpec'' provided. The files are read, and their content is
-   * placed on the command line. The resulting command line is returned. If
-   * reading a parameter file causes an error, the resulting ''Try'' fails with
-   * a ''ParameterExtractionException'' pointing to the option responsible for
+   * placed on the command line, replacing the original option. The order of
+   * options, as they are defined in the file and on the remaining command
+   * line, is kept. The resulting command line is returned. If reading a
+   * parameter file causes an error, the resulting ''Try'' fails with a
+   * ''ParameterExtractionException'' pointing to the option responsible for
    * the failure.
    *
    * @param args the original sequence with command line arguments
    * @param spec the spec for the extraction operation
    * @param cf   the classifier function
-   * @return
+   * @return a ''Try'' with the resulting command line
    */
   def processParameterFiles(args: Seq[String], spec: ExtractionSpec[_])
                            (cf: CliClassifierFunc): Try[Seq[String]] = {
