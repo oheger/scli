@@ -892,17 +892,24 @@ object ParameterExtractor {
 
   /**
    * Returns an extractor that extracts the value of the specified option key
-   * in its basic string representation. If it checked whether this option has
-   * at most one value; if multiple values are found, the extractor fails.
+   * in its basic string representation. Per default, it is checked whether
+   * this option has at most one value, and if multiple values are found, the
+   * extractor fails. This can be changed via the ''allowOverride'' flag: If
+   * set to '''true''', multiple option values are accepted, but only the last
+   * value is returned by this extractor. This is useful for instance when
+   * parameter files are involved: in a file a default value for an option can
+   * be provided, but it is possible to override it on the command line.
    *
-   * @param key        the key of the option
-   * @param help       an optional help text for this option
-   * @param shortAlias flag whether the key is a short alias
+   * @param key           the key of the option
+   * @param help          an optional help text for this option
+   * @param shortAlias    flag whether the key is a short alias
+   * @param allowOverride flag whether later option values override previous
+   *                      ones
    * @return the extractor to extract the option value
    */
-  def optionValue(key: String, help: Option[String] = None, shortAlias: Boolean = false):
-  CliExtractor[SingleOptionValue[String]] =
-    asSingleOptionValue(optionValues(key, help, shortAlias))
+  def optionValue(key: String, help: Option[String] = None, shortAlias: Boolean = false,
+                  allowOverride: Boolean = false): CliExtractor[SingleOptionValue[String]] =
+    asSingleOptionValue(optionValues(key, help, shortAlias), allowOverride)
 
   /**
    * Returns an extractor that extracts all values of the specified option key
@@ -1246,18 +1253,20 @@ object ParameterExtractor {
   /**
    * Returns an extractor that extracts a single option value from the result
    * of the given extractor. It is an error if the result contains multiple
-   * values; however, an undefined value is accepted.
+   * values, unless ''allowOverride'' is '''true'''; in this case, the last
+   * value set for the option is used. An undefined value is always accepted.
    *
    * @param ext the extractor to be decorated
    * @return the extractor extracting the single option value
    */
-  def asSingleOptionValue[A](ext: CliExtractor[OptionValue[A]]): CliExtractor[SingleOptionValue[A]] =
+  def asSingleOptionValue[A](ext: CliExtractor[OptionValue[A]], allowOverride: Boolean = false):
+  CliExtractor[SingleOptionValue[A]] =
     ext.mapWithContext((optionValue, context) => {
       val res = optionValue flatMap { values =>
-        if (values.size > 1)
+        if (values.size > 1 && !allowOverride)
           Failure(paramException(context, ext.key,
             context.exceptionGenerator(ext.key, FailureCodes.MultipleValues, Seq(values.mkString(", ")))))
-        else Success(values.headOption)
+        else Success(values.lastOption)
       }
       (res, context.updateModelContext(ParameterModel.AttrMultiplicity, Multiplicity.SingleOptional))
     })

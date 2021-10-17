@@ -206,6 +206,13 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
     }
   }
 
+  it should "return the last value for a single option if override is allowed" in {
+    val ext = optionValue(KeyNumbers, allowOverride = true)
+
+    val result = runExtractor(ext)
+    result should be(Success(Some(NumberValues.last.toString)))
+  }
+
   it should "extract numeric values" in {
     val ext = optionValues(KeyNumbers).toInt
 

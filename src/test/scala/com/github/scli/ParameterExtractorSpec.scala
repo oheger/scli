@@ -395,6 +395,17 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
       FailureCodes.MultipleValues, Seq("v1, v2")))
   }
 
+  it should "provide an extractor to extract a single option value if there are multiple values with override" in {
+    val context = extractionContext()
+    val MultiValue: OptionValue[String] = Success(List("v1", "v2"))
+    val ext = testExtractor(MultiValue, context)
+    val extractor = ParameterExtractor.asSingleOptionValue(ext, allowOverride = true)
+
+    val (res, next) = ParameterExtractor.runExtractor(extractor, context)
+    next.parameters should be(NextParameters)
+    res should be(Success(Some("v2")))
+  }
+
   it should "provide a mapping extractor that handles a failed result" in {
     val context = extractionContext()
     val FailedValue: OptionValue[String] = Failure(new Exception("Failed"))
