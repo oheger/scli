@@ -479,7 +479,7 @@ object TransferParameterManager {
       .fallbackValue(DefaultChunkSize)
       .mandatory
       .alias("s")
-    val extTimeout = optionValue("timeout", Some(HelpTimeout))
+    val extTimeout = optionValue("timeout", Some(HelpTimeout), allowOverride = true)
       .alias("t")
       .toInt
       .mapTo(t => t.seconds)

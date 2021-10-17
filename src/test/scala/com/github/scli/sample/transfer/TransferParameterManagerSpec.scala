@@ -17,8 +17,7 @@
 package com.github.scli.sample.transfer
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
-
+import java.nio.file.{Files, Path, Paths}
 import com.github.scli.ParameterExtractor.{ExtractionContext, ParameterExtractionException}
 import com.github.scli.ParameterManager.ProcessingContext
 import com.github.scli.ParametersTestHelper._
@@ -363,9 +362,7 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     val serverConfig = HttpServerConfig("scott", "tiger")
     val fileContent = List("--timeout", "15", "--chunk-size", "8192", "--user", serverConfig.user,
       "--password", serverConfig.password)
-    val contentBinary = fileContent.mkString(HelpGenerator.CR).getBytes(StandardCharsets.UTF_8)
-    val path = Files.createTempFile("scliTest", ".tmp")
-    val paramFile = Files.write(path, contentBinary)
+    val paramFile = writeParameterFile(fileContent)
     try {
       val args = inputParameters(http = true) ::: List(key, paramFile.toAbsolutePath.toString)
       val config = extractResult(args)
@@ -377,12 +374,39 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     }
   }
 
+  /**
+   * Writes a temporary file containing parameters based on the given content.
+   * Each list element is written on a separate line on the file.
+   *
+   * @param fileContent the list with the content to be written
+   * @return the path to the temporary parameter file
+   */
+  private def writeParameterFile(fileContent: List[String]): Path = {
+    val contentBinary = fileContent.mkString(HelpGenerator.CR).getBytes(StandardCharsets.UTF_8)
+    val path = Files.createTempFile("scliTest", ".tmp")
+    val paramFile = Files.write(path, contentBinary)
+    paramFile
+  }
+
   it should "support parameter files" in {
     checkSupportForParameterFiles("--param-file")
   }
 
   it should "support parameter files with a short alias" in {
     checkSupportForParameterFiles("-f")
+  }
+
+  it should "support overriding the timeout read from a parameter file" in {
+    val paramFile = writeParameterFile(List("--timeout", "30"))
+    try {
+      val args = inputParameters(http = false) ::: List("--param-file", paramFile.toAbsolutePath.toString,
+        "--timeout", "60")
+
+      val config = extractResult(args)
+      config.transferConfig.timeout should be(Some(60.seconds))
+    } finally {
+      Files.delete(paramFile)
+    }
   }
 
   it should "support combining switches in a single parameter" in {
