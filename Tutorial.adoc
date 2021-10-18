@@ -108,14 +108,27 @@ val extTag = optionValue("tag")
 ----
 
 This extractor yields an `Option[String]`, which corresponds to the basic
-`SingleOptionValue[String]` type; it fails if the option occurs multiple times
-and thus has more than one value.
+`SingleOptionValue[String]` type; per default, it fails if the option occurs
+multiple times and thus has more than one value.
 
 NOTE: Actually, `SingleOptionValue[String]` corresponds to a
 `Try[Option[String]]`. Extractors typically return `Try` types because
 transformations on the user input can always fail. When combining the results
 of extractors failed extractions are detected and collected into a meaningful
 error message.
+
+Above we stated that the `optionValue()` extractor "fails if the option occurs
+multiple times". This seems quite natural, but there is one exception to this
+rule: `optionValue()` accepts an additional Boolean parameter named
+`allowOverride`. If set to *true*, the extractor does not fail if it encounters
+multiple option values, but takes only the last value ignoring any previous
+ones. This basically means that options occurring later on the command line can
+override options before. A use case where this behaviour if useful is
+extracting standard options to <<Reading parameter files,parameter files>>: The
+parameter file can contain a default value for a specific option. It is,
+however, still possible to override this value by simply adding the option
+again to the command line (after the option that includes the file) and setting
+the new value.
 
 ==== Extracting an option with multiple string values
 
