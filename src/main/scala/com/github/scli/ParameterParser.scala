@@ -389,15 +389,8 @@ object ParameterParser {
    * @param options a sequence with options referencing parameter files
    * @return the ''FileOptionFunc'' detecting these keys
    */
-  def fileOptionFuncForOptions(options: Iterable[ParameterKey]): FileOptionFunc = {
-    val fileOptionKeys = options.toSet
-    elem =>
-      elem match {
-        case OptionElement(key, value) if fileOptionKeys.contains(key) =>
-          value map (v => (key, v))
-        case _ => None
-      }
-  }
+  def fileOptionFuncForOptions(options: Iterable[ParameterKey]): FileOptionFunc =
+    fileOptionFuncForOptionsSet(options.toSet)
 
   /**
    * Processes the passed in sequence of parameters and resolves all parameter
@@ -490,6 +483,20 @@ object ParameterParser {
   }
 
   /**
+   * Returns a ''FileOptionFunc'' that detects the parameter keys in the given
+   * set as file options. This function has been extracted from
+   * ''fileOptionFuncForOptions()'' to fix an IntelliJ warning.
+   *
+   * @param options a set with options referencing parameter files
+   * @return the ''FileOptionFunc'' detecting these keys
+   */
+  private def fileOptionFuncForOptionsSet(options: Set[ParameterKey]): FileOptionFunc = {
+    case OptionElement(key, value) if options.contains(key) =>
+      value map (v => (key, v))
+    case _ => None
+  }
+
+  /**
    * Reads a file with parameters and returns its single lines
    * as a list of strings.
    *
@@ -499,7 +506,7 @@ object ParameterParser {
   private def readParameterFile(path: String): Try[List[String]] = Try {
     val source = Source.fromFile(path)
     source.getLines()
-      .filter(_.length > 0)
+      .filter(_.nonEmpty)
       .toList
   }
 
