@@ -68,6 +68,10 @@ object ParameterParser {
    * This trait also plays a role for error handling: It stores the original
    * key and the raw value of the represented parameter. This information is
    * useful when generating meaningful error messages.
+   *
+   * In addition, the position of the corresponding element on the command line
+   * can be queried. This is needed by some use cases that override the values
+   * of options with values appearing later on the command line.
    */
   sealed trait CliElement {
     /**
@@ -88,6 +92,15 @@ object ParameterParser {
      * @return the value of this ''CliElement''
      */
     def value: String
+
+    /**
+     * Returns the (0-based) index where this element was placed on the command
+     * line. This makes it possible to sort command line items by their
+     * position they have been placed on the command line.
+     *
+     * @return the index of this ''CliElement'' on the command line
+     */
+    def index: Int
   }
 
   /**
@@ -99,8 +112,11 @@ object ParameterParser {
    *
    * @param key      the key of the option
    * @param optValue an ''Option'' with the value
+   * @param index    the index of this element on the command line
    */
-  case class OptionElement(override val key: ParameterKey, optValue: Option[String]) extends CliElement {
+  case class OptionElement(override val key: ParameterKey,
+                           optValue: Option[String],
+                           override val index: Int = 0) extends CliElement {
     override def value: String = optValue getOrElse ""
   }
 
@@ -118,8 +134,10 @@ object ParameterParser {
    *
    * @param switches a list with switches and their values that have been
    *                 extracted
+   * @param index    the index of this element on the command line
    */
-  case class SwitchesElement(switches: List[(ParameterKey, String)]) extends CliElement {
+  case class SwitchesElement(switches: List[(ParameterKey, String)],
+                             override val index: Int = 0) extends CliElement {
     override def key: ParameterKey = switches.head._1
 
     override def value: String = switches.head._2
@@ -129,8 +147,10 @@ object ParameterParser {
    * A concrete ''CliElement'' class representing an input parameter.
    *
    * @param value the value to be added to the input parameters
+   * @param index the index of this element on the command line
    */
-  case class InputParameterElement(override val value: String) extends CliElement {
+  case class InputParameterElement(override val value: String,
+                                   override val index: Int = 0) extends CliElement {
     override val key: ParameterKey = InputParameter
   }
 
@@ -310,7 +330,7 @@ object ParameterParser {
 
     (args, idx) =>
       keyExtractor(args(idx)) flatMap (key => classifyKey(keyClassifiers,
-        key, args, idx)) getOrElse InputParameterElement(args(idx))
+        key, args, idx)) getOrElse InputParameterElement(args(idx), idx)
   }
 
   /**
@@ -329,7 +349,7 @@ object ParameterParser {
       if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
         ParameterModel.ParameterTypeSwitch)(resolverFunc) == ParameterModel.ParameterTypeOption) {
         val value = args.lift(idx + 1)
-        Some(OptionElement(key, value))
+        Some(OptionElement(key, value, idx))
       }
       else None
   }
@@ -346,8 +366,8 @@ object ParameterParser {
   def switchKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
   ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
-    (key, _, _) =>
-      classifySwitchKey(context, key)(resolverFunc)
+    (key, _, index) =>
+      classifySwitchKey(context, key, index)(resolverFunc)
   }
 
   /**
@@ -367,8 +387,8 @@ object ParameterParser {
   def combinedSwitchKeyClassifierFunc(modelContext: => ModelContext)(resolverFunc: AliasResolverFunc):
   ExtractedKeyClassifierFunc = {
     lazy val context = modelContext
-    (key, _, _) =>
-      if (!key.shortAlias) classifySwitchKey(context, key)(resolverFunc)
+    (key, _, index) =>
+      if (!key.shortAlias) classifySwitchKey(context, key, index)(resolverFunc)
       else {
         val switches = key.key.map { c =>
           val switchKey = ParameterKey(c.toString, shortAlias = true)
@@ -376,7 +396,7 @@ object ParameterParser {
             "true")(resolverFunc)
           (switchKey, switchValue)
         }.toList
-        Some(SwitchesElement(switches))
+        Some(SwitchesElement(switches, index))
       }
   }
 
@@ -413,7 +433,7 @@ object ParameterParser {
     def processFileOptionsInArgs(args: Seq[String], processedFiles: Set[String]): Try[(Seq[String], Set[String])] = {
       val argList = args.toList
       val parameterFiles = classify(args)(classifierFunc)
-        .map(t => (t._1, fileOptionFunc(t._2)))
+        .map(elem => (elem.index, fileOptionFunc(elem)))
         .filter(_._2.isDefined)
         .map(t => (t._1, t._2.get))
       if (parameterFiles.isEmpty) Success((args, processedFiles))
@@ -466,17 +486,17 @@ object ParameterParser {
     classify(args)(classifierFunc)
       .reverse
       .foldLeft(Map.empty[ParameterKey, List[CliElement]]) { (argsMap, elem) =>
-        elem._2 match {
+        elem match {
           case elem: InputParameterElement =>
             appendOptionValue(argsMap, InputParameter, elem)
 
-          case elem@OptionElement(key, optValue) =>
+          case elem@OptionElement(key, optValue, _) =>
             optValue.fold(argsMap)(_ => appendOptionValue(argsMap,
               resolveAlias(key)(aliasResolverFunc), elem))
 
-          case SwitchesElement(switches) =>
+          case SwitchesElement(switches, index) =>
             switches.foldLeft(argsMap) { (map, t) =>
-              appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), OptionElement(t._1, Some(t._2)))
+              appendOptionValue(map, resolveAlias(t._1)(aliasResolverFunc), OptionElement(t._1, Some(t._2), index))
             }
         }
       }
@@ -491,7 +511,7 @@ object ParameterParser {
    * @return the ''FileOptionFunc'' detecting these keys
    */
   private def fileOptionFuncForOptionsSet(options: Set[ParameterKey]): FileOptionFunc = {
-    case OptionElement(key, value) if options.contains(key) =>
+    case OptionElement(key, value, _) if options.contains(key) =>
       value map (v => (key, v))
     case _ => None
   }
@@ -532,32 +552,33 @@ object ParameterParser {
    *
    * @param context      the model context
    * @param key          the key of the switch
+   * @param index        the index on the command line
    * @param resolverFunc function to resolve alias keys
    * @return an ''Option'' with the classified ''SwitchesElement''
    */
-  private def classifySwitchKey(context: => ModelContext, key: ParameterKey)(resolverFunc: AliasResolverFunc):
-  Option[SwitchesElement] =
+  private def classifySwitchKey(context: => ModelContext, key: ParameterKey, index: Int)
+                               (resolverFunc: AliasResolverFunc): Option[SwitchesElement] =
     if (getModelContextAttribute(context, key, ParameterModel.AttrParameterType,
       ParameterModel.ParameterTypeOption)(resolverFunc) == ParameterModel.ParameterTypeSwitch)
       Some(SwitchesElement(List((key,
-        getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")(resolverFunc)))))
+        getModelContextAttribute(context, key, ParameterModel.AttrSwitchValue, "true")(resolverFunc))), index))
     else None
 
   /**
    * Classifies all command line elements in the given sequence. Result is a
-   * list with the elements found and their indices on the command line. This
-   * list is in reverse order based on the positions.
+   * list with the elements found. This list is in reverse order based on the
+   * positions.
    *
    * @param args           the sequence of arguments
    * @param classifierFunc the classifier function
-   * @return a list with the classified elements and their positions
+   * @return a list with the classified elements
    */
-  private def classify(args: Seq[String])(classifierFunc: CliClassifierFunc): List[(Int, CliElement)] = {
-    @tailrec def doClassify(index: Int, processed: List[(Int, CliElement)]): List[(Int, CliElement)] =
+  private def classify(args: Seq[String])(classifierFunc: CliClassifierFunc): List[CliElement] = {
+    @tailrec def doClassify(index: Int, processed: List[CliElement]): List[CliElement] =
       if (index >= args.size) processed
       else {
         val element = classifierFunc(args, index)
-        val updatedProcessed = (index, element) :: processed
+        val updatedProcessed = element :: processed
         val increment = element match {
           case _: OptionElement => 2
           case _ => 1

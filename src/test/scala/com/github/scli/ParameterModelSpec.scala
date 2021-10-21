@@ -573,7 +573,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   }
 
   it should "initialize the aliases list correctly" in {
-    val element = OptionElement(ParameterKey("e", shortAlias = true), Some("ignored"))
+    val element = OptionElement(ParameterKey("e", shortAlias = true), Some("ignored"), 0)
     val failure = ExtractionFailure(Key, new Exception, Some(element), null)
     val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
 
@@ -591,7 +591,7 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
   it should "include an attribute for the original value" in {
     val OrgValue = "the original parameter value"
-    val element = OptionElement(ParameterKey("e", shortAlias = true), Some(OrgValue))
+    val element = OptionElement(ParameterKey("e", shortAlias = true), Some(OrgValue), 0)
     val failure = ExtractionFailure(Key, new Exception, Some(element), null)
     val failureContext = new FailureContext(generateDefaultModelContext(), List(failure))
 
@@ -620,12 +620,12 @@ class ParameterModelSpec extends AnyFlatSpec with Matchers with MockitoSugar {
   it should "remove duplicate errors" in {
     val msg = "An error occurred!"
     val msg2 = "Another error was found."
-    val element = OptionElement(ParameterKey("e", shortAlias = true), None)
+    val element = OptionElement(ParameterKey("e", shortAlias = true), None, 0)
     val failure1 = ExtractionFailure(Key, new IllegalStateException(msg), None, null)
     val failure2 = ExtractionFailure(Key, new IllegalStateException(msg), Some(element), null)
     val failure3 = ExtractionFailure(Key, new IllegalStateException(msg), None, null)
     val failure4 = ExtractionFailure(Key, new IllegalStateException(msg),
-      Some(OptionElement(element.key, Some("a value"))), null)
+      Some(OptionElement(element.key, Some("a value"), 0)), null)
     val failure5 = ExtractionFailure(Key, new IOException(msg), None, null)
     val failure6 = ExtractionFailure(Key, new IllegalStateException(msg2), None, null)
     val failureContext = new FailureContext(generateDefaultModelContext(),

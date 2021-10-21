@@ -505,8 +505,8 @@ object ParameterManager {
    * @return an ''Option'' with the element identified
    */
   private def classifyUnknownOption(key: ParameterKey, args: Seq[String], index: Int): Option[CliElement] = {
-    val elem = if (index >= args.size - 1) SwitchesElement(List((key, "true")))
-    else OptionElement(key, Some(args(index + 1)))
+    val elem = if (index >= args.size - 1) SwitchesElement(List((key, "true")), index)
+    else OptionElement(key, Some(args(index + 1)), index)
     Some(elem)
   }
 

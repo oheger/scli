@@ -527,7 +527,7 @@ class CliExtractorOpsSpec extends AnyFlatSpec with Matchers {
       ParameterManager.defaultExceptionGenerator, None)
     val failure1 = ExtractionFailure(pk(KeyFlag), new Exception("Flag failure"), None, context)
     val failure2 = ExtractionFailure(pk(KeyAnswer), new Exception("Answer failure"),
-      Some(OptionElement(pk(KeyAnswer), None)), context)
+      Some(OptionElement(pk(KeyAnswer), None, 0)), context)
     val exception1 = ParameterExtractionException(failure1)
     val exception2 = ParameterExtractionException(failure2)
     val c1 = Failure(exception1)

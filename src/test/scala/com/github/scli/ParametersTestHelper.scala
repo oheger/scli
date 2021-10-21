@@ -47,12 +47,15 @@ object ParametersTestHelper {
    * @param p the original string-based map
    * @return the map with parameters
    */
-  implicit def toParametersMap(p: Map[String, Iterable[String]]): ParametersMap =
+  implicit def toParametersMap(p: Map[String, Iterable[String]]): ParametersMap = {
+    var index = 0
     p map { t =>
       val key = ParameterKey(t._1, shortAlias = false)
-      val values = t._2 map (s => OptionElement(key, Some(s)))
+      val values = t._2.zipWithIndex map (s => OptionElement(key, Some(s._1), index + 2 * s._2))
+      index += 2 * t._2.size
       (key, values)
     }
+  }
 
   /**
    * Converts a map with string parameter values to a ''ParametersMap''.
@@ -60,11 +63,14 @@ object ParametersTestHelper {
    * @param map the map with string values
    * @return the ''ParametersMap''
    */
-  def toParamValues(map: Map[ParameterKey, Iterable[String]]): ParametersMap =
+  def toParamValues(map: Map[ParameterKey, Iterable[String]]): ParametersMap = {
+    var index = 0
     map map { e =>
-      val values = e._2 map (s => OptionElement(e._1, Some(s)))
+      val values = e._2.zipWithIndex map (s => OptionElement(e._1, Some(s._1), index + 2 * s._2))
+      index += 2 * e._2.size
       (e._1, values)
     }
+  }
 
   /**
    * Convenience function to create a ''ParameterKey'' from a string with

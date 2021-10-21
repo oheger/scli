@@ -339,7 +339,7 @@ class ParameterManagerSpec extends AnyFlatSpec with Matchers {
 
   it should "detect a help switch on the command line" in {
     val HelpKey = ParameterKey("help", shortAlias = false)
-    val args = List("--" + TestOptionKey, TestOptionValue, "--" + HelpKey.key, "--foo", "bar", "--foo", "baz")
+    val args = List("--" + TestOptionKey, TestOptionValue, "--foo", "bar", "--foo", "baz", "--" + HelpKey.key)
     val ExpParamsMap = toParamValues(Map(TestOptionPk -> List(TestOptionValue),
       pk("foo") -> List("bar", "baz"),
       HelpKey -> List("true")))

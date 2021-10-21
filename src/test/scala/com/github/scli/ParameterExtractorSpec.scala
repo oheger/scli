@@ -237,7 +237,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
   "ExtractionFailure" should "return the failure key if available" in {
     val FailureKey = ParameterKey("failureKey", shortAlias = false)
-    val element = OptionElement(FailureKey, Some("a value"))
+    val element = OptionElement(FailureKey, Some("a value"), 0)
     val failure = ExtractionFailure(TestParamKey, new Exception, Some(element), TestContext)
 
     failure.failureKey should be(FailureKey)
@@ -251,7 +251,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
   it should "return the original value if available" in {
     val Value = "originalValue"
-    val element = OptionElement(TestParamKey, Some(Value))
+    val element = OptionElement(TestParamKey, Some(Value), 0)
     val failure = ExtractionFailure(TestParamKey, new Exception, Some(element), TestContext)
 
     failure.optOriginalValue should be(Some(Value))
@@ -441,7 +441,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
   it should "provide a mapping extractor that handles an exception thrown by the mapping function" in {
     val context = extractionContext()
-    val elem = OptionElement(ParameterKey("err", shortAlias = true), Some("wrong value"))
+    val elem = OptionElement(ParameterKey("err", shortAlias = true), Some("wrong value"), 0)
     val params: Parameters = Map(TestParamKey -> List(elem))
     val InvalidNumber = "Not a number!"
     val Result: OptionValue[String] = Success(Some(InvalidNumber))
@@ -481,7 +481,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val Alias = ParameterKey("e", shortAlias = true)
     val elements = Values.zipWithIndex map { t =>
       val key = if (t._2 % 2 == 0) TestParamKey else Alias
-      OptionElement(key, Some(t._1))
+      OptionElement(key, Some(t._1), t._2)
     }
     val failureElements = elements filter (e => InvalidValues contains e.value)
     val params: Parameters = Map(TestParamKey -> elements)
@@ -501,7 +501,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
 
   it should "provide a mapping extractor that deals with insufficient error information" in {
     val context = extractionContext()
-    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, None)))
+    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, None, 0)))
     val Result: OptionValue[String] = Success(List("42", "foo"))
     val ext = testExtractor(Result, context, nextParameters = params)
     val extractor = ParameterExtractor.mapped(ext)(_.toInt)
@@ -520,8 +520,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     }
     val Value = "notANumber"
     val context = extractionContext(mapper = Some(mapper))
-    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("1")),
-      OptionElement(TestParamKey, Some(Value)), OptionElement(TestParamKey, Some("2"))))
+    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("1"), 0),
+      OptionElement(TestParamKey, Some(Value), 1), OptionElement(TestParamKey, Some("2"), 2)))
     val Result: OptionValue[String] = Success(List("1", Value, "2"))
     val ext = testExtractor(Result, context, nextParameters = params)
     val extractor = ParameterExtractor.mapped(ext)(_.toInt)
@@ -582,7 +582,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val context = extractionContext()
     val InvalidNumber = "Not a number!"
     val Result: SingleOptionValue[String] = Success(Some(InvalidNumber))
-    val elem = OptionElement(pk("someAlternativeKey"), Some("foo"))
+    val elem = OptionElement(pk("someAlternativeKey"), Some("foo"), 0)
     val params: Parameters = Map(TestParamKey -> List(elem))
     val ext = testExtractor(Result, context, nextParameters = params)
     val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
@@ -597,8 +597,8 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
   it should "provide a single mapping extractor that handles exceptions and too much error information" in {
     val context = extractionContext()
     val Result: SingleOptionValue[String] = Success(Some("Not a number!"))
-    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("v1")),
-      OptionElement(pk("other"), Some("v2"))))
+    val params: Parameters = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("v1"), 0),
+      OptionElement(pk("other"), Some("v2"), 0)))
     val ext = testExtractor(Result, context, nextParameters = params)
     val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)
 
@@ -617,7 +617,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val context = extractionContext(mapper = Some(mapper))
     val InvalidNumber = "Not a number!"
     val Result: SingleOptionValue[String] = Success(Some(InvalidNumber))
-    val elem = OptionElement(pk("someAlternativeKey"), Some(InvalidNumber))
+    val elem = OptionElement(pk("someAlternativeKey"), Some(InvalidNumber), 0)
     val params: Parameters = Map(TestParamKey -> List(elem))
     val ext = testExtractor(Result, context, nextParameters = params)
     val extractor = ParameterExtractor.mappedSingle(ext)(_.toInt)

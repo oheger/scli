@@ -81,9 +81,9 @@ object ParameterParserSpec {
       val isLongOption = arg startsWith "--"
       if (isOption) {
         val keyPos = if (isLongOption) 2 else 1
-        OptionElement(ParameterKey(arg.substring(keyPos), !isLongOption), Some(args(idx + 1)))
+        OptionElement(ParameterKey(arg.substring(keyPos), !isLongOption), Some(args(idx + 1)), idx)
       }
-      else InputParameterElement(arg)
+      else InputParameterElement(arg, idx)
     }
 
   /**
@@ -356,37 +356,37 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   "CliElement" should "report the value for options" in {
-    val elem = OptionElement(TestKey, Some(TestValue))
+    val elem = OptionElement(TestKey, Some(TestValue), 0)
 
     elem.value should be(TestValue)
   }
 
   it should "report the value for options if no value is defined" in {
-    val elem = OptionElement(TestKey, None)
+    val elem = OptionElement(TestKey, None, 0)
 
     elem.value should be("")
   }
 
   it should "report the key for switches" in {
-    val elem = SwitchesElement(List((TestKey, TestValue), (pk("foo"), "aValue")))
+    val elem = SwitchesElement(List((TestKey, TestValue), (pk("foo"), "aValue")), 0)
 
     elem.key should be(TestKey)
   }
 
   it should "report the value for switches" in {
-    val elem = SwitchesElement(List((TestKey, TestValue), (pk("foo"), "aValue")))
+    val elem = SwitchesElement(List((TestKey, TestValue), (pk("foo"), "aValue")), 0)
 
     elem.value should be(TestValue)
   }
 
   it should "report the key for input parameters" in {
-    val elem = InputParameterElement(TestValue)
+    val elem = InputParameterElement(TestValue, 0)
 
     elem.key should be(ParameterParser.InputParameter)
   }
 
   it should "report the value for input parameters" in {
-    val elem = InputParameterElement(TestValue)
+    val elem = InputParameterElement(TestValue, 0)
 
     elem.value should be(TestValue)
   }
@@ -400,7 +400,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "correctly parse non-option parameters" in {
     val args = List("uri1", "uri2")
-    val elements = args map (v => InputParameterElement(v))
+    val elements = args.zipWithIndex map (v => InputParameterElement(v._1, v._2))
     val cf = classifierFunc(args, elements)
     val expArgMap = Map(ParameterParser.InputParameter -> elements)
 
@@ -410,9 +410,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "correctly parse arguments with options" in {
     val args = List("--opt1", "opt1Val1", "--opt2", "opt2Val1", "--opt1", "opt1Val2")
-    val elemOpt1v1 = OptionElement(pk("opt1"), Some("opt1Val1"))
-    val elemOpt2 = OptionElement(pk("opt2"), Some("opt2Val1"))
-    val elemOpt1v2 = OptionElement(pk("opt1"), Some("opt1Val2"))
+    val elemOpt1v1 = OptionElement(pk("opt1"), Some("opt1Val1"), 0)
+    val elemOpt2 = OptionElement(pk("opt2"), Some("opt2Val1"), 2)
+    val elemOpt1v2 = OptionElement(pk("opt1"), Some("opt1Val2"), 4)
     val elements = List(elemOpt1v1, null, elemOpt2, null, elemOpt1v2)
     val cf = classifierFunc(args, elements)
     val expArgMap = Map(pk("opt1") -> List(elemOpt1v1, elemOpt1v2),
@@ -425,7 +425,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   it should "correctly evaluate the shortAlias flag for options" in {
     val Key = ParameterKey("f", shortAlias = true)
     val args = List("--" + Key.key, TestValue)
-    val elem = OptionElement(Key, Some(TestValue))
+    val elem = OptionElement(Key, Some(TestValue), 0)
     val cf = classifierFunc(args, List(elem))
     val expArgMap = Map(Key -> List(elem))
 
@@ -436,8 +436,8 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   it should "ignore an option that is the last argument" in {
     val undefOption = "undefinedOption"
     val args = List("--opt1", "optValue", "--" + undefOption)
-    val elemOpt = OptionElement(pk("opt1"), Some("optValue"))
-    val elements = List(elemOpt, null, OptionElement(pk(undefOption), None))
+    val elemOpt = OptionElement(pk("opt1"), Some("optValue"), 0)
+    val elements = List(elemOpt, null, OptionElement(pk(undefOption), None, 2))
     val cf = classifierFunc(args, elements)
     val expArgsMap = Map(pk("opt1") -> List(elemOpt))
 
@@ -449,9 +449,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val Key = pk("strangeOption")
     val TestOption = "--" + Key.key
     val args = List(TestOption, "v1", TestOption, "v2", TestOption)
-    val elemOp1 = OptionElement(Key, Some("v1"))
-    val elemOp2 = OptionElement(Key, Some("v2"))
-    val elements = List(elemOp1, null, elemOp2, null, OptionElement(Key, None))
+    val elemOp1 = OptionElement(Key, Some("v1"), 0)
+    val elemOp2 = OptionElement(Key, Some("v2"), 2)
+    val elements = List(elemOp1, null, elemOp2, null, OptionElement(Key, None, 4))
     val cf = classifierFunc(args, elements)
     val expArgsMap = Map(Key -> List(elemOp1, elemOp2))
 
@@ -461,22 +461,22 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
 
   it should "correctly parse arguments with switches" in {
     val args = List("--v", "other", "--xzvf", "--flag")
-    val elemInp = InputParameterElement("other")
+    val elemInp = InputParameterElement("other", 1)
     val keyV = pk("v")
     val keyX = pk("x")
     val keyZ = pk("z")
     val keyF = pk("f")
     val keyFlag = pk("flag")
-    val elements = List(SwitchesElement(List((keyV, "true"))), elemInp,
-      SwitchesElement(List((keyX, "true"), (keyZ, "false"), (keyV, "true"), (keyF, "true"))),
-      SwitchesElement(List((keyFlag, "false"))))
+    val elements = List(SwitchesElement(List((keyV, "true")), 0), elemInp,
+      SwitchesElement(List((keyX, "true"), (keyZ, "false"), (keyV, "true"), (keyF, "true")), 2),
+      SwitchesElement(List((keyFlag, "false")), 3))
     val cf = classifierFunc(args, elements)
     val expArgsMap = Map(ParameterParser.InputParameter -> List(elemInp),
-      keyV -> List(OptionElement(keyV, Some("true")), OptionElement(keyV, Some("true"))),
-      keyX -> List(OptionElement(keyX, Some("true"))),
-      keyZ -> List(OptionElement(keyZ, Some("false"))),
-      keyF -> List(OptionElement(keyF, Some("true"))),
-      keyFlag -> List(OptionElement(keyFlag, Some("false"))))
+      keyV -> List(OptionElement(keyV, Some("true"), 0), OptionElement(keyV, Some("true"), 2)),
+      keyX -> List(OptionElement(keyX, Some("true"), 2)),
+      keyZ -> List(OptionElement(keyZ, Some("false"), 2)),
+      keyF -> List(OptionElement(keyF, Some("true"), 2)),
+      keyFlag -> List(OptionElement(keyFlag, Some("false"), 3)))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -485,9 +485,9 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   it should "correctly evaluate the shortAlias flag for switches" in {
     val Key = ParameterKey("f", shortAlias = true)
     val args = List("--v")
-    val elements = List(SwitchesElement(List((Key, "true"))))
+    val elements = List(SwitchesElement(List((Key, "true")), 0))
     val cf = classifierFunc(args, elements)
-    val expArgsMap = Map(Key -> List(OptionElement(Key, Some("true"))))
+    val expArgsMap = Map(Key -> List(OptionElement(Key, Some("true"), 0)))
 
     val params = parseParametersSuccess(args)(cf)
     params should be(expArgsMap)
@@ -497,10 +497,10 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val AliasKey = ParameterKey("o", shortAlias = true)
     val AliasValue = "anotherValue"
     val args = List("--" + TestKey.key, TestValue, "-" + AliasKey.key, AliasValue)
-    val elements = List(OptionElement(TestKey, Some(TestValue)), null, OptionElement(AliasKey, Some(AliasValue)))
+    val elements = List(OptionElement(TestKey, Some(TestValue), 0), null, OptionElement(AliasKey, Some(AliasValue), 2))
     val cf = classifierFunc(args, elements)
     val expArgsMap =
-      Map(TestKey -> List(OptionElement(TestKey, Some(TestValue)), OptionElement(AliasKey, Some(AliasValue))))
+      Map(TestKey -> List(OptionElement(TestKey, Some(TestValue), 0), OptionElement(AliasKey, Some(AliasValue), 2)))
 
     val params = ParameterParser.parseParameters(args)(cf) { key =>
       if (key == AliasKey) Some(TestKey)
@@ -514,11 +514,11 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val Key2 = pk("flag")
     val AliasKey2 = ParameterKey("f", shortAlias = true)
     val args = List("-" + AliasKey.key + AliasKey2.key)
-    val elements = List(SwitchesElement(List((AliasKey, "true"), (AliasKey2, "false"))))
+    val elements = List(SwitchesElement(List((AliasKey, "true"), (AliasKey2, "false")), 0))
     val cf = classifierFunc(args, elements)
     val AliasMapping = Map(AliasKey -> TestKey, AliasKey2 -> Key2)
-    val expArgsMap = Map(TestKey -> List(OptionElement(AliasKey, Some("true"))),
-      Key2 -> List(OptionElement(AliasKey2, Some("false"))))
+    val expArgsMap = Map(TestKey -> List(OptionElement(AliasKey, Some("true"), 0)),
+      Key2 -> List(OptionElement(AliasKey2, Some("false"), 0)))
 
     val params = ParameterParser.parseParameters(args)(cf)(AliasMapping.get)
     params should be(expArgsMap)
@@ -605,14 +605,15 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val args = List("foo")
     val cf = ParameterParser.classifierOf(List(blowUpKeyClassifier))(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
-    cf(args, 0) should be(InputParameterElement(args.head))
+    cf(args, 0) should be(InputParameterElement(args.head, 0))
   }
 
   it should "create a classifier function with an empty list of key classifiers" in {
     val args = List("foo", "bar")
+    val Index = 1
     val cf = ParameterParser.classifierOf(List.empty)(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
-    cf(args, 1) should be(InputParameterElement(args(1)))
+    cf(args, Index) should be(InputParameterElement(args(Index), Index))
   }
 
   it should "create a classifier function that handles key classifiers returning None" in {
@@ -621,12 +622,12 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val cf = ParameterParser.classifierOf(List(definedKeyClassifier(Key, args, 0, None),
       definedKeyClassifier(Key, args, 0, None)))(ParameterParser.DefaultOptionPrefixes.tryExtract)
 
-    cf(args, 0) should be(InputParameterElement(args.head))
+    cf(args, 0) should be(InputParameterElement(args.head, 0))
   }
 
   it should "create a classifier function that correctly delegates to key classifiers" in {
     val Key = ParameterKey("theOptionKey", shortAlias = true)
-    val Result = OptionElement(Key, Some("someValue"))
+    val Result = OptionElement(Key, Some("someValue"), 0)
     val args = List("test", "-" + Key.key)
     val cf = ParameterParser.classifierOf(List(definedKeyClassifier(Key, args, 1, None),
       definedKeyClassifier(Key, args, 1, Some(Result)),
@@ -636,11 +637,11 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   }
 
   it should "provide a key classifier for options that handles an option key" in {
-    val args = List("someKey", TestValue)
+    val args = List("before", "someKey", TestValue)
     val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
-    classifier(TestKey, args, 0) should be(Some(OptionElement(TestKey, Some(TestValue))))
+    classifier(TestKey, args, 1) should be(Some(OptionElement(TestKey, Some(TestValue), 1)))
   }
 
   it should "provide a key classifier for options that checks the option type" in {
@@ -673,7 +674,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeOption))
 
     val classifier = ParameterParser.optionKeyClassifierFunc(context)(NoAliasResolverFunc)
-    classifier(TestKey, args, 2) should be(Some(OptionElement(TestKey, None)))
+    classifier(TestKey, args, 2) should be(Some(OptionElement(TestKey, None, 2)))
   }
 
   it should "provide a key classifier for switches that handles a switch key" in {
@@ -683,7 +684,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(attributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
-    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
+    classifier(TestKey, Nil, 1) should be(Some(SwitchesElement(List((TestKey, "true")), 1)))
   }
 
   it should "provide a key classifier for switches that evaluates the value of the switch" in {
@@ -693,7 +694,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(attributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
-    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "false")))))
+    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "false")), 0)))
   }
 
   it should "provide a key classifier for switches that evaluates the parameter type" in {
@@ -714,7 +715,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(singleAttr(ParameterModel.AttrParameterType, ParameterModel.ParameterTypeSwitch))
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(NoAliasResolverFunc)
-    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
+    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")), 0)))
   }
 
   it should "handle aliases when accessing metadata during classification" in {
@@ -724,7 +725,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(attributes)
 
     val classifier = ParameterParser.switchKeyClassifierFunc(context)(context.aliasMapping.keyForAlias.get)
-    classifier(AliasKey, Nil, 0) should be(Some(SwitchesElement(List((AliasKey, "false")))))
+    classifier(AliasKey, Nil, 0) should be(Some(SwitchesElement(List((AliasKey, "false")), 0)))
   }
 
   it should "provide a multi key classifier for switches that handles long switch keys" in {
@@ -734,7 +735,7 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
     val context = createModelContext(attributes)
 
     val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(NoAliasResolverFunc)
-    classifier(TestKey, Nil, 0) should be(Some(SwitchesElement(List((TestKey, "true")))))
+    classifier(TestKey, Nil, 1) should be(Some(SwitchesElement(List((TestKey, "true")), 1)))
   }
 
   it should "provide a multi key classifier for switches that handles long keys for non-switches" in {
@@ -747,10 +748,10 @@ class ParameterParserSpec extends AnyFlatSpec with BeforeAndAfterEach with Match
   it should "provide a multi key classifier for switches that extracts multiple keys" in {
     val AliasKey2 = ParameterKey("x", shortAlias = true)
     val multiKey = ParameterKey(AliasKey.key + AliasKey2.key, shortAlias = true)
-    val expElement = SwitchesElement(List((AliasKey, "false"), (AliasKey2, "true")))
+    val expElement = SwitchesElement(List((AliasKey, "false"), (AliasKey2, "true")), 2)
     val context = createModelContext(singleAttr(ParameterModel.AttrSwitchValue, "false"))
 
     val classifier = ParameterParser.combinedSwitchKeyClassifierFunc(context)(context.aliasMapping.keyForAlias.get)
-    classifier(multiKey, Nil, 0) should be(Some(expElement))
+    classifier(multiKey, Nil, 2) should be(Some(expElement))
   }
 }
