@@ -11,6 +11,9 @@ of the SCLI library.
   failure or if they override each other based on their position on the
   command line.
 
+* The `CliExtractor` type is now covariant in its type parameter. It can
+  therefore be used in a more flexible way.
+
 == Release 1.0.0 (2020-09-26)
 
 The initial release.

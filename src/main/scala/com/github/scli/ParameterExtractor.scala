@@ -389,7 +389,7 @@ object ParameterExtractor {
    * @param optKey optional key of the option to be extracted
    * @tparam A the type of the result of the extractor
    */
-  case class CliExtractor[A](run: ExtractionContext => (A, ExtractionContext), optKey: Option[ParameterKey] = None) {
+  case class CliExtractor[+A](run: ExtractionContext => (A, ExtractionContext), optKey: Option[ParameterKey] = None) {
     /**
      * Returns the key of the option this extractor deals with. If there is no
      * key, result is an empty string. This case should normally not occur in
