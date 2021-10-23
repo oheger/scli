@@ -1076,7 +1076,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val value: SingleOptionValue[String] = Success(None)
     val ext1 = testExtractor(value, context1)
     val ext2 = testExtractor(value, context2, finalParameters)
-    val extractor = excluding(ext1, ext2) { optDefined =>
+    val extractor = excluding(false, ext1, ext2) { optDefined =>
       optDefined should be(None)
       optDefined
     }
@@ -1094,7 +1094,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val valueDefined: SingleOptionValue[String] = Success(Some("definedValue"))
     val ext1 = testExtractor(valueNone, context1)
     val ext2 = testExtractor(valueDefined, context2, finalParameters)
-    val extractor = excluding(ext1, ext2)(_.map(_._2))
+    val extractor = excluding(false, ext1, ext2)(_.map(_._2))
 
     val (result, ctx) = ParameterExtractor.runExtractor(extractor, context1)
     ctx.parameters should be(finalParameters)
@@ -1118,7 +1118,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val ext1 = testExtractor(valueErr1, context1)
     val ext2 = testExtractor(valueDefined, context2, nextParams2, key = ParameterKey("k2", shortAlias = false))
     val ext3 = testExtractor(valueErr2, context3, nextParams3, key = failure2.key)
-    val extractor = excluding(ext1, ext2, ext3)(_.map(_._2))
+    val extractor = excluding(false, ext1, ext2, ext3)(_.map(_._2))
 
     val exception = expectExtractionException(ParameterExtractor.tryExtractor(extractor, context1))
     exception.failures should contain only(failure1, failure2)
@@ -1142,7 +1142,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val ext4 = testExtractor(valueDefined3, context4, nextParams4, key = nextParams4.parametersMap.head._1)
 
     val mappedKeys = collection.mutable.Set.empty[ParameterKey]
-    val extractor = excluding(ext1, ext2, ext3, ext4) {
+    val extractor = excluding(false, ext1, ext2, ext3, ext4) {
       case Some(value) =>
         mappedKeys += value._1
         value._2
@@ -1154,6 +1154,74 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     checkExtractionFailure[IllegalArgumentException](exception.failures.head, expKey = ext4.key)(ext2.key.key,
       ext3.key.key)
     exception.failures.head.optElement should be(nextParams4.parametersMap.get(ext4.key).map(_.head))
+  }
+
+  it should "provide an extractor defining excluding options that allows overriding option values" in {
+    val Key2 = pk("k2")
+    val params = Map(TestParamKey -> List("someOtherResult"),
+      Key2 -> List("ResultValue"))
+    val context = extractionContext(Parameters(toParamValues(params), Set.empty))
+    val otherValue: SingleOptionValue[String] = Success(Some("aValue"))
+    val resultValue: SingleOptionValue[String] = Success(Some("ResultValue"))
+    val ext1 = testExtractor(otherValue, context, context.parameters)
+    val ext2 = testExtractor(resultValue, context, context.parameters, Key2)
+    val extractor = excluding(true, ext1, ext2)(_.map(_._2))
+
+    val (result, _) = ParameterExtractor.runExtractor(extractor, context)
+    result should be(resultValue)
+  }
+
+  it should "provide an extractor defining excluding options that allows overriding by the last option value" in {
+    val MappedResult = "The mapped result"
+    val Key2 = pk("k2")
+    val Key3 = pk("k3")
+    val params = Map(TestParamKey -> List("someOtherResult"),
+      Key2 -> List("stillAnotherResult"),
+      Key3 -> List("The real result"))
+    val context = extractionContext(Parameters(toParamValues(params), Set.empty))
+    val otherValue: SingleOptionValue[String] = Success(Some("aValue"))
+    val resultValue: SingleOptionValue[String] = Success(Some("ResultValue"))
+    val ext1 = testExtractor(otherValue, context, context.parameters)
+    val ext2 = testExtractor(otherValue, context, context.parameters, Key2)
+    val ext3 = testExtractor(resultValue, context, context.parameters, Key3)
+    val extractor = excluding(true, ext3, ext1, ext2) { opt =>
+      opt.map { kv =>
+        if (kv._2 == "ResultValue") MappedResult else "BOOM"
+      }
+    }
+
+    val (result, _) = ParameterExtractor.runExtractor(extractor, context)
+    result should be(Success(Some(MappedResult)))
+  }
+
+  it should "provide an extractor defining excluding options that handles undefined values in override mode" in {
+    val nextParams2 = generateParameters(2)
+    val context1 = extractionContext()
+    val context2 = extractionContext(NextParameters, reader = context1.reader)
+    val definedValue: SingleOptionValue[String] = Success(Some("aValue"))
+    val ext1 = testExtractor(definedValue, context1)
+    val ext2 = testExtractor(definedValue, context2, nextParams2, key = ParameterKey("k2", shortAlias = false))
+    val extractor = excluding(true, ext1, ext2)(_.map(_._2))
+
+    expectExtractionException(ParameterExtractor.tryExtractor(extractor, context1))
+  }
+
+  it should "provide an extractor defining excluding options that sorts by all values in override mode" in {
+    val Key2 = pk("k2")
+    val Key3 = pk("k3")
+    val params = Map(TestParamKey -> List(OptionElement(TestParamKey, Some("r1"), 5)),
+      Key2 -> List(),
+      Key3 -> List(OptionElement(Key3, Some("r3.1"), 1), OptionElement(Key3, Some("r.2"), 6)))
+    val context = extractionContext(Parameters(params, Set.empty))
+    val otherValue: SingleOptionValue[String] = Success(Some("aValue"))
+    val resultValue: SingleOptionValue[String] = Success(Some("ResultValue"))
+    val ext1 = testExtractor(otherValue, context, context.parameters)
+    val ext2 = testExtractor(otherValue, context, context.parameters, Key2)
+    val ext3 = testExtractor(resultValue, context, context.parameters, Key3)
+    val extractor = excluding(true, ext1, ext3, ext2)(_.map(_._2))
+
+    val (result, _) = ParameterExtractor.runExtractor(extractor, context)
+    result should be(resultValue)
   }
 
   it should "provide an extractor for excluding switches that returns None if all switches are unset" in {

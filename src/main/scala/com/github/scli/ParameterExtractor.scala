@@ -1320,15 +1320,22 @@ object ParameterExtractor {
   /**
    * Returns an extractor that checks that from a given number of options only
    * at most one has a defined value. A mapping function is called on the
-   * optional value that produces the final result.
+   * optional value that produces the final result. The ''allowOverride'' flag
+   * determines the outcome if multiple options have values. If '''true''',
+   * the last value on the command line overrides values before. If
+   * '''false''', this extractor produces a failure result. Note that
+   * overriding values works only if the extractors involved are primitive and
+   * correspond directly to elements on the command line; otherwise, this
+   * extractor behaves as if ''allowOverride'' was '''false'''.
    *
-   * @param options the options to be checked to be excluding
-   * @param fMap    the mapping function
+   * @param allowOverride flag to enable the override mode
+   * @param options       the options to be checked to be excluding
+   * @param fMap          the mapping function
    * @tparam A the result type of the excluding options
    * @tparam B the result type of this extractor
    * @return the extractor checking for excluding options
    */
-  def excluding[A, B](options: CliExtractor[SingleOptionValue[A]]*)
+  def excluding[A, B](allowOverride: Boolean, options: CliExtractor[SingleOptionValue[A]]*)
                      (fMap: Option[(ParameterKey, A)] => B): CliExtractor[Try[B]] =
     CliExtractor(context => {
       val init = (List.empty[SingleOptionValue[A]], context)
@@ -1343,15 +1350,25 @@ object ParameterExtractor {
             .map(t => (t._1.key, t._2.get))
             .filter(t => t._2.isDefined)
             .map(t => (t._1, t._2.get))
+
           if (definedValues.size > 1) {
-            val excludingKeys = definedValues.tail.map(t => s"'${t._1.key}'").mkString(", ")
-            val msg = s"This option must not be used together with $excludingKeys."
-            val failure = ExtractionFailure(definedValues.head._1, new IllegalArgumentException(msg),
-              processed._2.parameters.parametersMap.get(definedValues.head._1).map(_.head), context)
-            (Failure(ParameterExtractionException(failure)), processed._2)
+            if (allowOverride && definedValues.forall(kv => context.parameters.parametersMap.contains(kv._1))) {
+              val optionPositions = definedValues.map { keyValue =>
+                keyValue -> maxOpt(context.parameters.parametersMap(keyValue._1).map(_.index))
+              }.sortWith(_._2 > _._2)
+              (Try(fMap(optionPositions.headOption.map(_._1))), processed._2)
+            } else {
+
+              val excludingKeys = definedValues.tail.map(t => s"'${t._1.key}'").mkString(", ")
+              val msg = s"This option must not be used together with $excludingKeys."
+              val failure = ExtractionFailure(definedValues.head._1, new IllegalArgumentException(msg),
+                processed._2.parameters.parametersMap.get(definedValues.head._1).map(_.head), context)
+              (Failure(ParameterExtractionException(failure)), processed._2)
+            }
           } else {
             (Try(fMap(definedValues.headOption)), processed._2)
           }
+
         case failures =>
           (Failure(ParameterExtractionException(failures)), processed._2)
       }
@@ -1375,7 +1392,7 @@ object ParameterExtractor {
       }
     }
 
-    excluding(optionalSwitches: _*) { opt => opt.map(_._1.key) }
+    excluding(false, optionalSwitches: _*) { opt => opt.map(_._1.key) }
   }
 
   /**
@@ -2165,4 +2182,16 @@ object ParameterExtractor {
       .map(pf => pf andThen (t => Failure[A](t)))
       .map(pf => triedValue recoverWith pf)
       .getOrElse(triedValue)
+
+  /**
+   * Computes the maximum of a list of integer values. Also handles empty
+   * lists. This could be achieved easily with ''maxOption'', but this is not
+   * available in Scala 2.11.
+   *
+   * @param xs the collection
+   * @return the maximum value in this collection
+   */
+  private def maxOpt(xs: Iterable[Int]): Int =
+    if (xs.isEmpty) 0
+    else xs.max
 }
