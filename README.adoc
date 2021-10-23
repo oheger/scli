@@ -309,6 +309,11 @@ This concludes the discussion of the fundamental concepts of the _SCLI_ library.
 Now it is a good time to checkout the link:Tutorial.adoc[tutorial] to see
 practical usage examples.
 
+== Release Notes
+
+Information about the different releases can be found at the
+link:ReleaseNotes.adoc[Release Notes page].
+
 == License
 
 _SCLI_ is available under the http://www.apache.org/licenses/LICENSE-2.0.html[Apache 2.0 License].
