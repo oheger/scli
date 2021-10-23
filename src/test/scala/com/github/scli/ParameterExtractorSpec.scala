@@ -1230,7 +1230,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val finalParameters = generateParameters(2)
     val ext1 = testExtractor(Try(false), context1)
     val ext2 = testExtractor(Try(false), context2, finalParameters)
-    val extractor = excludingSwitches(ext1, ext2)
+    val extractor = excludingSwitches(false, ext1, ext2)
 
     val (result, ctx) = ParameterExtractor.runExtractor(extractor, context1)
     ctx.parameters should be(finalParameters)
@@ -1244,7 +1244,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val ext1 = testExtractor(Try(false), context1)
     val ext2 = testExtractor(Try(true), context2, generateParameters(2),
       ParameterKey(SelectedKey, shortAlias = false))
-    val extractor = excludingSwitches(ext1, ext2)
+    val extractor = excludingSwitches(false, ext1, ext2)
 
     val (result, _) = ParameterExtractor.runExtractor(extractor, context1)
     result should be(Success(Some(SelectedKey)))
@@ -1259,7 +1259,7 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val ext1 = testExtractor(Try(false), context1)
     val ext2 = testExtractor(Failure(switchException): Try[Boolean], context2, generateParameters(2),
       ParameterKey("k2", shortAlias = false))
-    val extractor = excludingSwitches(ext1, ext2)
+    val extractor = excludingSwitches(false, ext1, ext2)
 
     val exception = expectExtractionException(ParameterExtractor.tryExtractor(extractor, context1))
     exception.failures should contain only failure
@@ -1270,11 +1270,23 @@ class ParameterExtractorSpec extends AnyFlatSpec with Matchers with MockitoSugar
     val context2 = extractionContext(NextParameters, reader = context1.reader)
     val ext1 = testExtractor(Try(true), context1)
     val ext2 = testExtractor(Try(true), context2, generateParameters(2), ParameterKey("k2", shortAlias = false))
-    val extractor = excludingSwitches(ext1, ext2)
+    val extractor = excludingSwitches(false, ext1, ext2)
 
     val exception = expectExtractionException(ParameterExtractor.tryExtractor(extractor, context1))
     exception.failures should have size 1
     checkExtractionFailure[IllegalArgumentException](exception.failures.head, expKey = ext2.key)(TestParamKey.key)
+  }
+
+  it should "provide an extractor for excluding switches that allows overriding" in {
+    val Key2 = pk("k2")
+    val params = Parameters(toParamValues(Map(TestParamKey -> List("true"), Key2 -> List("true"))), Set.empty)
+    val context = extractionContext(params)
+    val ext1 = testExtractor(Try(true), context, params)
+    val ext2 = testExtractor(Try(true), context, params, key = Key2)
+    val extractor = excludingSwitches(true, ext1, ext2)
+
+    val (result, _) = ParameterExtractor.runExtractor(extractor, context)
+    result should be(Success(Some(Key2.key)))
   }
 
   it should "check whether all parameters have been consumed" in {

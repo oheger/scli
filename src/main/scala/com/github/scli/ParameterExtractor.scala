@@ -1379,20 +1379,24 @@ object ParameterExtractor {
    * supposed to be switches - only a single one yields a value of '''true'''.
    * The extractor yields the optional key of the option that was set. If one
    * of the passed in extractors yields a ''Failure'', the resulting extractor
-   * fails accordingly; also if multiple of these extractors produce a
-   * '''true''' result.
+   * fails accordingly. The ''allowOverride'' flag determines the outcome if
+   * multiple switches are set on the command line. If '''true''', the switch
+   * appearing on the latest position is selected; so it overrides the others.
+   * If '''false''', this extractor produces a failure result.
    *
+   * @param allowOverride flag to enable the override mode
    * @param switches the switches to be checked to be excluding
    * @return the extractor checking for excluding switches
    */
-  def excludingSwitches(switches: CliExtractor[Try[Boolean]]*): CliExtractor[SingleOptionValue[String]] = {
+  def excludingSwitches(allowOverride: Boolean, switches: CliExtractor[Try[Boolean]]*):
+  CliExtractor[SingleOptionValue[String]] = {
     val optionalSwitches = switches.map { switch =>
       switch.map { result =>
         result.map(flag => if (flag) Some(true) else None)
       }
     }
 
-    excluding(false, optionalSwitches: _*) { opt => opt.map(_._1.key) }
+    excluding(allowOverride, optionalSwitches: _*) { opt => opt.map(_._1.key) }
   }
 
   /**

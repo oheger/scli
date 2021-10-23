@@ -396,14 +396,15 @@ class TransferParameterManagerSpec extends AnyFlatSpecLike with Matchers with Mo
     checkSupportForParameterFiles("-f")
   }
 
-  it should "support overriding the timeout read from a parameter file" in {
-    val paramFile = writeParameterFile(List("--timeout", "30"))
+  it should "support overriding the timeout and log level read from a parameter file" in {
+    val paramFile = writeParameterFile(List("--timeout", "30", "--warn"))
     try {
       val args = inputParameters(http = false) ::: List("--param-file", paramFile.toAbsolutePath.toString,
-        "--timeout", "60")
+        "--timeout", "60", "--info")
 
       val config = extractResult(args)
       config.transferConfig.timeout should be(Some(60.seconds))
+      config.transferConfig.logLevel should be("info")
     } finally {
       Files.delete(paramFile)
     }

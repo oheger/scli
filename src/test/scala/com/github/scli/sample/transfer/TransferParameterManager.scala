@@ -498,7 +498,7 @@ object TransferParameterManager {
     val extLogInfo = switchValue("info", optHelp = Some(HelpLogInfo))
     val extLogWarn = switchValue("warn", optHelp = Some(HelpLogWarn))
     val extLogError = switchValue("error", optHelp = Some(HelpLogError))
-    val extLogLevel = excludingSwitches(extLogDebug, extLogInfo, extLogWarn, extLogError)
+    val extLogLevel = excludingSwitches(true, extLogDebug, extLogInfo, extLogWarn, extLogError)
       .fallbackValue("warn")
       .mandatory
 
