@@ -1512,13 +1512,20 @@ type `SingleOptionValue[String]`. This can take the following values:
   `Success(Some("debug"))`.)
 * If none of the configured switches is present on the command line, result is
   `Success(None)`.
-* If the user specified multiple of the switches that exclude each other,
-  result is a `Failure`; the failure message points to the keys of switches
-  that are not allowed together.
+* If the user specified multiple of the switches that exclude each other, the
+  result depends on the additional _allowOverride_ parameter accepted by
+  `excludingSwitches()`, which is analogous to the equally named parameter
+  described under <<Extracting a single string option value>>:
+  - If this flag is *false*, result is a `Failure`; so this is actually a hard
+    exclusion. The failure message points to the keys of switches that are not
+    allowed together.
+  - If this flag is *true*, the result corresponds to the switch that occurs at
+    the latest position on the command line; so this switch overrides the
+    others.
 
 The _transfer_ demo application implements exactly this use case with switches
 for log levels. Here is the code that defines the different switches and
-applies the exclusion criteria:
+applies the exclusion criteria; note that overrides are allowed:
 
 [source,scala]
 ----
@@ -1526,7 +1533,7 @@ val extLogDebug = switchValue("debug", optHelp = Some(HelpLogDebug))
 val extLogInfo = switchValue("info", optHelp = Some(HelpLogInfo))
 val extLogWarn = switchValue("warn", optHelp = Some(HelpLogWarn))
 val extLogError = switchValue("error", optHelp = Some(HelpLogError))
-val extLogLevel = excludingSwitches(extLogDebug, extLogInfo, extLogWarn, extLogError)
+val extLogLevel = excludingSwitches(true, extLogDebug, extLogInfo, extLogWarn, extLogError)
   .fallbackValue("warn")
   .mandatory
 ----
@@ -1542,11 +1549,20 @@ line options. SCLI therefore offers a generic function, `excluding()` to deal
 with this topic. (In fact, `excludingSwitches()` is implemented on top of this
 function.) `excluding()` expects an arbitrary number of extractors of type
 `SingleOptionValue[A]` for a generic type `A`. In addition, it requires a
-mapping function to produce the final result type. The function checks whether
-at most one of the configured extractors yields a defined value. If so, it
-invokes the mapping function with the value and the key of the producing
-extractor (or `None` if no value at all is found). If there are multiple
-values, however, it produces a failure.
+mapping function to produce the final result type. The _allowOverride_ flag is
+supported as well; however, overriding works only if all the excluding
+extractors passed to the function can be associated with specific elements on
+the command line. This is the case for primitive extractors, but not
+necessarily for complex ones with conditional logic or that combine the values
+of multiple other options. In this case, the concept of a last option on the
+command line is undefined; therefore, an override is not possible.
+
+The generic `excluding()` function checks whether at most one of the configured
+extractors yields a defined value or if overriding is enabled and can be
+applied. If so, it invokes the mapping function with the selected value and the
+key of the producing extractor (or `None` if no value at all is found). Result
+is again a failure, if there are multiple values and _allowOverride_ is
+*false* or overriding is not possible.
 
 === Generating help
 
