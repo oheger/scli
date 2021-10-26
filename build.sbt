@@ -35,7 +35,7 @@ lazy val testDependencies = Seq(
 
 lazy val SCli = (project in file("."))
   .settings(
-    version := "1.1.0-SNAPSHOT",
+    version := "1.1.0",
     scalaVersion := VersionScala213,
     crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= testDependencies,
